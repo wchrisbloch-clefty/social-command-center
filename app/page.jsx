@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, X, TrendingUp, Users, Sparkles, RefreshCw, Brain, Hash, Filter, Search, Sun, Moon, Layers, ChevronRight, BookmarkPlus } from "lucide-react";
 
