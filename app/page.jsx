@@ -737,7 +737,8 @@ export default function SocialCommandCenter() {
   const hero = sorted[0];
   const rest = sorted.slice(1);
   const filterTerm = globalSearch.trim().toLowerCase() || activeFilter?.toLowerCase() || null;
-  const filteredRest = filterTerm ? rest.filter(p=>p.buzzwords?.some(b=>b.toLowerCase()===filterTerm)||p.content.toLowerCase().includes(filterTerm)) : rest;
+  const postMatchesFilter = (p, term) => !term || p.buzzwords?.some(b=>b.toLowerCase()===term) || p.content.toLowerCase().includes(term) || p.author.toLowerCase().includes(term);
+  const filteredRest = filterTerm ? rest.filter(p=>postMatchesFilter(p,filterTerm)) : rest;
 
   const handleFilter = (word) => { setActiveFilter(prev=>prev===word?null:word); setGlobalSearch(""); };
   const switchTab = (tab) => { setActiveTab(tab); setActiveFilter(null); setGlobalSearch(""); };
@@ -913,7 +914,7 @@ export default function SocialCommandCenter() {
                       <button onClick={()=>{setActiveFilter(null);setGlobalSearch("");}} style={{ fontSize:11, color:cfg.color, background:"none", border:"none", cursor:"pointer", textDecoration:"underline" }}>Clear filter</button>
                     </div>
                   ) : (
-                    (filterTerm ? sorted.filter(p=>p.buzzwords?.some(b=>b.toLowerCase()===filterTerm)||p.content.toLowerCase().includes(filterTerm)) : filteredRest)
+                    (filterTerm ? sorted.filter(p=>postMatchesFilter(p,filterTerm)) : filteredRest)
                       .map(post=><PostCard key={post.id} post={post} platform={activeTab} activeFilter={activeFilter||globalSearch||null} t={t} onBookmark={toggleBookmark} bookmarked={bookmarks.some(b=>b.id===post.id)}/>)
                   )}
                 </>
