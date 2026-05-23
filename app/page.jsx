@@ -885,7 +885,7 @@ export default function SocialCommandCenter() {
             <div>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
                 <span style={{ fontSize:13, fontWeight:700, color:t.text }}>Inner Circle · <span style={{ color:cfg.color }}>{activeTab}</span></span>
-                <span style={{ fontSize:10, color:t.textSub, display:"flex", alignItems:"center", gap:4 }}><Clock size:9/> Updated just now · {circle[activeTab]?.length||0} accounts</span>
+                <span style={{ fontSize:10, color:t.textSub, display:"flex", alignItems:"center", gap:4 }}><Clock size={9}/> Updated just now · {circle[activeTab]?.length||0} accounts</span>
               </div>
 
               {filterTerm && (
