@@ -4,12 +4,12 @@ export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return Response.json({ text: "API key not configured. Add GEMINI_API_KEY in Vercel settings.", error: true }, { status: 500 });
+    return Response.json({ text: "API key not configured. Add GEMINI_API_KEY in Vercel settings." }, { status: 500 });
   }
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -24,7 +24,17 @@ export async function POST(request) {
     );
 
     const data = await res.json();
+
+    if (!res.ok || data.error) {
+      const errMsg = data?.error?.message || "Gemini API error";
+      return Response.json({ text: `Error: ${errMsg}` }, { status: 500 });
+    }
+
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    if (!text) {
+      return Response.json({ text: `No response from Gemini. Reason: ${data?.promptFeedback?.blockReason || "unknown"}` });
+    }
 
     if (type === "handle") {
       try {
@@ -37,7 +47,8 @@ export async function POST(request) {
     }
 
     return Response.json({ text });
+
   } catch (err) {
-    return Response.json({ text: "Request failed. Please try again.", error: true }, { status: 500 });
+    return Response.json({ text: `Connection failed: ${err.message}` }, { status: 500 });
   }
 }
