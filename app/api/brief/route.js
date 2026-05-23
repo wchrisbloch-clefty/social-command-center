@@ -9,7 +9,7 @@ export async function POST(request) {
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -26,14 +26,13 @@ export async function POST(request) {
     const data = await res.json();
 
     if (!res.ok || data.error) {
-      const errMsg = data?.error?.message || "Gemini API error";
-      return Response.json({ text: `Error: ${errMsg}` }, { status: 500 });
+      return Response.json({ text: `Error: ${data?.error?.message || "Gemini API error"}` }, { status: 500 });
     }
 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!text) {
-      return Response.json({ text: `No response from Gemini. Reason: ${data?.promptFeedback?.blockReason || "unknown"}` });
+      return Response.json({ text: `Blocked: ${data?.promptFeedback?.blockReason || "unknown reason"}` });
     }
 
     if (type === "handle") {
