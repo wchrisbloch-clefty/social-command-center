@@ -1,53 +1,120 @@
-export async function POST(request) {
-  const body = await request.json();
-  const { prompt, type } = body;
-  const apiKey = process.env.GEMINI_API_KEY;
+// app/api/brief/route.js — AetherHub Social Intelligence Brief API
+// Providers: Groq (free) → Gemini (free) → Claude (paid)
+// Env vars: GROQ_API_KEY, GOOGLE_AI_KEY (or GEMINI_API_KEY), ANTHROPIC_API_KEY
 
-  if (!apiKey) {
-    return Response.json({ text: "API key not configured. Add GEMINI_API_KEY in Vercel settings." }, { status: 500 });
-  }
-
+async function tryGroq(prompt, maxTokens) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.4,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content?.trim() || null;
+  } catch { return null; }
+}
+
+async function tryGemini(prompt, maxTokens) {
+  const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: type === "handle" ? 150 : 350,
-            temperature: type === "handle" ? 0.1 : 0.7,
-          },
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.5 },
         }),
+        signal: AbortSignal.timeout(10000),
       }
     );
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+  } catch { return null; }
+}
 
-    const data = await res.json();
+async function tryClaude(prompt, maxTokens) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.content?.[0]?.text?.trim() || null;
+  } catch { return null; }
+}
 
-    if (!res.ok || data.error) {
-      return Response.json({ text: `Error: ${data?.error?.message || "Gemini API error"}` }, { status: 500 });
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { prompt, type } = body;
+
+    if (!prompt) {
+      return Response.json({ text: 'No prompt provided.' }, { status: 400 });
     }
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const maxTokens = type === 'handle' ? 150 : type === 'digest' ? 300 : 400;
 
-    if (!text) {
-      return Response.json({ text: `Blocked: ${data?.promptFeedback?.blockReason || "unknown reason"}` });
-    }
-
-    if (type === "handle") {
-      try {
-        const clean = text.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
-        return Response.json({ handles: parsed });
-      } catch {
-        return Response.json({ handles: {} });
+    for (const { name, fn } of [
+      { name: 'Groq',   fn: tryGroq   },
+      { name: 'Gemini', fn: tryGemini },
+      { name: 'Claude', fn: tryClaude },
+    ]) {
+      const result = await fn(prompt, maxTokens);
+      if (result) {
+        if (type === 'handle') {
+          try {
+            const clean = result.replace(/```json|```/g, '').trim();
+            return Response.json({ handles: JSON.parse(clean), provider: name });
+          } catch {
+            return Response.json({ handles: {}, provider: name });
+          }
+        }
+        return Response.json({ text: result, provider: name });
       }
     }
 
-    return Response.json({ text });
+    const configured = [
+      process.env.GROQ_API_KEY && 'Groq',
+      (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY) && 'Gemini',
+      process.env.ANTHROPIC_API_KEY && 'Claude',
+    ].filter(Boolean);
 
-  } catch (err) {
-    return Response.json({ text: `Connection failed: ${err.message}` }, { status: 500 });
+    if (!configured.length) {
+      return Response.json({
+        text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_KEY in Vercel → Settings → Environment Variables.',
+      }, { status: 500 });
+    }
+    return Response.json({
+      text: `All providers failed (tried: ${configured.join(', ')}). Please retry.`,
+    }, { status: 502 });
+
+  } catch {
+    return Response.json({ error: 'Bad request body' }, { status: 400 });
   }
 }
