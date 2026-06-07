@@ -190,13 +190,27 @@ function postsForFilter(filter) {
 
 // ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
 function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
-  const cfg = PLAT[platform] || PLAT.LinkedIn;
-  const sig = sigColor(post.signal);
-  const bk  = bookmarks?.some(b => b.id === post.id);
+  const [expanded, setExpanded] = useState(false);
+  const [copied,   setCopied]   = useState(false);
+  const cfg    = PLAT[platform] || PLAT.LinkedIn;
+  const sig    = sigColor(post.signal);
+  const bk     = bookmarks?.some(b => b.id === post.id);
+  const isLong = post.content.length > 160;
+
+  const displayContent = compact
+    ? post.content.slice(0,110)+'…'
+    : expanded ? post.content : post.content.slice(0,160)+(isLong?'':'' );
+
+  const copyText = () => {
+    navigator.clipboard?.writeText(`@${post.author} on ${platform}:\n\n${post.content}`);
+    setCopied(true); setTimeout(()=>setCopied(false), 2000);
+  };
+
   return (
-    <div style={{ borderRadius:14, padding:compact?'10px 12px':'14px 16px', border:`1px solid ${t.border}`, background:t.glass, marginBottom:7, transition:'all 0.18s', cursor:'default' }}
+    <div style={{ borderRadius:14, padding:compact?'10px 12px':'14px 16px', border:`1px solid ${t.border}`, background:t.glass, marginBottom:7, transition:'all 0.18s' }}
       onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg.border; e.currentTarget.style.background=t.raised; }}
       onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.glass; }}>
+      {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <div style={{ width:30, height:30, borderRadius:9, background:cfg.bg, border:`1px solid ${cfg.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color, flexShrink:0 }}>
@@ -205,6 +219,7 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:5 }}>
               <span style={{ color:cfg.color }}>{cfg.icon}</span>@{post.author}
+              <span style={{ fontSize:9, fontWeight:600, padding:'1px 5px', borderRadius:4, background:cfg.bg, color:cfg.color }}>{platform}</span>
             </div>
             <div style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
               <Clock size={9}/>{post.time} · <span style={{ color:cfg.color }}>{post.eng}</span>
@@ -221,13 +236,33 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
           )}
         </div>
       </div>
-      <p style={{ fontSize:12, lineHeight:1.6, color:t.text, marginBottom:7 }}>
-        {compact ? post.content.slice(0,100)+'…' : post.content.slice(0,180)+(post.content.length>180?'…':'')}
+
+      {/* Content */}
+      <p style={{ fontSize:12, lineHeight:1.65, color:t.text, marginBottom:compact?6:8 }}>
+        {displayContent}{isLong && !expanded && !compact ? '…' : ''}
       </p>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-        {post.bw?.slice(0,3).map((w,i)=>(
-          <span key={i} style={{ fontSize:10, padding:'2px 7px', borderRadius:5, fontWeight:600, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>{w}</span>
-        ))}
+
+      {/* Expand / collapse */}
+      {!compact && isLong && (
+        <button onClick={()=>setExpanded(e=>!e)}
+          style={{ fontSize:10, fontWeight:700, color:cfg.color, background:'none', border:'none', cursor:'pointer', padding:'0 0 6px 0', display:'flex', alignItems:'center', gap:3 }}>
+          {expanded ? <>↑ Show less</> : <>↓ Read full post</>}
+        </button>
+      )}
+
+      {/* Tags + actions */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:6 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+          {post.bw?.slice(0,3).map((w,i)=>(
+            <span key={i} style={{ fontSize:10, padding:'2px 7px', borderRadius:5, fontWeight:600, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>#{w}</span>
+          ))}
+        </div>
+        {!compact && (
+          <button onClick={copyText}
+            style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:600, padding:'3px 8px', borderRadius:7, border:`1px solid ${t.border}`, background:t.glass, color:copied?'#10B981':t.textSub, cursor:'pointer', transition:'color 0.2s', flexShrink:0 }}>
+            {copied?<Check size={9}/>:<Copy size={9}/>}{copied?'Copied!':'Copy post'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -518,7 +553,7 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
-function FeedView({ t, activeFilter, setActiveFilter, onNav }) {
+function FeedView({ t, activeFilter, setActiveFilter, onNav, isMobile }) {
   const [bookmarks,   setBookmarks]   = useState([]);
   const [activeTopic, setActiveTopic] = useState(null);
   const [liveStats,   setLiveStats]   = useState({ reach:2410000, mentions:4782, active:31 });
@@ -546,13 +581,11 @@ function FeedView({ t, activeFilter, setActiveFilter, onNav }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-      {/* Live indicator */}
       <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'rgba(16,185,129,0.07)', border:'1px solid rgba(16,185,129,0.18)', width:'fit-content' }}>
         <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
         <span style={{ fontSize:11, fontWeight:600, color:'#10B981' }}>LIVE · {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active</span>
       </div>
 
-      {/* Topic cards */}
       <div>
         <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Your Topics — click to filter</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:10 }}>
@@ -562,7 +595,6 @@ function FeedView({ t, activeFilter, setActiveFilter, onNav }) {
         </div>
       </div>
 
-      {/* Active filter */}
       {filterKey && (
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ fontSize:11, color:t.textSub }}>Showing:</span>
@@ -574,8 +606,7 @@ function FeedView({ t, activeFilter, setActiveFilter, onNav }) {
         </div>
       )}
 
-      {/* Two-column layout */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:16 }}>
         <div>
           <MorningDigest t={t}/>
           <div style={{ marginTop:16 }}>
@@ -644,7 +675,6 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
-      {/* Search */}
       <div style={{ position:'relative' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 18px', borderRadius:14, border:`1px solid ${query?'#6366F1':t.borderMid}`, background:t.card, transition:'all 0.2s', boxShadow:query?'0 0 0 3px rgba(99,102,241,0.1)':'none' }}>
           <Search size={18} style={{ color:query?'#6366F1':t.textSub, flexShrink:0 }}/>
@@ -654,8 +684,6 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
           {searching && <RefreshCw size={14} style={{ color:t.textSub, animation:'spin 1s linear infinite', flexShrink:0 }}/>}
           {query && !searching && <button onClick={()=>{setQuery('');setResults(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub, display:'flex' }}><X size={14}/></button>}
         </div>
-
-        {/* Results dropdown */}
         {results !== null && query && (
           <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, right:0, borderRadius:14, background:t.surface, border:`1px solid ${t.borderMid}`, boxShadow:'0 20px 60px rgba(0,0,0,0.45)', zIndex:50, padding:18 }}>
             <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:12 }}>
@@ -670,8 +698,7 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
                       style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'7px 13px', borderRadius:20, border:`1px solid ${cfg?.border||t.border}`, background:cfg?.bg||t.glass, color:cfg?.color||t.text, cursor:'pointer', transition:'all 0.15s' }}
                       onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
                       onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      {cfg?.icon}
-                      {item.tag}
+                      {cfg?.icon}{item.tag}
                       <span style={{ fontSize:10, color:'#10B981', fontWeight:700 }}>{item.d}</span>
                       {item.v!=='—' && <span style={{ fontSize:10, color:t.textSub }}>{item.v}</span>}
                     </button>
@@ -685,7 +712,6 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
         )}
       </div>
 
-      {/* Platform filter pills */}
       <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
         <button onClick={()=>setActivePlat('all')} style={{ fontSize:11, fontWeight:700, padding:'6px 14px', borderRadius:20, cursor:'pointer', border:`1px solid ${activePlat==='all'?'#6366F1':t.border}`, background:activePlat==='all'?'rgba(99,102,241,0.12)':t.glass, color:activePlat==='all'?'#818CF8':t.textSub }}>
           All Platforms
@@ -697,7 +723,6 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
         ))}
       </div>
 
-      {/* Trending grid */}
       <div>
         <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
           <TrendingUp size={14} style={{ color:'#EF4444' }}/>
@@ -726,7 +751,6 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
         </div>
       </div>
 
-      {/* Topic exploration */}
       <div>
         <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
           <Layers size={14} style={{ color:'#6366F1' }}/>Explore by Topic Area
@@ -780,10 +804,10 @@ function IntelligenceView({ t }) {
   );
 }
 
-function StudioView({ t }) {
+function StudioView({ t, isMobile }) {
   const [generating, setGenerating] = useState(false);
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:16 }}>
+    <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 300px', gap:16 }}>
       <div>
         <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
           <Flame size={14} style={{ color:'#F59E0B' }}/>Top Performing Content — All Platforms
@@ -856,20 +880,26 @@ function AlertsView({ t }) {
       {filtered.map(alert=>{
         const s=sevStyle(alert.sev);
         return (
-          <div key={alert.id} style={{ borderRadius:14, padding:'14px 16px', background:alert.read?t.glass:s.bg, border:`1px solid ${alert.read?t.border:s.border}`, display:'flex', gap:12, alignItems:'flex-start' }}>
-            <div style={{ width:32, height:32, borderRadius:9, background:s.bg, border:`1px solid ${s.border}`, display:'flex', alignItems:'center', justifyContent:'center', color:s.color, flexShrink:0 }}>{s.icon}</div>
+          <div key={alert.id} style={{ borderRadius:14, padding:'14px 16px', background:alert.read?t.glass:s.bg, border:`1px solid ${alert.read?t.border:s.border}`, display:'flex', gap:12, alignItems:'flex-start', opacity:alert.read?0.5:1, transition:'opacity 0.3s, background 0.3s, border-color 0.3s' }}>
+            <div style={{ width:32, height:32, borderRadius:9, background:alert.read?t.glass:s.bg, border:`1px solid ${alert.read?t.border:s.border}`, display:'flex', alignItems:'center', justifyContent:'center', color:alert.read?t.textSub:s.color, flexShrink:0, transition:'all 0.3s' }}>
+              {alert.read ? <Check size={13}/> : s.icon}
+            </div>
             <div style={{ flex:1 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, flexWrap:'wrap' }}>
                 <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:4, background:s.bg, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{alert.sev}</span>
                 {alert.plat!=='all'&&PLAT[alert.plat]&&<span style={{ color:PLAT[alert.plat].color, display:'flex', alignItems:'center', gap:3, fontSize:10 }}>{PLAT[alert.plat].icon}{alert.plat}</span>}
                 {!alert.read&&<div style={{ width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>}
+                {alert.read&&<span style={{ fontSize:9, color:t.textSub, fontStyle:'italic' }}>read</span>}
               </div>
               <p style={{ fontSize:12, lineHeight:1.55, color:alert.read?t.textSub:t.text, marginBottom:4 }}>{alert.msg}</p>
               <span style={{ fontSize:10, color:t.textMuted, display:'flex', alignItems:'center', gap:3 }}><Clock size={9}/>{alert.time}</span>
             </div>
             <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-              {!alert.read&&<button onClick={()=>markRead(alert.id)} style={{ fontSize:10, padding:'4px 8px', borderRadius:7, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)', cursor:'pointer' }}>Read</button>}
-              <button onClick={()=>dismiss(alert.id)} style={{ padding:'4px 6px', borderRadius:7, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex' }}><X size={11}/></button>
+              {!alert.read
+                ? <button onClick={()=>markRead(alert.id)} style={{ fontSize:10, fontWeight:700, padding:'5px 10px', borderRadius:7, background:'rgba(16,185,129,0.15)', color:'#10B981', border:'1px solid rgba(16,185,129,0.35)', cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}><Check size={10}/>Mark Read</button>
+                : <span style={{ fontSize:10, color:'#10B981', display:'flex', alignItems:'center', gap:3, padding:'5px 8px' }}><Check size={10}/>Done</span>
+              }
+              <button onClick={()=>dismiss(alert.id)} style={{ padding:'5px 7px', borderRadius:7, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex' }}><X size={11}/></button>
             </div>
           </div>
         );
@@ -951,12 +981,12 @@ function SourcesView({ t, circle, setCircle }) {
   );
 }
 
-function SettingsView({ t, dark, onDark }) {
+function SettingsView({ t, dark, onDark, isMobile }) {
   const [notif, setNotif] = useState({ spikes:true, sentiment:true, growth:false });
   const [saved, setSaved] = useState(false);
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, maxWidth:780 }}>
+    <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:16, maxWidth:780 }}>
       <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:20 }}>
         <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
           <Key size={14} style={{ color:'#6366F1' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>AI API Keys</span>
@@ -1018,7 +1048,6 @@ function SettingsView({ t, dark, onDark }) {
 function TopNav({ view, onNav, dark, onDark, t, alertCount, isMobile }) {
   return (
     <div style={{ height:isMobile?52:58, background:t.navBg, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:`1px solid ${t.border}`, display:'flex', alignItems:'center', paddingLeft:isMobile?14:22, paddingRight:isMobile?14:18, gap:10, flexShrink:0, position:'sticky', top:0, zIndex:100 }}>
-      {/* Logo */}
       <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, marginRight:6 }}>
         <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#6366F1,#22D3EE)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Zap size={14} color="#fff" fill="#fff"/>
@@ -1027,8 +1056,6 @@ function TopNav({ view, onNav, dark, onDark, t, alertCount, isMobile }) {
           AetherHub
         </span>
       </div>
-
-      {/* Desktop tabs */}
       {!isMobile && (
         <nav style={{ display:'flex', gap:1, flex:1, overflow:'hidden' }}>
           {NAV_TABS.map(tab=>{
@@ -1045,10 +1072,7 @@ function TopNav({ view, onNav, dark, onDark, t, alertCount, isMobile }) {
           })}
         </nav>
       )}
-
       {isMobile && <div style={{ flex:1 }}/>}
-
-      {/* Right controls */}
       <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
         {alertCount>0&&(
           <button onClick={()=>onNav('alerts')} style={{ position:'relative', padding:7, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
@@ -1111,9 +1135,7 @@ export default function AetherHub() {
       <TopNav view={view} onNav={setView} dark={dark} onDark={()=>setDark(d=>!d)} t={t} alertCount={unreadAlerts} isMobile={isMobile}/>
 
       <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
-        {/* Main content */}
         <main style={{ flex:1, overflowY:'auto', padding:isMobile?'16px 14px':'22px 26px' }}>
-          {/* Page header */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
             <div>
               <h1 style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:isMobile?17:20, fontWeight:800, color:t.text, margin:0, letterSpacing:'-0.02em' }}>{viewLabel[view]||'Feed'}</h1>
@@ -1126,16 +1148,15 @@ export default function AetherHub() {
             )}
           </div>
 
-          {view==='feed'         && <FeedView         t={t} activeFilter={activeFilter} setActiveFilter={setActiveFilter} onNav={setView}/>}
+          {view==='feed'         && <FeedView         t={t} activeFilter={activeFilter} setActiveFilter={setActiveFilter} onNav={setView} isMobile={isMobile}/>}
           {view==='discover'     && <DiscoverView     t={t} setActiveFilter={setActiveFilter} onNav={setView}/>}
           {view==='intelligence' && <IntelligenceView t={t}/>}
-          {view==='studio'       && <StudioView       t={t}/>}
+          {view==='studio'       && <StudioView       t={t} isMobile={isMobile}/>}
           {view==='alerts'       && <AlertsView       t={t}/>}
           {view==='sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
-          {view==='settings'     && <SettingsView     t={t} dark={dark} onDark={()=>setDark(d=>!d)}/>}
+          {view==='settings'     && <SettingsView     t={t} dark={dark} onDark={()=>setDark(d=>!d)} isMobile={isMobile}/>}
         </main>
 
-        {/* Right intelligence panel */}
         {(showPanel||panelOpen) && (
           <aside style={{ width:280, minWidth:280, borderLeft:`1px solid ${t.border}`, overflowY:'auto', padding:'18px 14px', flexShrink:0, position:panelOpen&&!showPanel?'absolute':'relative', right:0, top:0, bottom:0, background:t.bg, zIndex:panelOpen&&!showPanel?50:undefined }}>
             {panelOpen&&!showPanel&&(
