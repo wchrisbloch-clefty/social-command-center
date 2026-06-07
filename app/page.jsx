@@ -1,53 +1,46 @@
 'use client';
-// AetherHub v1.0 — Elite Social Intelligence & Growth Command Center
+// AetherHub v2.0 — Elite Trend Intelligence & Content Discovery Platform
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  LayoutDashboard, Globe, Users, TrendingUp, FileText, Bell,
-  BarChart2, Settings, ChevronLeft, ChevronRight, Search, Sun, Moon,
-  Zap, Bookmark, BookmarkCheck, Plus, Trash2, X, Sparkles, RefreshCw,
-  Brain, Hash, Filter, Clock, ArrowUpRight, ArrowDownRight, Activity,
-  Eye, Heart, Share2, AlertTriangle, CheckCircle, Info, Target, Rocket,
-  ChevronDown, MoreHorizontal, Download, Key, Palette, Star, Flame,
-  BellRing, Check,
+  Search, Sun, Moon, Zap, Bookmark, BookmarkCheck, Plus, Trash2, X,
+  Sparkles, RefreshCw, Brain, Hash, Clock, ArrowUpRight, ArrowDownRight,
+  Activity, AlertTriangle, CheckCircle, Info, Target, Rocket, Download,
+  Key, Palette, Star, Flame, BellRing, Check, Bell, Settings, TrendingUp,
+  BarChart2, FileText, Link, Copy, ChevronRight, Globe, Eye, Users,
+  Heart, Filter, Menu, Compass, MoreHorizontal, Play, BookOpen, Layers,
 } from 'lucide-react';
 
-// ─── THEME ─────────────────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
   dark: {
-    bg:'#08080F', surface:'#0F0F1A', raised:'#161625', card:'#13131F',
-    border:'rgba(255,255,255,0.06)', borderMid:'rgba(255,255,255,0.11)',
-    text:'#F0F0FA', textSub:'#6B6B8A', textMuted:'#2E2E4A',
-    glass:'rgba(255,255,255,0.03)', glassBorder:'rgba(255,255,255,0.07)',
-    sidebarBg:'#09090F', sidebarBorder:'rgba(255,255,255,0.05)',
+    bg:'#06060F', surface:'#0B0B1A', raised:'#0F0F26', card:'#0D0D20',
+    border:'rgba(255,255,255,0.05)', borderMid:'rgba(255,255,255,0.09)', borderHigh:'rgba(255,255,255,0.16)',
+    text:'#EAEAFF', textSub:'#5C5C80', textMuted:'#21213F',
+    glass:'rgba(255,255,255,0.025)', glassBorder:'rgba(255,255,255,0.06)',
+    navBg:'rgba(6,6,15,0.9)',
+    accent:'#6366F1', accentSub:'rgba(99,102,241,0.12)', accentBorder:'rgba(99,102,241,0.28)',
   },
   light: {
-    bg:'#F4F5FB', surface:'#FFFFFF', raised:'#F8F9FE', card:'#FFFFFF',
-    border:'rgba(0,0,0,0.07)', borderMid:'rgba(0,0,0,0.12)',
-    text:'#0F0F1E', textSub:'#64647A', textMuted:'#B0B0C8',
-    glass:'rgba(0,0,0,0.02)', glassBorder:'rgba(0,0,0,0.06)',
-    sidebarBg:'#FFFFFF', sidebarBorder:'rgba(0,0,0,0.06)',
+    bg:'#ECEEF8', surface:'#FFFFFF', raised:'#F4F4FC', card:'#FFFFFF',
+    border:'rgba(0,0,0,0.055)', borderMid:'rgba(0,0,0,0.09)', borderHigh:'rgba(0,0,0,0.15)',
+    text:'#0D0D1E', textSub:'#585878', textMuted:'#ABABCB',
+    glass:'rgba(0,0,0,0.015)', glassBorder:'rgba(0,0,0,0.05)',
+    navBg:'rgba(236,238,248,0.92)',
+    accent:'#6366F1', accentSub:'rgba(99,102,241,0.08)', accentBorder:'rgba(99,102,241,0.22)',
   },
 };
 
-// ─── PLATFORM CONFIG ───────────────────────────────────────────────────────────
+// ─── PLATFORM CONFIG ──────────────────────────────────────────────────────────
 const PLAT = {
-  LinkedIn:  { color:'#2D88FF', glow:'rgba(45,136,255,0.25)',  bg:'rgba(45,136,255,0.08)',  border:'rgba(45,136,255,0.2)',  icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg> },
-  X:         { color:'#E8EAF0', glow:'rgba(232,234,240,0.15)', bg:'rgba(232,234,240,0.06)', border:'rgba(232,234,240,0.14)', icon:<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.713 5.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
-  Instagram: { color:'#F0609E', glow:'rgba(240,96,158,0.25)',  bg:'rgba(240,96,158,0.07)',  border:'rgba(240,96,158,0.18)', icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg> },
-  YouTube:   { color:'#FF4444', glow:'rgba(255,68,68,0.2)',    bg:'rgba(255,68,68,0.07)',   border:'rgba(255,68,68,0.18)',  icon:<svg width="14" height="10" viewBox="0 0 24 17" fill="currentColor"><path d="M23.495 2.205a3.02 3.02 0 0 0-2.122-2.136C19.505 0 12 0 12 0s-7.505 0-9.374.069A3.02 3.02 0 0 0 .505 2.205 31.247 31.247 0 0 0 0 8.465a31.247 31.247 0 0 0 .505 6.26 3.02 3.02 0 0 0 2.121 2.136C4.495 17 12 17 12 17s7.505 0 9.373-.069a3.02 3.02 0 0 0 2.122-2.136A31.247 31.247 0 0 0 24 8.465a31.247 31.247 0 0 0-.505-6.26zM9.609 12.093V4.837l6.264 3.628-6.264 3.628z"/></svg> },
-  TikTok:    { color:'#69C9D0', glow:'rgba(105,201,208,0.2)',  bg:'rgba(105,201,208,0.07)', border:'rgba(105,201,208,0.18)',icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.94a8.24 8.24 0 0 0 4.83 1.55V7.04a4.85 4.85 0 0 1-1.06-.35z"/></svg> },
+  LinkedIn:  { color:'#2D88FF', glow:'rgba(45,136,255,0.22)',  bg:'rgba(45,136,255,0.07)',  border:'rgba(45,136,255,0.18)',  icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg> },
+  X:         { color:'#E8EAF0', glow:'rgba(232,234,240,0.12)', bg:'rgba(232,234,240,0.05)', border:'rgba(232,234,240,0.12)', icon:<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.713 5.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
+  Instagram: { color:'#F0609E', glow:'rgba(240,96,158,0.22)',  bg:'rgba(240,96,158,0.07)',  border:'rgba(240,96,158,0.17)', icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg> },
+  YouTube:   { color:'#FF4444', glow:'rgba(255,68,68,0.18)',   bg:'rgba(255,68,68,0.06)',   border:'rgba(255,68,68,0.16)',  icon:<svg width="14" height="10" viewBox="0 0 24 17" fill="currentColor"><path d="M23.495 2.205a3.02 3.02 0 0 0-2.122-2.136C19.505 0 12 0 12 0s-7.505 0-9.374.069A3.02 3.02 0 0 0 .505 2.205 31.247 31.247 0 0 0 0 8.465a31.247 31.247 0 0 0 .505 6.26 3.02 3.02 0 0 0 2.121 2.136C4.495 17 12 17 12 17s7.505 0 9.373-.069a3.02 3.02 0 0 0 2.122-2.136A31.247 31.247 0 0 0 24 8.465a31.247 31.247 0 0 0-.505-6.26zM9.609 12.093V4.837l6.264 3.628-6.264 3.628z"/></svg> },
+  TikTok:    { color:'#69C9D0', glow:'rgba(105,201,208,0.18)', bg:'rgba(105,201,208,0.06)', border:'rgba(105,201,208,0.16)',icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.94a8.24 8.24 0 0 0 4.83 1.55V7.04a4.85 4.85 0 0 1-1.06-.35z"/></svg> },
 };
 
-// ─── MOCK DATA ─────────────────────────────────────────────────────────────────
-const KPIS = [
-  { id:'reach',  label:'Total Reach',     value:'2.41M',  delta:'+12.3%', pos:true,  color:'#6366F1', spark:[180,220,195,280,310,290,340,380,420,390,450,490] },
-  { id:'eng',    label:'Engagement Rate', value:'4.7%',   delta:'+0.8%',  pos:true,  color:'#22D3EE', spark:[3.8,4.1,3.9,4.3,4.5,4.2,4.6,4.4,4.8,4.7,4.9,4.7] },
-  { id:'follow', label:'New Followers',   value:'+1,247', delta:'+18.2%', pos:true,  color:'#10B981', spark:[820,950,1100,980,1300,1250,1400,1200,1350,1500,1380,1600] },
-  { id:'sent',   label:'Sentiment Score', value:'87/100', delta:'+3pts',  pos:true,  color:'#F59E0B', spark:[78,80,82,79,84,83,85,84,86,85,87,87] },
-];
-
-const GROWTH_DATA = [1820,1950,2100,1980,2300,2450,2600,2900,3100,2950,3200,3500,3800,4100,4350,4600,4900,5100,4950,5300,5600,5900,6200,6500,6800,7100,7400,7800,8200,8700];
-
+// ─── MOCK DATA ────────────────────────────────────────────────────────────────
 const MOCK_POSTS = {
   LinkedIn: [
     { id:'li1', author:'satyanadella',  time:'1h',  signal:'high',   velocity:'+340%', bw:['AI','productivity','Microsoft'],  eng:'4.2K reactions', content:"The next wave of productivity isn't about doing more — it's about deciding better. We're embedding AI reasoning directly into every workflow at Microsoft." },
@@ -84,28 +77,50 @@ const TRENDING = {
 };
 
 const ALERTS = [
-  { id:'a1', type:'spike',    sev:'critical', msg:'@lexfridman post gaining +890% velocity on YouTube — viral opportunity window open now',           time:'2m ago',  plat:'YouTube',  read:false },
-  { id:'a2', type:'mention',  sev:'high',     msg:'Keyword "AI strategy" spiking +61% on X — 22.8K mentions in last hour',                           time:'8m ago',  plat:'X',        read:false },
-  { id:'a3', type:'follower', sev:'high',     msg:'Follower growth rate up 18.2% vs 7-day average — maintain current posting cadence',                time:'15m ago', plat:'all',      read:false },
-  { id:'a4', type:'negative', sev:'medium',   msg:'Sentiment dip detected on Instagram (-3pts) — monitor comments on recent posts',                   time:'1h ago',  plat:'Instagram',read:true  },
-  { id:'a5', type:'trend',    sev:'medium',   msg:'#BuildInPublic trending +44% on X — consider engaging with this hashtag today',                    time:'2h ago',  plat:'X',        read:true  },
-  { id:'a6', type:'spike',    sev:'low',      msg:'LinkedIn engagement rate above baseline for the 5th consecutive day',                              time:'3h ago',  plat:'LinkedIn', read:true  },
+  { id:'a1', sev:'critical', msg:'@lexfridman post gaining +890% velocity on YouTube — viral opportunity window open now', time:'2m ago',  plat:'YouTube',  read:false },
+  { id:'a2', sev:'high',     msg:'Keyword "AI strategy" spiking +61% on X — 22.8K mentions in last hour',                time:'8m ago',  plat:'X',        read:false },
+  { id:'a3', sev:'high',     msg:'Follower growth rate up 18.2% vs 7-day average — maintain current posting cadence',    time:'15m ago', plat:'all',      read:false },
+  { id:'a4', sev:'medium',   msg:'Sentiment dip detected on Instagram (-3pts) — monitor comments on recent posts',       time:'1h ago',  plat:'Instagram',read:true  },
+  { id:'a5', sev:'medium',   msg:'#BuildInPublic trending +44% on X — consider engaging with this hashtag today',        time:'2h ago',  plat:'X',        read:true  },
+  { id:'a6', sev:'low',      msg:'LinkedIn engagement rate above baseline for the 5th consecutive day',                  time:'3h ago',  plat:'LinkedIn', read:true  },
 ];
 
 const CONTENT_IDEAS = [
-  { id:'ci1', hook:'Thread: 5 AI tools that replaced a full-time hire for me in 2025',   plat:'X',         trend:'#AIProductivity', score:94 },
-  { id:'ci2', hook:'Why I turned down $2M in VC and built to $1M ARR alone instead',    plat:'LinkedIn',  trend:'#IndieHacker',    score:91 },
-  { id:'ci3', hook:'POV: Day 1 vs Day 365 of building in public — what changed',        plat:'Instagram', trend:'#BuildInPublic',  score:88 },
-  { id:'ci4', hook:"I analyzed 100 viral creator posts. Here's the single pattern",     plat:'YouTube',   trend:'#CreatorEconomy', score:85 },
-  { id:'ci5', hook:'Uncomfortable truth about personal brand that nobody talks about',  plat:'TikTok',    trend:'#ForYouPage',     score:82 },
+  { id:'ci1', hook:'Thread: 5 AI tools that replaced a full-time hire for me in 2025',  plat:'X',         trend:'#AIProductivity', score:94 },
+  { id:'ci2', hook:'Why I turned down $2M in VC and built to $1M ARR alone instead',   plat:'LinkedIn',  trend:'#IndieHacker',    score:91 },
+  { id:'ci3', hook:'POV: Day 1 vs Day 365 of building in public — what changed',       plat:'Instagram', trend:'#BuildInPublic',  score:88 },
+  { id:'ci4', hook:"I analyzed 100 viral creator posts. Here's the single pattern",    plat:'YouTube',   trend:'#CreatorEconomy', score:85 },
+  { id:'ci5', hook:'Uncomfortable truth about personal brand that nobody talks about', plat:'TikTok',    trend:'#ForYouPage',     score:82 },
 ];
 
-const ACTIONS = [
-  { id:'ac1', label:"Engage with @sama's thread on X — high signal, +520% velocity",         icon:<Zap size={13}/>,       color:'#6366F1', plat:'X'         },
-  { id:'ac2', label:"Reply to top 3 comments on @andrewhuberman's YouTube video",            icon:<Heart size={13}/>,     color:'#FF4444', plat:'YouTube'   },
-  { id:'ac3', label:'Post on LinkedIn during 8–10am window — your peak engagement time',      icon:<Clock size={13}/>,     color:'#2D88FF', plat:'LinkedIn'  },
-  { id:'ac4', label:'Create Reel using trending #ContentCreator audio — 28K+ mentions today', icon:<Activity size={13}/>,  color:'#F0609E', plat:'Instagram' },
-  { id:'ac5', label:'Comment on 5 posts tagged #BuildInPublic — 73% audience overlap',        icon:<Target size={13}/>,    color:'#22D3EE', plat:'X'         },
+// ─── NEW DATA ─────────────────────────────────────────────────────────────────
+const TOPIC_AREAS = [
+  { id:'ai',      label:'AI & Technology',    icon:'🤖', color:'#6366F1', mentions:847,  delta:'+31%', pos:true,  keywords:['AI','AGI','OpenAI','productivity','technology','machine'] },
+  { id:'biz',     label:'Business & Strategy', icon:'💼', color:'#22D3EE', mentions:423,  delta:'+18%', pos:true,  keywords:['founders','startups','growth','SaaS','revenue','strategy'] },
+  { id:'creator', label:'Creator Economy',    icon:'🎨', color:'#F0609E', mentions:612,  delta:'+44%', pos:true,  keywords:['creator','content','viral','brand','reel','audience'] },
+  { id:'finance', label:'Finance & Markets',  icon:'📈', color:'#10B981', mentions:289,  delta:'+9%',  pos:true,  keywords:['investing','market','crypto','money','stocks','finance'] },
+  { id:'sports',  label:'Sports & Culture',   icon:'🏆', color:'#F59E0B', mentions:156,  delta:'+7%',  pos:true,  keywords:['sports','NFL','NBA','football','basketball','culture'] },
+];
+
+const KEYWORD_TRENDS = {
+  football: [{ tag:'#CollegeFootball',v:'89.2K',d:'+44%',plat:'X' },{ tag:'#NFLDraft',v:'41.3K',d:'+28%',plat:'X' },{ tag:'#SEC',v:'23.1K',d:'+19%',plat:'X' },{ tag:'#CFB',v:'18.7K',d:'+33%',plat:'YouTube' }],
+  kentucky: [{ tag:'#BigBlueNation',v:'12.4K',d:'+67%',plat:'X' },{ tag:'#Wildcats',v:'8.9K',d:'+42%',plat:'Instagram' },{ tag:'#SEC',v:'23.1K',d:'+19%',plat:'X' },{ tag:'#KentuckyFootball',v:'5.2K',d:'+89%',plat:'X' }],
+  ai:       [{ tag:'#AIStrategy',v:'22.8K',d:'+61%',plat:'LinkedIn' },{ tag:'#ChatGPT',v:'45.1K',d:'+18%',plat:'X' },{ tag:'#MachineLearning',v:'31.2K',d:'+24%',plat:'YouTube' },{ tag:'#BuildWithAI',v:'9.8K',d:'+52%',plat:'X' }],
+  crypto:   [{ tag:'#Bitcoin',v:'112.4K',d:'+18%',plat:'X' },{ tag:'#Ethereum',v:'67.2K',d:'+12%',plat:'X' },{ tag:'#DeFi',v:'23.1K',d:'+29%',plat:'X' },{ tag:'#Web3',v:'18.9K',d:'+14%',plat:'LinkedIn' }],
+  startup:  [{ tag:'#BuildInPublic',v:'31.2K',d:'+44%',plat:'X' },{ tag:'#IndieHacker',v:'9.7K',d:'+13%',plat:'X' },{ tag:'#SaaS',v:'14.1K',d:'+22%',plat:'LinkedIn' },{ tag:'#Founder',v:'19.3K',d:'+16%',plat:'LinkedIn' }],
+  nba:      [{ tag:'#NBA',v:'67.2K',d:'+22%',plat:'X' },{ tag:'#NBAPlayoffs',v:'41.3K',d:'+38%',plat:'X' },{ tag:'#Basketball',v:'28.1K',d:'+14%',plat:'Instagram' }],
+  nfl:      [{ tag:'#NFL',v:'89.2K',d:'+18%',plat:'X' },{ tag:'#NFLDraft',v:'41.3K',d:'+28%',plat:'X' },{ tag:'#SuperBowl',v:'23.1K',d:'+12%',plat:'Instagram' }],
+  creator:  [{ tag:'#CreatorEconomy',v:'18.4K',d:'+27%',plat:'X' },{ tag:'#ContentCreator',v:'28.1K',d:'+22%',plat:'Instagram' },{ tag:'#ForYouPage',v:'89.2K',d:'+72%',plat:'TikTok' },{ tag:'#BuildInPublic',v:'31.2K',d:'+44%',plat:'X' }],
+  sports:   [{ tag:'#Sports',v:'44.1K',d:'+12%',plat:'X' },{ tag:'#NFL',v:'89.2K',d:'+18%',plat:'X' },{ tag:'#NBA',v:'67.2K',d:'+22%',plat:'X' },{ tag:'#CollegeFootball',v:'89.2K',d:'+44%',plat:'X' }],
+  tech:     [{ tag:'#TechNews',v:'31.2K',d:'+19%',plat:'X' },{ tag:'#AIStrategy',v:'22.8K',d:'+61%',plat:'LinkedIn' },{ tag:'#TechReview',v:'8.6K',d:'+7%',plat:'YouTube' },{ tag:'#BuildWithAI',v:'9.8K',d:'+52%',plat:'X' }],
+};
+
+const RECOMMENDED = [
+  { id:'r1', title:"Sam Altman on AGI timelines — 4hr conversation",  platform:'YouTube',  author:'lexfridman',     stat:'312K views',     signal:'high'  },
+  { id:'r2', title:"$2.1M ARR with no employees — full breakdown",     platform:'X',        author:'levelsio',       stat:'987 reposts',    signal:'high'  },
+  { id:'r3', title:"The Science of Deep Focus — neurochemistry guide", platform:'YouTube',  author:'andrewhuberman', stat:'48K views',      signal:'rising'},
+  { id:'r4', title:"Microsoft AI workflow — what's actually changing", platform:'LinkedIn', author:'satyanadella',   stat:'4.2K reactions', signal:'high'  },
+  { id:'r5', title:"Founder to $1M ARR — the uncomfortable truth",    platform:'LinkedIn', author:'reidhoffman',    stat:'2.8K reactions', signal:'rising'},
 ];
 
 const DEFAULT_CIRCLE = {
@@ -116,125 +131,101 @@ const DEFAULT_CIRCLE = {
   TikTok:    ['khaby.lame','charlidamelio'],
 };
 
-const NAV = [
-  { id:'dashboard',    label:'Dashboard',    icon:<LayoutDashboard size={18}/> },
-  { id:'sources',      label:'Sources',      icon:<Globe size={18}/>            },
-  { id:'intelligence', label:'Intelligence', icon:<Brain size={18}/>            },
-  { id:'trending',     label:'Trending',     icon:<TrendingUp size={18}/>       },
-  { id:'content',      label:'Content',      icon:<FileText size={18}/>         },
-  { id:'alerts',       label:'Alerts',       icon:<Bell size={18}/>             },
-  { id:'growth',       label:'Growth',       icon:<BarChart2 size={18}/>        },
-  { id:'settings',     label:'Settings',     icon:<Settings size={18}/>         },
+const NAV_TABS = [
+  { id:'feed',         label:'Feed',         icon:<Zap size={16}/>         },
+  { id:'discover',     label:'Discover',     icon:<Compass size={16}/>     },
+  { id:'intelligence', label:'Intelligence', icon:<Brain size={16}/>       },
+  { id:'studio',       label:'Studio',       icon:<FileText size={16}/>    },
+  { id:'alerts',       label:'Alerts',       icon:<Bell size={16}/>        },
+  { id:'sources',      label:'Sources',      icon:<Globe size={16}/>       },
+  { id:'settings',     label:'Settings',     icon:<Settings size={16}/>    },
 ];
 
-const VIEW_LABELS = {
-  dashboard:'Executive Dashboard', sources:'Source Pages', intelligence:'Audience Intelligence',
-  trending:'Trending & Discovery', content:'Content Intelligence', alerts:'Alerts & Monitoring',
-  growth:'Growth Tools', settings:'Settings',
-};
-
-// ─── UTILITIES ─────────────────────────────────────────────────────────────────
-function sparkPath(data, w = 80, h = 28) {
-  if (!data || data.length < 2) return { line:'', area:'' };
-  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
-  const pts = data.map((v, i) => [
-    ((i / (data.length - 1)) * w).toFixed(1),
-    (h - ((v - min) / range) * h * 0.85 - h * 0.07).toFixed(1),
-  ]);
-  const line = pts.map((p, i) => `${i===0?'M':'L'} ${p[0]} ${p[1]}`).join(' ');
-  const area = `M ${pts[0][0]} ${h} L ${pts.map(p=>`${p[0]} ${p[1]}`).join(' L ')} L ${pts[pts.length-1][0]} ${h} Z`;
-  return { line, area, pts };
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
+function useWindowSize() {
+  const [w, setW] = useState(1280);
+  useEffect(() => {
+    const fn = () => setW(window.innerWidth);
+    fn();
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return w;
 }
 
 function fmt(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
   return String(n);
 }
 
 function sigColor(sig) {
-  if (sig === 'high')   return { c:'#10B981', bg:'rgba(16,185,129,0.12)',  label:'HIGH'     };
-  if (sig === 'rising') return { c:'#F59E0B', bg:'rgba(245,158,11,0.12)',  label:'RISING'   };
-  return                       { c:'#52525B', bg:'rgba(82,82,91,0.1)',     label:'MODERATE' };
+  if (sig==='high')   return { c:'#10B981', bg:'rgba(16,185,129,0.12)',  label:'HIGH'    };
+  if (sig==='rising') return { c:'#F59E0B', bg:'rgba(245,158,11,0.12)',  label:'RISING'  };
+  return                     { c:'#52525B', bg:'rgba(82,82,91,0.1)',     label:'MODERATE'};
 }
 
-// ─── BASE COMPONENTS ───────────────────────────────────────────────────────────
-function Sparkline({ data, color, width = 80, height = 28 }) {
-  const { line, area } = sparkPath(data, width, height);
-  const id = `sg${color.replace('#','')}`;
-  return (
-    <svg width={width} height={height} style={{ overflow:'visible' }}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${id})`}/>
-      <path d={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
+function searchTrending(query) {
+  if (!query.trim()) return null;
+  const q = query.toLowerCase();
+  const matchKey = Object.keys(KEYWORD_TRENDS).find(k => q.includes(k) || k.includes(q.split(' ')[0]));
+  if (matchKey) return KEYWORD_TRENDS[matchKey];
+  const tagMatches = Object.values(TRENDING).flat().filter(t => t.tag.toLowerCase().includes(q));
+  if (tagMatches.length) return tagMatches;
+  const bwMatches = Object.entries(MOCK_POSTS).flatMap(([plat, posts]) =>
+    posts.filter(p => p.content.toLowerCase().includes(q) || p.bw?.some(w => w.toLowerCase().includes(q)))
+      .flatMap(p => (p.bw||[]).map(w => ({ tag:`#${w}`, v:'—', d:'trending', plat })))
+  );
+  return bwMatches.length ? [...new Map(bwMatches.map(x=>[x.tag,x])).values()] : [];
+}
+
+function postsForFilter(filter) {
+  if (!filter) return Object.entries(MOCK_POSTS).flatMap(([plat,ps])=>ps.map(p=>({...p,platform:plat})));
+  const f = filter.replace('#','').toLowerCase();
+  return Object.entries(MOCK_POSTS).flatMap(([plat,ps]) =>
+    ps.filter(p => p.content.toLowerCase().includes(f) || p.bw?.some(w=>w.toLowerCase().includes(f)) || p.author.toLowerCase().includes(f))
+      .map(p=>({...p,platform:plat}))
   );
 }
 
-function KPICard({ kpi, t }) {
-  return (
-    <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:'18px 20px', display:'flex', flexDirection:'column', gap:10, flex:1, minWidth:160, position:'relative', overflow:'hidden', transition:'box-shadow 0.25s' }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 30px ${kpi.color}20`}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-      <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg, ${kpi.color}, transparent)`, borderRadius:'16px 16px 0 0' }}/>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-        <span style={{ fontSize:11, fontWeight:600, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.05em' }}>{kpi.label}</span>
-        <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6, background:kpi.pos?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)', color:kpi.pos?'#10B981':'#EF4444', display:'flex', alignItems:'center', gap:2 }}>
-          {kpi.pos?<ArrowUpRight size={10}/>:<ArrowDownRight size={10}/>}{kpi.delta}
-        </span>
-      </div>
-      <div style={{ fontSize:26, fontWeight:700, color:t.text, letterSpacing:'-0.02em', lineHeight:1 }}>{kpi.value}</div>
-      <Sparkline data={kpi.spark} color={kpi.color} width={80} height={24}/>
-    </div>
-  );
-}
-
-function GlassCard({ children, style, t }) {
-  return (
-    <div style={{ background:t.glass, border:`1px solid ${t.glassBorder}`, borderRadius:16, backdropFilter:'blur(12px)', ...style }}>
-      {children}
-    </div>
-  );
-}
-
-function PostCard({ post, platform, t, bookmarks, onBookmark }) {
+// ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
+function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
   const cfg = PLAT[platform] || PLAT.LinkedIn;
   const sig = sigColor(post.signal);
   const bk  = bookmarks?.some(b => b.id === post.id);
   return (
-    <div style={{ borderRadius:14, padding:'14px 16px', border:`1px solid ${t.border}`, background:t.glass, marginBottom:6, transition:'border-color 0.2s' }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMid}
-      onMouseLeave={e => e.currentTarget.style.borderColor = t.border}>
+    <div style={{ borderRadius:14, padding:compact?'10px 12px':'14px 16px', border:`1px solid ${t.border}`, background:t.glass, marginBottom:7, transition:'all 0.18s', cursor:'default' }}
+      onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg.border; e.currentTarget.style.background=t.raised; }}
+      onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.glass; }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ width:32, height:32, borderRadius:9, background:cfg.bg, border:`1px solid ${cfg.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color, flexShrink:0 }}>
+          <div style={{ width:30, height:30, borderRadius:9, background:cfg.bg, border:`1px solid ${cfg.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color, flexShrink:0 }}>
             {post.author[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontSize:12, fontWeight:700, color:t.text }}>@{post.author}</div>
+            <div style={{ fontSize:12, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:5 }}>
+              <span style={{ color:cfg.color }}>{cfg.icon}</span>@{post.author}
+            </div>
             <div style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
-              <Clock size={9}/>{post.time} ago · <span style={{ color:cfg.color }}>{post.eng}</span>
+              <Clock size={9}/>{post.time} · <span style={{ color:cfg.color }}>{post.eng}</span>
             </div>
           </div>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-          <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:5, background:sig.bg, color:sig.c, letterSpacing:'0.05em' }}>{sig.label}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ fontSize:9, fontWeight:800, padding:'2px 6px', borderRadius:5, background:sig.bg, color:sig.c }}>{sig.label}</span>
           <span style={{ fontSize:9, fontWeight:700, color:'#10B981' }}>{post.velocity}</span>
           {onBookmark && (
-            <button onClick={() => onBookmark(post, platform)} style={{ background:'none', border:'none', cursor:'pointer', color:bk?'#F59E0B':t.textSub, padding:2 }}>
-              {bk ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}
+            <button onClick={()=>onBookmark(post,platform)} style={{ background:'none', border:'none', cursor:'pointer', color:bk?'#F59E0B':t.textSub, padding:2 }}>
+              {bk?<BookmarkCheck size={12}/>:<Bookmark size={12}/>}
             </button>
           )}
         </div>
       </div>
-      <p style={{ fontSize:12, lineHeight:1.6, color:t.text, marginBottom:8 }}>{post.content.slice(0,160)}{post.content.length>160?'…':''}</p>
+      <p style={{ fontSize:12, lineHeight:1.6, color:t.text, marginBottom:7 }}>
+        {compact ? post.content.slice(0,100)+'…' : post.content.slice(0,180)+(post.content.length>180?'…':'')}
+      </p>
       <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-        {post.bw?.map((w, i) => (
+        {post.bw?.slice(0,3).map((w,i)=>(
           <span key={i} style={{ fontSize:10, padding:'2px 7px', borderRadius:5, fontWeight:600, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>{w}</span>
         ))}
       </div>
@@ -242,7 +233,25 @@ function PostCard({ post, platform, t, bookmarks, onBookmark }) {
   );
 }
 
-// ─── AI BRIEF ──────────────────────────────────────────────────────────────────
+function TopicCard({ topic, t, active, onClick }) {
+  return (
+    <div onClick={onClick} style={{ borderRadius:16, padding:'15px 16px', background:active?`${topic.color}14`:t.card, border:`1px solid ${active?topic.color+'55':t.border}`, cursor:'pointer', transition:'all 0.18s', position:'relative', overflow:'hidden' }}
+      onMouseEnter={e=>{ if (!active) e.currentTarget.style.borderColor=topic.color+'40'; }}
+      onMouseLeave={e=>{ if (!active) e.currentTarget.style.borderColor=t.border; }}>
+      <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg, ${topic.color}, transparent)`, opacity:active?1:0.5 }}/>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
+        <span style={{ fontSize:18 }}>{topic.icon}</span>
+        <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:'rgba(16,185,129,0.12)', color:'#10B981', display:'flex', alignItems:'center', gap:2 }}>
+          <ArrowUpRight size={9}/>{topic.delta}
+        </span>
+      </div>
+      <div style={{ fontSize:20, fontWeight:800, color:t.text, letterSpacing:'-0.02em', marginBottom:2 }}>{fmt(topic.mentions)}</div>
+      <div style={{ fontSize:11, color:t.textSub, fontWeight:600 }}>{topic.label}</div>
+    </div>
+  );
+}
+
+// ─── AI BRIEF ─────────────────────────────────────────────────────────────────
 function AIBriefPanel({ platform, t }) {
   const [brief,   setBrief]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -253,15 +262,15 @@ function AIBriefPanel({ platform, t }) {
   const generate = useCallback(async () => {
     setLoading(true); setBrief('');
     const posts = MOCK_POSTS[platform] || [];
-    const summary = posts.map((p, i) => `${i+1}. @${p.author}: "${p.content.slice(0,100)}" — Signal: ${p.signal}, Velocity: ${p.velocity}`).join('\n');
-    const prompt = `You are a social media intelligence analyst. Platform: ${platform}.\n\nTop posts:\n${summary}\n\nWrite exactly 3 bullet points (use • character):\n• What dominant narrative is emerging on ${platform} right now\n• Which specific account to engage with TODAY and exactly why\n• One concrete action to take in the next 24 hours\n\nEach bullet: one sharp sentence. Chief of staff tone. No fluff.`;
+    const summary = posts.map((p,i)=>`${i+1}. @${p.author}: "${p.content.slice(0,100)}" — Signal: ${p.signal}, Velocity: ${p.velocity}`).join('\n');
+    const prompt = `Social intelligence analyst. Platform: ${platform}.\n\nTop posts:\n${summary}\n\nWrite exactly 3 bullet points (use • character):\n• Dominant narrative on ${platform} right now\n• Which account to engage TODAY and exactly why\n• One concrete 24-hour action\n\nSharp, chief-of-staff tone. No fluff.`;
     try {
       const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'brief' }) });
       const d = await r.json();
       setBrief(d.text || 'Unable to generate brief.');
-    } catch { setBrief('Connection failed. Check your API key in Vercel → Settings → Environment Variables.'); }
+    } catch { setBrief('Connection failed. Add an API key in Settings → Environment Variables.'); }
     setLoading(false);
-    setTs(new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }));
+    setTs(new Date().toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' }));
   }, [platform]);
 
   useEffect(() => {
@@ -269,40 +278,106 @@ function AIBriefPanel({ platform, t }) {
   }, [platform, generate]);
 
   return (
-    <div style={{ background:cfg.bg||t.glass, border:`1px solid ${cfg.border||t.glassBorder}`, borderRadius:16, padding:16, boxShadow:cfg.glow?`0 0 24px ${cfg.glow}`:'none' }}>
+    <div style={{ background:cfg.bg||t.glass, border:`1px solid ${cfg.border||t.glassBorder}`, borderRadius:16, padding:16, boxShadow:cfg.glow?`0 0 28px ${cfg.glow}`:'none' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <Brain size={13} style={{ color:cfg.color||'#6366F1' }}/>
-          <span style={{ fontSize:11, fontWeight:700, color:cfg.color||'#6366F1', letterSpacing:'0.04em', textTransform:'uppercase' }}>AI Brief · {platform}</span>
-          {ts && <span style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}><Clock size={9}/>{ts}</span>}
+          <span style={{ fontSize:11, fontWeight:700, color:cfg.color||'#6366F1', textTransform:'uppercase', letterSpacing:'0.04em' }}>AI Brief · {platform}</span>
+          {ts && <span style={{ fontSize:10, color:t.textSub }}>{ts}</span>}
         </div>
-        <button onClick={generate} disabled={loading}
-          style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:8, background:cfg.color||'#6366F1', color:platform==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer', opacity:loading?0.6:1 }}>
+        <button onClick={generate} disabled={loading} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:8, background:cfg.color||'#6366F1', color:platform==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer', opacity:loading?0.6:1 }}>
           {loading?<RefreshCw size={10} style={{ animation:'spin 1s linear infinite' }}/>:<Sparkles size={10}/>}
           {loading?'Thinking…':'Refresh'}
         </button>
       </div>
-      {loading && (
-        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {[85,70,55].map((w, i) => <div key={i} style={{ height:7, borderRadius:4, background:t.border, width:`${w}%`, animation:'pulse 1.5s ease-in-out infinite' }}/>)}
-        </div>
-      )}
+      {loading && [85,70,55].map((w,i)=><div key={i} style={{ height:7, borderRadius:4, background:t.border, width:`${w}%`, marginBottom:6, animation:'pulse 1.5s ease-in-out infinite' }}/>)}
       {!loading && brief && (
-        <div style={{ fontSize:11, lineHeight:1.75, color:t.textSub }}>
-          {brief.split('\n').filter(l => l.trim()).map((line, i) => (
-            <div key={i} style={{ display:'flex', gap:7, marginBottom:6 }}>
-              {line.startsWith('•') && <span style={{ color:cfg.color||'#6366F1', flexShrink:0, marginTop:1 }}>•</span>}
+        <div style={{ fontSize:11, lineHeight:1.75 }}>
+          {brief.split('\n').filter(l=>l.trim()).map((line,i)=>(
+            <div key={i} style={{ display:'flex', gap:7, marginBottom:5 }}>
+              {line.startsWith('•')&&<span style={{ color:cfg.color||'#6366F1', flexShrink:0 }}>•</span>}
               <span style={{ color:line.startsWith('•')?t.text:t.textSub }}>{line.replace(/^•\s*/,'')}</span>
             </div>
           ))}
         </div>
       )}
-      {!loading && !brief && <p style={{ fontSize:11, color:t.textMuted }}>Generating your {platform} intelligence brief…</p>}
+      {!loading && !brief && <p style={{ fontSize:11, color:t.textSub }}>Generating {platform} intelligence brief…</p>}
     </div>
   );
 }
 
-// ─── MORNING DIGEST ────────────────────────────────────────────────────────────
+// ─── SUMMARIZE PANEL ──────────────────────────────────────────────────────────
+function SummarizePanel({ t }) {
+  const [input,   setInput]   = useState('');
+  const [result,  setResult]  = useState('');
+  const [loading, setLoading] = useState(false);
+  const [copied,  setCopied]  = useState(false);
+
+  const run = async () => {
+    if (!input.trim()) return;
+    setLoading(true); setResult('');
+    const prompt = `Analyze this content for a social media strategist:\n\n${input.slice(0,2500)}\n\nRespond with:\n• Main Topic: one sentence\n• Key Takeaways: 3 sharp bullet points\n• Trend Signal: rising, plateauing, or declining? Why?\n• Recommended Action: one concrete next step\n\nBe punchy. Executive-summary level.`;
+    try {
+      const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'brief' }) });
+      const d = await r.json();
+      setResult(d.text || 'Unable to analyze. Try again.');
+    } catch { setResult('Connection failed. Check your API key in Settings.'); }
+    setLoading(false);
+  };
+
+  const copy = () => { navigator.clipboard?.writeText(result); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  return (
+    <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:18, padding:22 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+        <div style={{ width:34, height:34, borderRadius:10, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.25)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Brain size={16} style={{ color:'#6366F1' }}/>
+        </div>
+        <div>
+          <div style={{ fontSize:14, fontWeight:700, color:t.text }}>AI Source Summarizer</div>
+          <div style={{ fontSize:11, color:t.textSub }}>Paste any URL, article, tweet, or text — get instant intelligence</div>
+        </div>
+      </div>
+      <textarea value={input} onChange={e=>setInput(e.target.value)}
+        placeholder={"Paste a URL, article, post, or any text here…\n\nExamples:\n• https://techcrunch.com/2025/...\n• Paste raw article or LinkedIn post text\n• A tweet thread or YouTube description"}
+        style={{ width:'100%', height:140, resize:'vertical', padding:'12px 14px', borderRadius:12, border:`1px solid ${input?t.borderMid:t.border}`, background:t.glass, color:t.text, fontSize:12, lineHeight:1.65, outline:'none', fontFamily:'inherit', boxSizing:'border-box', transition:'border-color 0.2s' }}
+        onFocus={e=>e.target.style.borderColor=t.borderMid}
+        onBlur={e=>e.target.style.borderColor=input?t.borderMid:t.border}
+      />
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10 }}>
+        <span style={{ fontSize:10, color:t.textMuted }}>{input.length.toLocaleString()} chars</span>
+        <div style={{ display:'flex', gap:8 }}>
+          {input && <button onClick={()=>{setInput('');setResult('');}} style={{ fontSize:11, padding:'7px 14px', borderRadius:10, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer' }}>Clear</button>}
+          <button onClick={run} disabled={loading||!input.trim()}
+            style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'8px 20px', borderRadius:10, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:loading||!input.trim()?'not-allowed':'pointer', opacity:!input.trim()?0.45:1 }}>
+            {loading?<RefreshCw size={13} style={{ animation:'spin 1s linear infinite' }}/>:<Sparkles size={13}/>}
+            {loading?'Analyzing…':'Analyze'}
+          </button>
+        </div>
+      </div>
+      {result && (
+        <div style={{ marginTop:14, padding:16, borderRadius:14, background:t.glass, border:'1px solid rgba(99,102,241,0.2)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <span style={{ fontSize:11, fontWeight:700, color:'#6366F1', textTransform:'uppercase', letterSpacing:'0.04em' }}>Intelligence Brief</span>
+            <button onClick={copy} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, padding:'3px 8px', borderRadius:7, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer' }}>
+              {copied?<Check size={10}/>:<Copy size={10}/>}{copied?'Copied':'Copy'}
+            </button>
+          </div>
+          <div style={{ fontSize:11, lineHeight:1.8 }}>
+            {result.split('\n').filter(l=>l.trim()).map((line,i)=>(
+              <div key={i} style={{ display:'flex', gap:7, marginBottom:5 }}>
+                {line.startsWith('•')&&<span style={{ color:'#6366F1', flexShrink:0 }}>•</span>}
+                <span style={{ color:line.startsWith('•')?t.text:t.textSub }}>{line.replace(/^•\s*/,'')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MORNING DIGEST ───────────────────────────────────────────────────────────
 function MorningDigest({ t }) {
   const [bullets, setBullets] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -311,391 +386,409 @@ function MorningDigest({ t }) {
 
   const generate = useCallback(async () => {
     setLoading(true); setBullets([]);
-    const summaries = Object.entries(MOCK_POSTS).map(([plat, posts]) => {
+    const summaries = Object.entries(MOCK_POSTS).map(([plat,posts])=>{
       const top = posts[0];
       return `${plat}: @${top.author} — "${top.content.slice(0,80)}" (${top.signal} signal, ${top.velocity})`;
     }).join('\n');
-    const prompt = `Morning briefing for a social media command center. Top posts:\n\n${summaries}\n\nWrite exactly 5 bullet points — one per platform (LinkedIn, X, Instagram, YouTube, TikTok). Format:\n• [Platform]: one sharp sentence on what's dominating right now\n\nPunchy. Executive summary. Each bullet under 20 words.`;
+    const prompt = `Morning briefing. Top posts:\n\n${summaries}\n\nWrite exactly 5 bullet points — one per platform:\n• [Platform]: one sharp sentence on what's dominating\n\nPunchy. Executive summary. Each bullet under 20 words.`;
     try {
       const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'digest' }) });
       const d = await r.json();
-      setBullets((d.text||'').split('\n').filter(l => l.trim() && l.includes('•')));
+      setBullets((d.text||'').split('\n').filter(l=>l.trim()&&l.includes('•')));
     } catch { setBullets(['• Unable to generate digest. Check your API configuration.']); }
     setLoading(false);
-    setTs(new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }));
+    setTs(new Date().toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' }));
   }, []);
 
-  useEffect(() => { if (!done.current) { done.current = true; generate(); } }, [generate]);
+  useEffect(()=>{ if (!done.current) { done.current=true; generate(); } }, [generate]);
 
   const platColor = { LinkedIn:'#2D88FF', X:'#E8EAF0', Instagram:'#F0609E', YouTube:'#FF4444', TikTok:'#69C9D0' };
 
   return (
-    <GlassCard t={t} style={{ padding:16 }}>
+    <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:18 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-          <div style={{ width:8, height:8, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
+          <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
           <span style={{ fontSize:11, fontWeight:700, color:'#10B981', letterSpacing:'0.06em', textTransform:'uppercase' }}>Morning Digest</span>
           {ts && <span style={{ fontSize:10, color:t.textSub }}>{ts}</span>}
         </div>
-        <button onClick={generate} style={{ fontSize:10, color:t.textSub, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+        <button onClick={generate} style={{ fontSize:10, color:t.textSub, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
           <RefreshCw size={10}/>Refresh
         </button>
       </div>
-      {loading && <div style={{ display:'flex', flexDirection:'column', gap:6 }}>{[90,75,80,70,65].map((w,i)=><div key={i} style={{ height:7, borderRadius:4, background:t.border, width:`${w}%`, animation:'pulse 1.5s ease-in-out infinite' }}/>)}</div>}
-      {!loading && bullets.map((line, i) => {
+      {loading && [90,75,80,70,65].map((w,i)=><div key={i} style={{ height:7, borderRadius:4, background:t.border, width:`${w}%`, marginBottom:6, animation:'pulse 1.5s ease-in-out infinite' }}/>)}
+      {!loading && bullets.map((line,i)=>{
         const clean = line.replace(/^•\s*/,'');
-        const plat  = Object.keys(platColor).find(p => clean.startsWith(p));
+        const plat  = Object.keys(platColor).find(p=>clean.startsWith(p));
         return (
           <div key={i} style={{ display:'flex', gap:8, marginBottom:8, alignItems:'flex-start' }}>
-            <span style={{ color:plat?platColor[plat]:'#10B981', fontSize:12, flexShrink:0, marginTop:1 }}>•</span>
+            <span style={{ color:plat?platColor[plat]:'#10B981', fontSize:12, flexShrink:0 }}>•</span>
             <span style={{ fontSize:11, lineHeight:1.65, color:t.text }}>{clean}</span>
           </div>
         );
       })}
-      {!loading && !bullets.length && <p style={{ fontSize:11, color:t.textMuted }}>Loading intelligence…</p>}
-    </GlassCard>
+      {!loading && !bullets.length && <p style={{ fontSize:11, color:t.textSub }}>Loading intelligence…</p>}
+    </div>
   );
 }
 
-// ─── VIEWS ─────────────────────────────────────────────────────────────────────
-function DashboardView({ t, onNav }) {
-  const [bookmarks, setBookmarks] = useState([]);
-  const [liveStats, setLiveStats] = useState({ reach:2410000, mentions:4782, active:31 });
-
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setLiveStats(s => ({
-        reach:    s.reach    + Math.floor(Math.random() * 50 - 10),
-        mentions: s.mentions + Math.floor(Math.random() * 8  - 2),
-        active:   Math.max(20, s.active + Math.floor(Math.random() * 6 - 3)),
-      }));
-    }, 3500);
-    return () => clearInterval(iv);
-  }, []);
-
-  const toggleBk = (post, plat) => setBookmarks(prev => prev.some(b => b.id === post.id) ? prev.filter(b => b.id !== post.id) : [...prev, { ...post, platform:plat }]);
-
-  const HEAT_COLORS   = [['#6366F1','#4F46E5','#22D3EE','#818CF8','#6366F1'],['#22D3EE','#6366F1','#10B981','#22D3EE','#F59E0B'],['#10B981','#818CF8','#6366F1','#10B981','#22D3EE'],['#F59E0B','#22D3EE','#EF4444','#6366F1','#10B981']];
-  const HEAT_OPACITY  = [[0.9,0.5,0.8,0.3,0.6],[0.4,0.7,0.9,0.5,0.3],[0.8,0.4,0.5,0.7,0.9],[0.3,0.6,0.4,0.8,0.5]];
-  const HEAT_TAGS     = [['#AIStrategy','#BuildInPublic','#FutureOfWork','#DeepDive','#Leadership'],['#CreatorEconomy','#AGI','#BrandIdentity','#ForYouPage','#Investing'],['#IndieHacker','#ContentCreator','#AIProductivity','#ScienceExplained','#LongForm'],['#Startups','#PersonalBrand','#Viral','#AItools','#GrowthHacking']];
+// ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
+function RightPanel({ t, activeFilter, setActiveFilter }) {
+  const allBuzz = [...new Set(Object.values(MOCK_POSTS).flatMap(p=>p.flatMap(x=>x.bw||[])))];
+  const topTrending = Object.entries(TRENDING).flatMap(([plat,items])=>items.map(item=>({...item,plat}))).sort((a,b)=>parseFloat(b.d)-parseFloat(a.d)).slice(0,8);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:10, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.18)', width:'fit-content' }}>
-        <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
-        <span style={{ fontSize:11, fontWeight:600, color:'#10B981' }}>LIVE</span>
-        <span style={{ fontSize:11, color:'#10B981', opacity:0.8 }}>· {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active accounts</span>
-      </div>
-
-      <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-        {KPIS.map(k => <KPICard key={k.id} kpi={k} t={t}/>)}
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:16, alignItems:'start' }}>
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <MorningDigest t={t}/>
-          <div>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <Zap size={13} style={{ color:'#6366F1' }}/>
-              <span style={{ fontSize:12, fontWeight:700, color:t.text }}>Top Signals — All Platforms</span>
-            </div>
-            {Object.entries(MOCK_POSTS).slice(0,3).map(([plat, posts]) => (
-              <div key={plat} style={{ marginBottom:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                  <span style={{ color:PLAT[plat]?.color }}>{PLAT[plat]?.icon}</span>
-                  <span style={{ fontSize:10, fontWeight:700, color:PLAT[plat]?.color, textTransform:'uppercase', letterSpacing:'0.04em' }}>{plat}</span>
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      {/* Trending Now */}
+      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
+          <Flame size={13} style={{ color:'#EF4444' }}/>
+          <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Trending Now</span>
+        </div>
+        {topTrending.map((item,i)=>{
+          const cfg = PLAT[item.plat];
+          const isActive = activeFilter===item.tag;
+          return (
+            <div key={i} onClick={()=>setActiveFilter(isActive?null:item.tag)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 0', borderBottom:`1px solid ${t.border}`, cursor:'pointer', transition:'opacity 0.15s' }}
+              onMouseEnter={e=>e.currentTarget.style.opacity='0.75'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+              <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                <span style={{ fontSize:10, color:t.textMuted, width:18, textAlign:'center', fontWeight:700 }}>#{i+1}</span>
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, color:isActive?'#818CF8':cfg?.color||t.text }}>{item.tag}</div>
+                  <div style={{ fontSize:9, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
+                    <span style={{ color:cfg?.color }}>{cfg?.icon}</span>{item.v}
+                  </div>
                 </div>
-                <PostCard post={posts[0]} platform={plat} t={t} bookmarks={bookmarks} onBookmark={toggleBk}/>
               </div>
+              <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{item.d}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Buzzwords */}
+      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+            <Hash size={13} style={{ color:'#6366F1' }}/>
+            <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Buzzwords</span>
+          </div>
+          {activeFilter && <button onClick={()=>setActiveFilter(null)} style={{ fontSize:9, padding:'2px 7px', borderRadius:5, background:'rgba(99,102,241,0.15)', color:'#818CF8', border:'none', cursor:'pointer' }}>Clear ×</button>}
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+          {allBuzz.slice(0,18).map((w,i)=>{
+            const active = activeFilter===w || activeFilter===`#${w}`;
+            return (
+              <button key={i} onClick={()=>setActiveFilter(active?null:w)}
+                style={{ fontSize:10, padding:'3px 9px', borderRadius:20, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'#6366F1':'rgba(99,102,241,0.2)'}`, background:active?'rgba(99,102,241,0.18)':'rgba(99,102,241,0.05)', color:active?'#A5B4FC':'#818CF8', transition:'all 0.15s' }}>
+                {w}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recommended Viewings */}
+      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
+          <Star size={13} style={{ color:'#F59E0B' }}/>
+          <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Recommended</span>
+        </div>
+        {RECOMMENDED.map(item=>{
+          const cfg = PLAT[item.platform];
+          const sig = sigColor(item.signal);
+          return (
+            <div key={item.id} style={{ marginBottom:9, padding:'10px 11px', borderRadius:12, background:t.glass, border:`1px solid ${t.border}`, cursor:'pointer', transition:'all 0.18s' }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg?.border||t.borderMid; e.currentTarget.style.background=t.raised; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.glass; }}>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
+                <span style={{ color:cfg?.color }}>{cfg?.icon}</span>
+                <span style={{ fontSize:9, fontWeight:700, color:cfg?.color }}>{item.platform}</span>
+                <span style={{ fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4, background:sig.bg, color:sig.c, marginLeft:'auto' }}>{sig.label}</span>
+              </div>
+              <p style={{ fontSize:11, fontWeight:600, color:t.text, lineHeight:1.4, marginBottom:4 }}>{item.title}</p>
+              <div style={{ fontSize:10, color:t.textSub }}>@{item.author} · {item.stat}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── VIEWS ────────────────────────────────────────────────────────────────────
+function FeedView({ t, activeFilter, setActiveFilter, onNav }) {
+  const [bookmarks,   setBookmarks]   = useState([]);
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [liveStats,   setLiveStats]   = useState({ reach:2410000, mentions:4782, active:31 });
+
+  useEffect(()=>{
+    const iv = setInterval(()=>{
+      setLiveStats(s=>({
+        reach:    s.reach    + Math.floor(Math.random()*50-10),
+        mentions: s.mentions + Math.floor(Math.random()*8-2),
+        active:   Math.max(20, s.active+Math.floor(Math.random()*6-3)),
+      }));
+    }, 3500);
+    return ()=>clearInterval(iv);
+  }, []);
+
+  const toggleBk = (post,plat) => setBookmarks(prev=>prev.some(b=>b.id===post.id)?prev.filter(b=>b.id!==post.id):[...prev,{...post,platform:plat}]);
+
+  const handleTopicClick = (topic) => {
+    if (activeTopic===topic.id) { setActiveTopic(null); setActiveFilter(null); }
+    else { setActiveTopic(topic.id); setActiveFilter(topic.keywords[0]); }
+  };
+
+  const filterKey = activeFilter || (activeTopic ? TOPIC_AREAS.find(x=>x.id===activeTopic)?.keywords[0] : null);
+  const filtered  = postsForFilter(filterKey);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+      {/* Live indicator */}
+      <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'rgba(16,185,129,0.07)', border:'1px solid rgba(16,185,129,0.18)', width:'fit-content' }}>
+        <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
+        <span style={{ fontSize:11, fontWeight:600, color:'#10B981' }}>LIVE · {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active</span>
+      </div>
+
+      {/* Topic cards */}
+      <div>
+        <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Your Topics — click to filter</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:10 }}>
+          {TOPIC_AREAS.map(topic=>(
+            <TopicCard key={topic.id} topic={topic} t={t} active={activeTopic===topic.id} onClick={()=>handleTopicClick(topic)}/>
+          ))}
+        </div>
+      </div>
+
+      {/* Active filter */}
+      {filterKey && (
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:11, color:t.textSub }}>Showing:</span>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.3)' }}>
+            <span style={{ fontSize:11, fontWeight:700, color:'#818CF8' }}>{activeFilter||TOPIC_AREAS.find(x=>x.id===activeTopic)?.label}</span>
+            <button onClick={()=>{setActiveFilter(null);setActiveTopic(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:'#818CF8', padding:0, display:'flex' }}><X size={11}/></button>
+          </div>
+          <span style={{ fontSize:11, color:t.textSub }}>{filtered.length} posts</span>
+        </div>
+      )}
+
+      {/* Two-column layout */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+        <div>
+          <MorningDigest t={t}/>
+          <div style={{ marginTop:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+              <Zap size={13} style={{ color:'#6366F1' }}/>
+              {filterKey ? 'Filtered Posts' : 'Top Signals — All Platforms'}
+            </div>
+            {(filtered.length
+              ? filtered
+              : Object.entries(MOCK_POSTS).flatMap(([plat,ps])=>ps.slice(0,1).map(p=>({...p,platform:plat})))
+            ).slice(0,6).map(post=>(
+              <PostCard key={post.id} post={post} platform={post.platform} t={t} bookmarks={bookmarks} onBookmark={toggleBk}/>
             ))}
           </div>
         </div>
-
-        <div style={{ display:'flex', flexDirection:'column', gap:14, position:'sticky', top:0 }}>
-          <GlassCard t={t} style={{ padding:16 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-              <Activity size={13} style={{ color:'#22D3EE' }}/>
-              <span style={{ fontSize:11, fontWeight:700, color:t.text }}>Trending Heat Map</span>
+        <div>
+          {bookmarks.length>0 && (
+            <div style={{ marginBottom:14, padding:16, borderRadius:16, background:t.card, border:`1px solid ${t.border}` }}>
+              <div style={{ fontSize:11, fontWeight:700, color:t.text, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                <BookmarkCheck size={13} style={{ color:'#F59E0B' }}/>Saved ({bookmarks.length})
+              </div>
+              {bookmarks.slice(0,3).map(p=><PostCard key={p.id} post={p} platform={p.platform} t={t} bookmarks={bookmarks} onBookmark={toggleBk} compact/>)}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
-              {HEAT_COLORS.map((row, ri) => row.map((color, ci) => (
-                <div key={`${ri}-${ci}`} title={HEAT_TAGS[ri][ci]}
-                  style={{ height:26, borderRadius:6, background:color, opacity:HEAT_OPACITY[ri][ci], cursor:'default', transition:'opacity 0.3s' }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                  onMouseLeave={e => e.currentTarget.style.opacity = HEAT_OPACITY[ri][ci]}
-                />
-              )))}
+          )}
+          <div style={{ padding:16, borderRadius:16, background:t.card, border:`1px solid ${t.border}` }}>
+            <div style={{ fontSize:11, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+              <Target size={13} style={{ color:'#22D3EE' }}/>Quick Actions
             </div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:10 }}>
-              {HEAT_TAGS.flat().slice(0,5).map((tag, i) => (
-                <span key={i} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:t.glass, border:`1px solid ${t.border}`, color:t.textSub }}>{tag}</span>
-              ))}
-            </div>
-          </GlassCard>
-
-          <GlassCard t={t} style={{ padding:16 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-              <Target size={13} style={{ color:'#F59E0B' }}/>
-              <span style={{ fontSize:11, fontWeight:700, color:t.text }}>Recommended Actions</span>
-            </div>
-            {ACTIONS.slice(0,4).map((a, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8, padding:'8px 10px', borderRadius:10, background:t.glass, border:`1px solid ${t.border}` }}>
-                <span style={{ color:a.color, flexShrink:0, marginTop:1 }}>{a.icon}</span>
-                <span style={{ fontSize:11, lineHeight:1.55, color:t.textSub }}>{a.label}</span>
+            {[
+              { label:"Engage @sama's AGI thread — +520% velocity", color:'#6366F1' },
+              { label:'Post on LinkedIn 8–10am — peak engagement window', color:'#2D88FF' },
+              { label:'Create Reel using #ContentCreator audio trend', color:'#F0609E' },
+              { label:'Comment on 5x #BuildInPublic posts today', color:'#22D3EE' },
+            ].map((a,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:7, padding:'8px 10px', borderRadius:10, background:t.glass, border:`1px solid ${t.border}` }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:a.color, flexShrink:0, marginTop:4 }}/>
+                <span style={{ fontSize:11, lineHeight:1.5, color:t.textSub }}>{a.label}</span>
               </div>
             ))}
-            <button onClick={() => onNav('growth')}
-              style={{ width:'100%', fontSize:11, fontWeight:600, padding:'7px 0', borderRadius:10, background:'rgba(99,102,241,0.1)', color:'#6366F1', border:'1px solid rgba(99,102,241,0.2)', cursor:'pointer' }}>
-              View all growth actions →
+            <button onClick={()=>onNav('studio')} style={{ width:'100%', fontSize:11, fontWeight:600, padding:'8px 0', borderRadius:10, background:t.accentSub, color:t.accent, border:`1px solid ${t.accentBorder}`, cursor:'pointer', marginTop:4 }}>
+              Open Content Studio →
             </button>
-          </GlassCard>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function SourcesView({ t, circle, setCircle }) {
-  const [modal,     setModal]     = useState(null);
-  const [newAcc,    setNewAcc]    = useState('');
-  const [auditPlat, setAuditPlat] = useState(null);
+function DiscoverView({ t, setActiveFilter, onNav }) {
+  const [query,      setQuery]      = useState('');
+  const [results,    setResults]    = useState(null);
+  const [searching,  setSearching]  = useState(false);
+  const [activePlat, setActivePlat] = useState('all');
+  const inputRef = useRef(null);
 
-  const addAcc = () => {
-    if (!newAcc.trim() || !modal) return;
-    setCircle(prev => ({ ...prev, [modal]: [...(prev[modal]||[]).filter(a => a !== newAcc.trim()), newAcc.trim()] }));
-    setNewAcc('');
-  };
+  useEffect(()=>{
+    if (!query.trim()) { setResults(null); setSearching(false); return; }
+    setSearching(true);
+    const id = setTimeout(()=>{ setResults(searchTrending(query)); setSearching(false); }, 350);
+    return ()=>clearTimeout(id);
+  }, [query]);
+
+  const allTrending = Object.entries(TRENDING).flatMap(([plat,items])=>items.map(item=>({...item,plat}))).sort((a,b)=>parseFloat(b.d)-parseFloat(a.d));
+  const displayed   = activePlat==='all' ? allTrending : allTrending.filter(x=>x.plat===activePlat);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <p style={{ fontSize:13, color:t.textSub }}>{Object.values(circle).flat().length} total sources connected across all platforms.</p>
-        <button onClick={() => setModal(Object.keys(PLAT)[0])}
-          style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, padding:'8px 16px', borderRadius:10, background:'#6366F1', color:'#fff', border:'none', cursor:'pointer' }}>
-          <Plus size={14}/>Add Source
-        </button>
-      </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
+      {/* Search */}
+      <div style={{ position:'relative' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 18px', borderRadius:14, border:`1px solid ${query?'#6366F1':t.borderMid}`, background:t.card, transition:'all 0.2s', boxShadow:query?'0 0 0 3px rgba(99,102,241,0.1)':'none' }}>
+          <Search size={18} style={{ color:query?'#6366F1':t.textSub, flexShrink:0 }}/>
+          <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
+            placeholder="Search topics, hashtags — e.g. 'kentucky football', 'AI strategy', 'crypto', 'creator'…"
+            style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:14, color:t.text, fontFamily:'inherit' }}/>
+          {searching && <RefreshCw size={14} style={{ color:t.textSub, animation:'spin 1s linear infinite', flexShrink:0 }}/>}
+          {query && !searching && <button onClick={()=>{setQuery('');setResults(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub, display:'flex' }}><X size={14}/></button>}
+        </div>
 
-      {Object.entries(PLAT).map(([plat, cfg]) => (
-        <div key={plat}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ color:cfg.color }}>{cfg.icon}</span>
-              <span style={{ fontSize:13, fontWeight:700, color:t.text }}>{plat}</span>
-              <span style={{ fontSize:11, padding:'2px 8px', borderRadius:6, background:cfg.bg, color:cfg.color, fontWeight:600 }}>{(circle[plat]||[]).length} sources</span>
+        {/* Results dropdown */}
+        {results !== null && query && (
+          <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, right:0, borderRadius:14, background:t.surface, border:`1px solid ${t.borderMid}`, boxShadow:'0 20px 60px rgba(0,0,0,0.45)', zIndex:50, padding:18 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:12 }}>
+              Top trending for &ldquo;{query}&rdquo;
             </div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button onClick={() => setAuditPlat(auditPlat===plat?null:plat)}
-                style={{ fontSize:11, fontWeight:600, padding:'5px 12px', borderRadius:8, background:auditPlat===plat?cfg.color:cfg.bg, color:auditPlat===plat?(plat==='X'?'#0d0d12':'#fff'):cfg.color, border:`1px solid ${cfg.border}`, cursor:'pointer' }}>
-                {auditPlat===plat?'✓ Auditing':'Audit'}
-              </button>
-              <button onClick={() => setModal(plat)}
-                style={{ padding:'5px 8px', borderRadius:8, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex', alignItems:'center' }}>
-                <Plus size={12}/>
-              </button>
-            </div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))', gap:8 }}>
-            {(circle[plat]||[]).map((acc, i) => (
-              <div key={i} style={{ borderRadius:12, padding:'12px 14px', background:t.card, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
-                  <div style={{ width:30, height:30, borderRadius:9, background:cfg.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color, flexShrink:0 }}>
-                    {acc[0].toUpperCase()}
-                  </div>
-                  <span style={{ fontSize:12, fontWeight:600, color:t.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>@{acc}</span>
-                </div>
-                <button onClick={() => setCircle(prev => ({ ...prev, [plat]:prev[plat].filter(a=>a!==acc) }))}
-                  style={{ background:'none', border:'none', cursor:'pointer', color:t.textMuted, flexShrink:0 }}><Trash2 size={12}/></button>
+            {results.length > 0 ? (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
+                {results.slice(0,10).map((item,i)=>{
+                  const cfg = PLAT[item.plat];
+                  return (
+                    <button key={i} onClick={()=>{ setActiveFilter(item.tag); setQuery(''); setResults(null); onNav('feed'); }}
+                      style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'7px 13px', borderRadius:20, border:`1px solid ${cfg?.border||t.border}`, background:cfg?.bg||t.glass, color:cfg?.color||t.text, cursor:'pointer', transition:'all 0.15s' }}
+                      onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
+                      onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+                      {cfg?.icon}
+                      {item.tag}
+                      <span style={{ fontSize:10, color:'#10B981', fontWeight:700 }}>{item.d}</span>
+                      {item.v!=='—' && <span style={{ fontSize:10, color:t.textSub }}>{item.v}</span>}
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-            {(circle[plat]||[]).length === 0 && (
-              <div style={{ borderRadius:12, padding:'20px 14px', background:t.glass, border:`1px dashed ${t.border}`, display:'flex', flexDirection:'column', alignItems:'center', gap:6, cursor:'pointer' }} onClick={() => setModal(plat)}>
-                <Plus size={16} style={{ color:t.textMuted }}/><span style={{ fontSize:11, color:t.textMuted }}>Add {plat} source</span>
-              </div>
+            ) : (
+              <p style={{ fontSize:12, color:t.textSub }}>No trending topics found for &ldquo;{query}&rdquo;. Try: football, ai, crypto, startup, creator, nba, nfl</p>
             )}
           </div>
-          {auditPlat===plat && (
-            <div style={{ marginTop:10, padding:14, borderRadius:12, background:cfg.bg, border:`1px solid ${cfg.border}` }}>
-              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
-                <RefreshCw size={12} style={{ color:cfg.color, animation:'spin 2s linear infinite' }}/>
-                <span style={{ fontSize:11, fontWeight:700, color:cfg.color }}>Live audit in progress…</span>
-              </div>
-              {MOCK_POSTS[plat]?.slice(0,2).map((p,i) => (
-                <div key={i} style={{ fontSize:11, color:t.textSub, padding:'5px 0', borderBottom:`1px solid ${t.border}` }}>
-                  <span style={{ color:cfg.color, fontWeight:600 }}>@{p.author}</span> — {p.eng} · Signal: <span style={{ color:sigColor(p.signal).c }}>{p.signal}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+        )}
+      </div>
 
-      {modal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-          <div style={{ width:'100%', maxWidth:440, borderRadius:20, background:t.surface, border:`1px solid ${t.borderMid}`, overflow:'hidden' }}>
-            <div style={{ padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${t.border}` }}>
-              <h3 style={{ fontFamily:'var(--font-syne), sans-serif', fontSize:16, fontWeight:800, color:t.text }}>Add {modal} Source</h3>
-              <button onClick={() => setModal(null)} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub }}><X size={18}/></button>
-            </div>
-            <div style={{ padding:20 }}>
-              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                <input value={newAcc} onChange={e => setNewAcc(e.target.value)} onKeyDown={e => e.key==='Enter'&&addAcc()} placeholder={`Add ${modal} handle…`}
-                  style={{ flex:1, fontSize:13, padding:'10px 14px', borderRadius:10, border:`1px solid ${PLAT[modal]?.border||t.border}`, background:t.glass, color:t.text, outline:'none' }}/>
-                <button onClick={addAcc} style={{ padding:'10px 16px', borderRadius:10, background:PLAT[modal]?.color||'#6366F1', color:modal==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer' }}><Plus size={16}/></button>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:200, overflowY:'auto' }}>
-                {(circle[modal]||[]).map((acc,i) => (
-                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderRadius:9, background:t.glass, border:`1px solid ${t.border}` }}>
-                    <span style={{ fontSize:12, color:t.text }}>@{acc}</span>
-                    <button onClick={() => setCircle(prev => ({ ...prev, [modal]:prev[modal].filter(a=>a!==acc) }))} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub }}><Trash2 size={13}/></button>
+      {/* Platform filter pills */}
+      <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+        <button onClick={()=>setActivePlat('all')} style={{ fontSize:11, fontWeight:700, padding:'6px 14px', borderRadius:20, cursor:'pointer', border:`1px solid ${activePlat==='all'?'#6366F1':t.border}`, background:activePlat==='all'?'rgba(99,102,241,0.12)':t.glass, color:activePlat==='all'?'#818CF8':t.textSub }}>
+          All Platforms
+        </button>
+        {Object.entries(PLAT).map(([plat,cfg])=>(
+          <button key={plat} onClick={()=>setActivePlat(plat)} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700, padding:'6px 12px', borderRadius:20, cursor:'pointer', border:`1px solid ${activePlat===plat?cfg.color:t.border}`, background:activePlat===plat?cfg.bg:t.glass, color:activePlat===plat?cfg.color:t.textSub }}>
+            <span style={{ color:cfg.color }}>{cfg.icon}</span>{plat}
+          </button>
+        ))}
+      </div>
+
+      {/* Trending grid */}
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+          <TrendingUp size={14} style={{ color:'#EF4444' }}/>
+          Trending {activePlat==='all'?'Everywhere':`on ${activePlat}`} — click any topic to filter your feed
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:10 }}>
+          {displayed.map((item,i)=>{
+            const cfg = PLAT[item.plat];
+            return (
+              <div key={i} onClick={()=>{ setActiveFilter(item.tag); onNav('feed'); }}
+                style={{ borderRadius:14, padding:'13px 16px', background:t.card, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', gap:12, cursor:'pointer', transition:'all 0.18s' }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg?.border||t.borderMid; e.currentTarget.style.transform='translateY(-1px)'; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.transform='none'; }}>
+                <div style={{ fontSize:18, fontWeight:800, color:t.textMuted, width:28, flexShrink:0, textAlign:'center' }}>#{i+1}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
+                    <span style={{ color:cfg?.color }}>{cfg?.icon}</span>
+                    <span style={{ fontSize:12, fontWeight:700, color:cfg?.color||t.text }}>{item.tag}</span>
                   </div>
+                  <div style={{ fontSize:10, color:t.textSub }}>{item.v} mentions · <span style={{ fontWeight:700, color:'#10B981' }}>{item.d}</span></div>
+                </div>
+                <ChevronRight size={13} style={{ color:t.textMuted }}/>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Topic exploration */}
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+          <Layers size={14} style={{ color:'#6366F1' }}/>Explore by Topic Area
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:10 }}>
+          {TOPIC_AREAS.map(topic=>(
+            <div key={topic.id} onClick={()=>{ setActiveFilter(topic.keywords[0]); onNav('feed'); }}
+              style={{ borderRadius:14, padding:'14px 15px', background:t.card, border:`1px solid ${t.border}`, cursor:'pointer', transition:'all 0.18s', position:'relative', overflow:'hidden' }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=topic.color+'55'; e.currentTarget.style.background=`${topic.color}08`; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.card; }}>
+              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg,${topic.color},transparent)` }}/>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <span style={{ fontSize:20 }}>{topic.icon}</span>
+                <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{topic.delta}</span>
+              </div>
+              <div style={{ fontSize:13, fontWeight:700, color:t.text, marginBottom:6 }}>{topic.label}</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {topic.keywords.slice(0,3).map((kw,i)=>(
+                  <span key={i} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:`${topic.color}12`, color:topic.color, border:`1px solid ${topic.color}30`, fontWeight:600 }}>{kw}</span>
                 ))}
               </div>
             </div>
-            <div style={{ padding:'12px 20px', borderTop:`1px solid ${t.border}`, display:'flex', justifyContent:'flex-end' }}>
-              <button onClick={() => setModal(null)} style={{ padding:'8px 20px', borderRadius:10, background:PLAT[modal]?.color||'#6366F1', color:modal==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Done</button>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 function IntelligenceView({ t }) {
-  const [activePlat,   setActivePlat]   = useState('LinkedIn');
-  const [activeFilter, setActiveFilter] = useState(null);
-  const cfg = PLAT[activePlat];
-  const allBw = [...new Set(Object.values(MOCK_POSTS).flatMap(p => p.flatMap(x => x.bw||[])))];
-
-  return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:16 }}>
-      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          {Object.keys(PLAT).map(plat => (
-            <button key={plat} onClick={() => setActivePlat(plat)}
-              style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, padding:'6px 12px', borderRadius:10, cursor:'pointer', border:`1px solid ${activePlat===plat?PLAT[plat].color:t.border}`, background:activePlat===plat?PLAT[plat].bg:t.glass, color:activePlat===plat?PLAT[plat].color:t.textSub }}>
-              <span style={{ color:PLAT[plat].color }}>{PLAT[plat].icon}</span>{plat}
-            </button>
-          ))}
-        </div>
-        <AIBriefPanel platform={activePlat} t={t}/>
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10 }}>
-            <Users size={13} style={{ color:cfg.color }}/>
-            <span style={{ fontSize:12, fontWeight:700, color:t.text }}>Inner Circle · {activePlat}</span>
-          </div>
-          {(MOCK_POSTS[activePlat]||[]).map(post => <PostCard key={post.id} post={post} platform={activePlat} t={t}/>)}
-        </div>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:12, position:'sticky', top:0 }}>
-        <GlassCard t={t} style={{ padding:16 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-            <Hash size={13} style={{ color:'#6366F1' }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>Buzzword Radar</span>
-          </div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {allBw.slice(0,18).map((w, i) => {
-              const active = activeFilter === w;
-              return (
-                <button key={i} onClick={() => setActiveFilter(active?null:w)}
-                  style={{ fontSize:11, padding:'3px 9px', borderRadius:7, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'#6366F1':'rgba(99,102,241,0.2)'}`, background:active?'#6366F1':'rgba(99,102,241,0.07)', color:active?'#fff':'#818CF8' }}>
-                  {w}
-                </button>
-              );
-            })}
-          </div>
-        </GlassCard>
-        <GlassCard t={t} style={{ padding:16 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-            <Target size={13} style={{ color:'#22D3EE' }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>Audience Segments</span>
-          </div>
-          {[{ label:'Founders & Builders', pct:34, color:'#6366F1' },{ label:'Creators & Influencers', pct:28, color:'#F0609E' },{ label:'Investors & Execs', pct:22, color:'#22D3EE' },{ label:'Tech Enthusiasts', pct:16, color:'#10B981' }].map((seg,i) => (
-            <div key={i} style={{ marginBottom:10 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                <span style={{ fontSize:11, color:t.textSub }}>{seg.label}</span>
-                <span style={{ fontSize:11, fontWeight:700, color:seg.color }}>{seg.pct}%</span>
-              </div>
-              <div style={{ height:4, borderRadius:4, background:t.border }}>
-                <div style={{ height:4, borderRadius:4, background:seg.color, width:`${seg.pct}%` }}/>
-              </div>
-            </div>
-          ))}
-        </GlassCard>
-        <GlassCard t={t} style={{ padding:16 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-            <TrendingUp size={13} style={{ color:cfg.color }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>Trending in Circle</span>
-          </div>
-          {(TRENDING[activePlat]||[]).map((item,i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 0', borderBottom:`1px solid ${t.border}` }}>
-              <span style={{ fontSize:11, fontWeight:600, color:cfg.color }}>{item.tag}</span>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:10, color:t.textSub }}>{item.v}</div>
-                <div style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{item.d}</div>
-              </div>
-            </div>
-          ))}
-        </GlassCard>
-      </div>
-    </div>
-  );
-}
-
-function TrendingView({ t }) {
-  const [activePlat, setActivePlat] = useState('all');
-  const allTrending = Object.entries(TRENDING).flatMap(([plat, items]) => items.map(item => ({ ...item, plat, color:PLAT[plat]?.color||'#6366F1' })));
-  const sorted    = [...allTrending].sort((a,b) => parseFloat(b.d)-parseFloat(a.d));
-  const displayed = activePlat==='all' ? sorted : sorted.filter(x => x.plat===activePlat);
-
+  const [activePlat, setActivePlat] = useState('LinkedIn');
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-        <button onClick={() => setActivePlat('all')}
-          style={{ fontSize:11, fontWeight:700, padding:'6px 14px', borderRadius:10, cursor:'pointer', border:`1px solid ${activePlat==='all'?'#6366F1':t.border}`, background:activePlat==='all'?'rgba(99,102,241,0.12)':t.glass, color:activePlat==='all'?'#6366F1':t.textSub }}>
-          All Platforms
-        </button>
-        {Object.keys(PLAT).map(plat => (
-          <button key={plat} onClick={() => setActivePlat(plat)}
-            style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700, padding:'6px 12px', borderRadius:10, cursor:'pointer', border:`1px solid ${activePlat===plat?PLAT[plat].color:t.border}`, background:activePlat===plat?PLAT[plat].bg:t.glass, color:activePlat===plat?PLAT[plat].color:t.textSub }}>
+      <SummarizePanel t={t}/>
+      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+        {Object.keys(PLAT).map(plat=>(
+          <button key={plat} onClick={()=>setActivePlat(plat)}
+            style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:700, padding:'6px 12px', borderRadius:10, cursor:'pointer', border:`1px solid ${activePlat===plat?PLAT[plat].color:t.border}`, background:activePlat===plat?PLAT[plat].bg:t.glass, color:activePlat===plat?PLAT[plat].color:t.textSub }}>
             <span style={{ color:PLAT[plat].color }}>{PLAT[plat].icon}</span>{plat}
           </button>
         ))}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-        {displayed.map((item, i) => (
-          <div key={i} style={{ borderRadius:14, padding:'14px 16px', background:t.card, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ fontSize:18, fontWeight:800, color:t.textMuted, width:28, flexShrink:0 }}>#{i+1}</div>
-            <div style={{ flex:1 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
-                <span style={{ color:item.color }}>{PLAT[item.plat]?.icon}</span>
-                <span style={{ fontSize:12, fontWeight:700, color:item.color }}>{item.tag}</span>
-              </div>
-              <div style={{ fontSize:10, color:t.textSub }}>{item.v} mentions · <span style={{ fontWeight:700, color:'#10B981' }}>{item.d}</span></div>
-            </div>
-            <Sparkline data={[20,35,28,45,38,52,48,61,55,70,65,parseFloat(item.d)]} color={item.color} width={40} height={18}/>
-          </div>
-        ))}
+      <AIBriefPanel platform={activePlat} t={t}/>
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+          <Users size={13} style={{ color:PLAT[activePlat]?.color }}/>Inner Circle · {activePlat}
+        </div>
+        {(MOCK_POSTS[activePlat]||[]).map(post=><PostCard key={post.id} post={post} platform={activePlat} t={t}/>)}
       </div>
     </div>
   );
 }
 
-function ContentView({ t }) {
+function StudioView({ t }) {
   const [generating, setGenerating] = useState(false);
-
-  const genIdeas = async () => {
-    setGenerating(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setGenerating(false);
-  };
-
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
-      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-          <Flame size={14} style={{ color:'#F59E0B' }}/>
-          <span style={{ fontSize:13, fontWeight:700, color:t.text }}>Top Performing Posts — All Platforms</span>
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:16 }}>
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+          <Flame size={14} style={{ color:'#F59E0B' }}/>Top Performing Content — All Platforms
         </div>
-        {Object.entries(MOCK_POSTS).flatMap(([plat, posts]) => posts.map(p => ({ ...p, platform:plat }))).sort((a,b) => a.signal==='high'?-1:1).slice(0,8).map(post => (
+        {Object.entries(MOCK_POSTS).flatMap(([plat,posts])=>posts.map(p=>({...p,platform:plat}))).sort((a,b)=>a.signal==='high'?-1:1).slice(0,8).map(post=>(
           <div key={post.id}>
             <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
               <span style={{ color:PLAT[post.platform]?.color }}>{PLAT[post.platform]?.icon}</span>
@@ -705,94 +798,78 @@ function ContentView({ t }) {
           </div>
         ))}
       </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:12, position:'sticky', top:0 }}>
-        <GlassCard t={t} style={{ padding:16 }}>
+      <div>
+        <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
             <Sparkles size={13} style={{ color:'#6366F1' }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>AI Content Ideas</span>
           </div>
-          <button onClick={genIdeas} disabled={generating}
-            style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:7, fontSize:12, fontWeight:700, padding:'10px 0', borderRadius:10, background:'linear-gradient(135deg, #6366F1, #22D3EE)', color:'#fff', border:'none', cursor:'pointer', opacity:generating?0.7:1, marginBottom:12 }}>
+          <button onClick={()=>{ setGenerating(true); setTimeout(()=>setGenerating(false),1500); }} disabled={generating}
+            style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:7, fontSize:12, fontWeight:700, padding:'10px 0', borderRadius:10, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:'pointer', opacity:generating?0.7:1, marginBottom:12 }}>
             {generating?<RefreshCw size={13} style={{ animation:'spin 1s linear infinite' }}/>:<Sparkles size={13}/>}
-            {generating?'Generating…':'Generate Ideas'}
+            {generating?'Generating…':'Generate New Ideas'}
           </button>
-          {CONTENT_IDEAS.map((idea) => (
+          {CONTENT_IDEAS.map(idea=>(
             <div key={idea.id} style={{ borderRadius:10, padding:'10px 12px', background:t.glass, border:`1px solid ${t.border}`, marginBottom:6 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                   <span style={{ color:PLAT[idea.plat]?.color }}>{PLAT[idea.plat]?.icon}</span>
                   <span style={{ fontSize:10, fontWeight:700, color:PLAT[idea.plat]?.color }}>{idea.plat}</span>
                   <span style={{ fontSize:10, color:t.textSub }}>{idea.trend}</span>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:3 }}>
-                  <Star size={9} style={{ color:'#F59E0B' }}/>
-                  <span style={{ fontSize:10, fontWeight:700, color:'#F59E0B' }}>{idea.score}</span>
-                </div>
+                <span style={{ fontSize:10, fontWeight:700, color:'#F59E0B' }}>★{idea.score}</span>
               </div>
               <p style={{ fontSize:11, lineHeight:1.55, color:t.text }}>{idea.hook}</p>
             </div>
           ))}
-        </GlassCard>
+        </div>
       </div>
     </div>
   );
 }
 
 function AlertsView({ t }) {
-  const [alerts,  setAlerts]  = useState(ALERTS);
-  const [filter,  setFilter]  = useState('all');
-  const unread = alerts.filter(a => !a.read).length;
-
-  const markRead = id => setAlerts(prev => prev.map(a => a.id===id?{ ...a, read:true }:a));
-  const markAll  = ()  => setAlerts(prev => prev.map(a => ({ ...a, read:true })));
-  const dismiss  = id => setAlerts(prev => prev.filter(a => a.id!==id));
-
-  const sevStyle = sev => ({
-    critical: { color:'#EF4444', bg:'rgba(239,68,68,0.12)',  border:'rgba(239,68,68,0.2)',  icon:<AlertTriangle size={13}/> },
-    high:     { color:'#F59E0B', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.2)', icon:<Zap size={13}/> },
-    medium:   { color:'#6366F1', bg:'rgba(99,102,241,0.1)',  border:'rgba(99,102,241,0.18)',icon:<Info size={13}/> },
-    low:      { color:'#10B981', bg:'rgba(16,185,129,0.1)',  border:'rgba(16,185,129,0.18)',icon:<CheckCircle size={13}/> },
-  }[sev] || { color:t.textSub, bg:t.glass, border:t.border, icon:<Bell size={13}/> });
-
-  const filtered = filter==='all' ? alerts : filter==='unread' ? alerts.filter(a=>!a.read) : alerts.filter(a=>a.sev===filter);
+  const [alerts, setAlerts] = useState(ALERTS);
+  const [filter, setFilter] = useState('all');
+  const unread = alerts.filter(a=>!a.read).length;
+  const markRead = id=>setAlerts(prev=>prev.map(a=>a.id===id?{...a,read:true}:a));
+  const markAll  = () =>setAlerts(prev=>prev.map(a=>({...a,read:true})));
+  const dismiss  = id =>setAlerts(prev=>prev.filter(a=>a.id!==id));
+  const sevStyle = sev=>({
+    critical:{ color:'#EF4444', bg:'rgba(239,68,68,0.1)',  border:'rgba(239,68,68,0.2)',  icon:<AlertTriangle size={13}/> },
+    high:    { color:'#F59E0B', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.2)', icon:<Zap size={13}/> },
+    medium:  { color:'#6366F1', bg:'rgba(99,102,241,0.1)', border:'rgba(99,102,241,0.18)',icon:<Info size={13}/> },
+    low:     { color:'#10B981', bg:'rgba(16,185,129,0.1)', border:'rgba(16,185,129,0.18)',icon:<CheckCircle size={13}/> },
+  }[sev]||{ color:t.textSub, bg:t.glass, border:t.border, icon:<Bell size={13}/> });
+  const filtered = filter==='all'?alerts:filter==='unread'?alerts.filter(a=>!a.read):alerts.filter(a=>a.sev===filter);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-          {unread>0 && <span style={{ fontSize:11, padding:'3px 10px', borderRadius:7, background:'rgba(239,68,68,0.12)', color:'#EF4444', fontWeight:700 }}>{unread} unread</span>}
-          {['all','unread','critical','high','medium','low'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:7, cursor:'pointer', border:`1px solid ${filter===f?'#6366F1':t.border}`, background:filter===f?'rgba(99,102,241,0.12)':t.glass, color:filter===f?'#6366F1':t.textSub, textTransform:'capitalize' }}>
-              {f}
-            </button>
+          {unread>0&&<span style={{ fontSize:11, padding:'3px 10px', borderRadius:7, background:'rgba(239,68,68,0.12)', color:'#EF4444', fontWeight:700 }}>{unread} unread</span>}
+          {['all','unread','critical','high','medium','low'].map(f=>(
+            <button key={f} onClick={()=>setFilter(f)} style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:7, cursor:'pointer', border:`1px solid ${filter===f?'#6366F1':t.border}`, background:filter===f?'rgba(99,102,241,0.12)':t.glass, color:filter===f?'#6366F1':t.textSub, textTransform:'capitalize' }}>{f}</button>
           ))}
         </div>
-        {unread>0 && <button onClick={markAll} style={{ fontSize:11, color:t.textSub, background:'none', border:'none', cursor:'pointer' }}>Mark all read</button>}
+        {unread>0&&<button onClick={markAll} style={{ fontSize:11, color:t.textSub, background:'none', border:'none', cursor:'pointer' }}>Mark all read</button>}
       </div>
-      {filtered.length===0 && (
-        <div style={{ padding:'48px 0', textAlign:'center' }}>
-          <CheckCircle size={32} style={{ color:t.textMuted, margin:'0 auto 10px' }}/>
-          <p style={{ fontSize:13, color:t.textSub }}>No alerts matching &quot;{filter}&quot;</p>
-        </div>
-      )}
-      {filtered.map(alert => {
-        const s = sevStyle(alert.sev);
-        const platCfg = PLAT[alert.plat];
+      {filtered.map(alert=>{
+        const s=sevStyle(alert.sev);
         return (
           <div key={alert.id} style={{ borderRadius:14, padding:'14px 16px', background:alert.read?t.glass:s.bg, border:`1px solid ${alert.read?t.border:s.border}`, display:'flex', gap:12, alignItems:'flex-start' }}>
             <div style={{ width:32, height:32, borderRadius:9, background:s.bg, border:`1px solid ${s.border}`, display:'flex', alignItems:'center', justifyContent:'center', color:s.color, flexShrink:0 }}>{s.icon}</div>
             <div style={{ flex:1 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, flexWrap:'wrap' }}>
                 <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:4, background:s.bg, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{alert.sev}</span>
-                {platCfg && <span style={{ color:platCfg.color, display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:600 }}>{platCfg.icon} {alert.plat}</span>}
-                {!alert.read && <div style={{ width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>}
+                {alert.plat!=='all'&&PLAT[alert.plat]&&<span style={{ color:PLAT[alert.plat].color, display:'flex', alignItems:'center', gap:3, fontSize:10 }}>{PLAT[alert.plat].icon}{alert.plat}</span>}
+                {!alert.read&&<div style={{ width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>}
               </div>
               <p style={{ fontSize:12, lineHeight:1.55, color:alert.read?t.textSub:t.text, marginBottom:4 }}>{alert.msg}</p>
               <span style={{ fontSize:10, color:t.textMuted, display:'flex', alignItems:'center', gap:3 }}><Clock size={9}/>{alert.time}</span>
             </div>
             <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-              {!alert.read && <button onClick={() => markRead(alert.id)} style={{ fontSize:10, padding:'4px 8px', borderRadius:7, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)', cursor:'pointer' }}>Read</button>}
-              <button onClick={() => dismiss(alert.id)} style={{ padding:'4px 6px', borderRadius:7, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex' }}><X size={11}/></button>
+              {!alert.read&&<button onClick={()=>markRead(alert.id)} style={{ fontSize:10, padding:'4px 8px', borderRadius:7, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)', cursor:'pointer' }}>Read</button>}
+              <button onClick={()=>dismiss(alert.id)} style={{ padding:'4px 6px', borderRadius:7, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex' }}><X size={11}/></button>
             </div>
           </div>
         );
@@ -801,318 +878,275 @@ function AlertsView({ t }) {
   );
 }
 
-function GrowthView({ t }) {
-  const [range, setRange] = useState('30d');
-  const data  = range==='7d' ? GROWTH_DATA.slice(-7) : range==='14d' ? GROWTH_DATA.slice(-14) : GROWTH_DATA;
-  const W=580, H=130;
-  const min=Math.min(...data), max=Math.max(...data), rv=max-min||1;
-  const pts = data.map((v,i) => [((i/(data.length-1))*W).toFixed(1),(H-((v-min)/rv)*H*0.88-H*0.06).toFixed(1)]);
-  const linePath = pts.map((p,i) => `${i===0?'M':'L'} ${p[0]} ${p[1]}`).join(' ');
-  const aPath    = `M ${pts[0][0]} ${H} L ${pts.map(p=>`${p[0]} ${p[1]}`).join(' L ')} L ${pts[pts.length-1][0]} ${H} Z`;
-  const growth   = ((data[data.length-1]-data[0])/data[0]*100).toFixed(1);
+function SourcesView({ t, circle, setCircle }) {
+  const [modal,  setModal]  = useState(null);
+  const [newAcc, setNewAcc] = useState('');
+  const addAcc = ()=>{ if (!newAcc.trim()||!modal) return; setCircle(prev=>({...prev,[modal]:[...(prev[modal]||[]).filter(a=>a!==newAcc.trim()),newAcc.trim()]})); setNewAcc(''); };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:18, padding:24 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
-          <div>
-            <p style={{ fontSize:11, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:3 }}>Follower Growth</p>
-            <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-              <span style={{ fontSize:28, fontWeight:700, color:t.text, letterSpacing:'-0.02em' }}>{fmt(data[data.length-1])}</span>
-              <span style={{ fontSize:13, fontWeight:700, color:'#10B981', display:'flex', alignItems:'center', gap:2 }}><ArrowUpRight size={13}/>{growth}%</span>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <p style={{ fontSize:13, color:t.textSub }}>{Object.values(circle).flat().length} sources tracked · manually add any handle below</p>
+        <button onClick={()=>setModal(Object.keys(PLAT)[0])} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, padding:'8px 16px', borderRadius:10, background:'#6366F1', color:'#fff', border:'none', cursor:'pointer' }}>
+          <Plus size={14}/>Add Source
+        </button>
+      </div>
+      {Object.entries(PLAT).map(([plat,cfg])=>(
+        <div key={plat}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ color:cfg.color }}>{cfg.icon}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:t.text }}>{plat}</span>
+              <span style={{ fontSize:11, padding:'2px 8px', borderRadius:6, background:cfg.bg, color:cfg.color, fontWeight:600 }}>{(circle[plat]||[]).length} following</span>
             </div>
+            <button onClick={()=>setModal(plat)} style={{ padding:'5px 8px', borderRadius:8, background:t.glass, color:t.textSub, border:`1px solid ${t.border}`, cursor:'pointer', display:'flex' }}><Plus size={12}/></button>
           </div>
-          <div style={{ display:'flex', gap:5 }}>
-            {['7d','14d','30d'].map(r => (
-              <button key={r} onClick={() => setRange(r)}
-                style={{ fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:8, cursor:'pointer', border:`1px solid ${range===r?'#6366F1':t.border}`, background:range===r?'rgba(99,102,241,0.12)':t.glass, color:range===r?'#6366F1':t.textSub }}>
-                {r}
-              </button>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(155px, 1fr))', gap:8 }}>
+            {(circle[plat]||[]).map((acc,i)=>(
+              <div key={i} style={{ borderRadius:12, padding:'10px 12px', background:t.card, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                  <div style={{ width:28, height:28, borderRadius:8, background:cfg.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color }}>{acc[0].toUpperCase()}</div>
+                  <span style={{ fontSize:12, fontWeight:600, color:t.text }}>@{acc}</span>
+                </div>
+                <button onClick={()=>setCircle(prev=>({...prev,[plat]:prev[plat].filter(a=>a!==acc)}))} style={{ background:'none', border:'none', cursor:'pointer', color:t.textMuted }}><Trash2 size={11}/></button>
+              </div>
             ))}
+            {!(circle[plat]||[]).length&&(
+              <div onClick={()=>setModal(plat)} style={{ borderRadius:12, padding:'18px 12px', background:t.glass, border:`1px dashed ${t.border}`, display:'flex', flexDirection:'column', alignItems:'center', gap:5, cursor:'pointer' }}>
+                <Plus size={14} style={{ color:t.textMuted }}/><span style={{ fontSize:11, color:t.textMuted }}>Add source</span>
+              </div>
+            )}
           </div>
         </div>
-        <svg width="100%" viewBox={`0 0 ${W} ${H+10}`} style={{ overflow:'visible', display:'block' }}>
-          <defs>
-            <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366F1" stopOpacity="0.22"/>
-              <stop offset="100%" stopColor="#6366F1" stopOpacity="0"/>
-            </linearGradient>
-          </defs>
-          {[0,0.25,0.5,0.75,1].map((f,i) => <line key={i} x1="0" y1={H*f} x2={W} y2={H*f} stroke={t.border} strokeWidth="1"/>)}
-          <path d={aPath} fill="url(#growthGrad)"/>
-          <path d={linePath} fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx={pts[pts.length-1][0]} cy={pts[pts.length-1][1]} r="5" fill="#6366F1" stroke={t.card} strokeWidth="2"/>
-        </svg>
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-        <GlassCard t={t} style={{ padding:18 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
-            <BarChart2 size={13} style={{ color:'#22D3EE' }}/><span style={{ fontSize:12, fontWeight:700, color:t.text }}>Platform Breakdown</span>
-          </div>
-          {[{ label:'LinkedIn', count:3420, delta:'+8.2%',  color:'#2D88FF' },
-            { label:'X',        count:4890, delta:'+12.4%', color:'#E8EAF0' },
-            { label:'Instagram',count:2810, delta:'+22.1%', color:'#F0609E' },
-            { label:'YouTube',  count:5340, delta:'+9.8%',  color:'#FF4444' },
-            { label:'TikTok',   count:8600, delta:'+41.2%', color:'#69C9D0' }].map((plat,i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 0', borderBottom:`1px solid ${t.border}` }}>
-              <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                <span style={{ color:plat.color }}>{PLAT[plat.label]?.icon}</span>
-                <span style={{ fontSize:12, color:t.textSub }}>{plat.label}</span>
+      ))}
+      {modal&&(
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ width:'100%', maxWidth:420, borderRadius:20, background:t.surface, border:`1px solid ${t.borderMid}`, overflow:'hidden' }}>
+            <div style={{ padding:'14px 18px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${t.border}` }}>
+              <h3 style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:15, fontWeight:800, color:t.text }}>Add {modal} Source</h3>
+              <button onClick={()=>setModal(null)} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub }}><X size={16}/></button>
+            </div>
+            <div style={{ padding:18 }}>
+              <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                <input value={newAcc} onChange={e=>setNewAcc(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addAcc()} placeholder="@handle"
+                  style={{ flex:1, fontSize:13, padding:'9px 12px', borderRadius:10, border:`1px solid ${PLAT[modal]?.border||t.border}`, background:t.glass, color:t.text, outline:'none' }}/>
+                <button onClick={addAcc} style={{ padding:'9px 14px', borderRadius:10, background:PLAT[modal]?.color||'#6366F1', color:modal==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer' }}><Plus size={15}/></button>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <span style={{ fontSize:12, fontWeight:600, color:t.text }}>{fmt(plat.count)}</span>
-                <span style={{ fontSize:11, fontWeight:700, color:'#10B981' }}>{plat.delta}</span>
+              <div style={{ display:'flex', flexDirection:'column', gap:5, maxHeight:180, overflowY:'auto' }}>
+                {(circle[modal]||[]).map((acc,i)=>(
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:8, background:t.glass, border:`1px solid ${t.border}` }}>
+                    <span style={{ fontSize:12, color:t.text }}>@{acc}</span>
+                    <button onClick={()=>setCircle(prev=>({...prev,[modal]:prev[modal].filter(a=>a!==acc)}))} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub }}><Trash2 size={12}/></button>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </GlassCard>
-
-        <GlassCard t={t} style={{ padding:18 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
-            <Rocket size={13} style={{ color:'#F59E0B' }}/><span style={{ fontSize:12, fontWeight:700, color:t.text }}>Growth Actions</span>
-          </div>
-          {ACTIONS.map((a,i) => (
-            <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'8px 10px', borderRadius:10, background:t.glass, border:`1px solid ${t.border}`, marginBottom:6, cursor:'pointer', transition:'border-color 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = a.color+'40'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = t.border}>
-              <span style={{ color:a.color, flexShrink:0, marginTop:1 }}>{a.icon}</span>
-              <span style={{ fontSize:11, lineHeight:1.55, color:t.textSub }}>{a.label}</span>
+            <div style={{ padding:'10px 18px', borderTop:`1px solid ${t.border}`, display:'flex', justifyContent:'flex-end' }}>
+              <button onClick={()=>setModal(null)} style={{ padding:'7px 18px', borderRadius:10, background:PLAT[modal]?.color||'#6366F1', color:modal==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Done</button>
             </div>
-          ))}
-          <button style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:11, fontWeight:600, padding:'8px 0', borderRadius:10, background:'rgba(245,158,11,0.1)', color:'#F59E0B', border:'1px solid rgba(245,158,11,0.2)', cursor:'pointer', marginTop:4 }}>
-            <Download size={12}/>Export Growth Report
-          </button>
-        </GlassCard>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function SettingsView({ t, dark, onDark }) {
-  const [showKey, setShowKey] = useState(false);
-  const [notif,   setNotif]   = useState({ spikes:true, sentiment:true, growth:false });
-  const [saved,   setSaved]   = useState(false);
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const [notif, setNotif] = useState({ spikes:true, sentiment:true, growth:false });
+  const [saved, setSaved] = useState(false);
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, maxWidth:800 }}>
-      <GlassCard t={t} style={{ padding:20 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:16 }}>
-          <Key size={14} style={{ color:'#6366F1' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>API Keys</span>
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, maxWidth:780 }}>
+      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
+          <Key size={14} style={{ color:'#6366F1' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>AI API Keys</span>
         </div>
-        <p style={{ fontSize:11, color:t.textSub, marginBottom:14, lineHeight:1.65 }}>Add keys in <strong style={{ color:t.text }}>Vercel → Settings → Environment Variables</strong> and redeploy. Keys are never stored in the browser.</p>
-        {[{ id:'groq',   label:'GROQ_API_KEY',                   hint:'Free at console.groq.com — fastest inference' },
-          { id:'google', label:'GOOGLE_AI_KEY / GEMINI_API_KEY', hint:'Free at aistudio.google.com — 500 req/day' },
-          { id:'claude', label:'ANTHROPIC_API_KEY',              hint:'Paid at console.anthropic.com — highest quality' }].map(f => (
-          <div key={f.id} style={{ marginBottom:14 }}>
-            <label style={{ fontSize:11, fontWeight:600, color:t.textSub, display:'block', marginBottom:5, letterSpacing:'0.04em', fontFamily:'monospace' }}>{f.label}</label>
-            <div style={{ display:'flex', gap:6 }}>
-              <input type={showKey?'text':'password'} readOnly value="•••••••••••••••••••"
-                style={{ flex:1, fontSize:12, padding:'8px 12px', borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, outline:'none', fontFamily:'monospace' }}/>
-              <button onClick={() => setShowKey(s=>!s)}
-                style={{ padding:'8px 10px', borderRadius:9, background:t.glass, border:`1px solid ${t.border}`, color:t.textSub, cursor:'pointer', display:'flex' }}><Eye size={13}/></button>
-            </div>
-            <p style={{ fontSize:10, color:t.textMuted, marginTop:3 }}>{f.hint}</p>
+        <p style={{ fontSize:11, color:t.textSub, marginBottom:14, lineHeight:1.65 }}>Add keys in <strong style={{ color:t.text }}>Vercel → Settings → Environment Variables</strong> and redeploy.</p>
+        {[
+          { label:'GROQ_API_KEY',                   hint:'Free · console.groq.com · fastest inference' },
+          { label:'GOOGLE_AI_KEY / GEMINI_API_KEY', hint:'Free · aistudio.google.com · 500 req/day' },
+          { label:'ANTHROPIC_API_KEY',              hint:'Paid · console.anthropic.com · highest quality' },
+        ].map((f,i)=>(
+          <div key={i} style={{ marginBottom:12 }}>
+            <label style={{ fontSize:10, fontWeight:700, color:t.textSub, display:'block', marginBottom:4, fontFamily:'monospace', letterSpacing:'0.04em' }}>{f.label}</label>
+            <input type="password" readOnly value="•••••••••••••••••••" style={{ width:'100%', fontSize:12, padding:'8px 12px', borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, outline:'none', fontFamily:'monospace', boxSizing:'border-box' }}/>
+            <p style={{ fontSize:10, color:t.textMuted, marginTop:2 }}>{f.hint}</p>
           </div>
         ))}
-      </GlassCard>
-
-      <GlassCard t={t} style={{ padding:20 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:16 }}>
-          <Palette size={14} style={{ color:'#22D3EE' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>Appearance & Notifications</span>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:12, background:t.glass, border:`1px solid ${t.border}`, marginBottom:16 }}>
-          <div>
-            <p style={{ fontSize:12, fontWeight:600, color:t.text }}>Dark Mode</p>
-            <p style={{ fontSize:10, color:t.textSub }}>Obsidian dark interface (recommended)</p>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:20 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
+            <Palette size={14} style={{ color:'#22D3EE' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>Appearance</span>
           </div>
-          <button onClick={onDark} style={{ width:44, height:24, borderRadius:12, background:dark?'#6366F1':t.border, border:'none', cursor:'pointer', position:'relative', transition:'background 0.3s', flexShrink:0 }}>
-            <div style={{ position:'absolute', top:3, left:dark?21:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.3s' }}/>
-          </button>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-          <BellRing size={13} style={{ color:'#F59E0B' }}/><span style={{ fontSize:12, fontWeight:700, color:t.text }}>Alert Preferences</span>
-        </div>
-        {[{ id:'spikes', label:'Spike Alerts', desc:'Notify on +200% velocity posts' },
-          { id:'sentiment', label:'Sentiment Alerts', desc:'Notify on negative sentiment drops' },
-          { id:'growth', label:'Growth Milestones', desc:'Notify on follower milestones' }].map(n => (
-          <div key={n.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:`1px solid ${t.border}` }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:12, background:t.glass, border:`1px solid ${t.border}` }}>
             <div>
-              <p style={{ fontSize:12, color:t.text }}>{n.label}</p>
-              <p style={{ fontSize:10, color:t.textSub }}>{n.desc}</p>
+              <p style={{ fontSize:12, fontWeight:600, color:t.text }}>Dark Mode</p>
+              <p style={{ fontSize:10, color:t.textSub }}>Obsidian dark (recommended)</p>
             </div>
-            <button onClick={() => setNotif(prev => ({ ...prev, [n.id]:!prev[n.id] }))}
-              style={{ width:38, height:21, borderRadius:10, background:notif[n.id]?'#6366F1':t.border, border:'none', cursor:'pointer', position:'relative', transition:'background 0.3s', flexShrink:0 }}>
-              <div style={{ position:'absolute', top:2.5, left:notif[n.id]?18:2.5, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left 0.3s' }}/>
+            <button onClick={onDark} style={{ width:44, height:24, borderRadius:12, background:dark?'#6366F1':t.border, border:'none', cursor:'pointer', position:'relative', transition:'background 0.3s', flexShrink:0 }}>
+              <div style={{ position:'absolute', top:3, left:dark?21:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.3s' }}/>
             </button>
           </div>
-        ))}
-      </GlassCard>
-
-      <div style={{ gridColumn:'1/-1', display:'flex', justifyContent:'flex-end' }}>
-        <button onClick={save}
-          style={{ display:'flex', alignItems:'center', gap:7, fontSize:13, fontWeight:700, padding:'10px 24px', borderRadius:12, background:saved?'#10B981':'#6366F1', color:'#fff', border:'none', cursor:'pointer', transition:'background 0.3s' }}>
-          {saved?<><Check size={15}/>Saved!</>:<><Download size={15}/>Save Settings</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── LAYOUT ────────────────────────────────────────────────────────────────────
-function Sidebar({ collapsed, onCollapse, view, onNav, t, alertCount }) {
-  return (
-    <div style={{ width:collapsed?64:232, minWidth:collapsed?64:232, height:'100vh', background:t.sidebarBg, borderRight:`1px solid ${t.sidebarBorder}`, display:'flex', flexDirection:'column', transition:'width 0.25s ease, min-width 0.25s ease', flexShrink:0, overflow:'hidden', zIndex:10 }}>
-      <div style={{ padding:collapsed?'18px 0':'18px 20px', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', borderBottom:`1px solid ${t.sidebarBorder}`, minHeight:60 }}>
-        <div style={{ width:32, height:32, borderRadius:10, background:'linear-gradient(135deg, #6366F1, #22D3EE)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          <Zap size={16} color="#fff" fill="#fff"/>
         </div>
-        {!collapsed && (
-          <span style={{ fontFamily:'var(--font-syne), sans-serif', fontSize:17, fontWeight:800, background:'linear-gradient(135deg, #6366F1, #22D3EE)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', whiteSpace:'nowrap' }}>
-            AetherHub
-          </span>
-        )}
-      </div>
-      <nav style={{ flex:1, padding:'12px 8px', overflowY:'auto' }}>
-        {NAV.map(item => {
-          const active = view===item.id;
-          const badge  = item.id==='alerts' && alertCount>0 ? alertCount : null;
-          return (
-            <button key={item.id} onClick={() => onNav(item.id)} title={collapsed?item.label:undefined}
-              style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:collapsed?'10px 0':'10px 12px', justifyContent:collapsed?'center':'flex-start', borderRadius:12, border:'none', cursor:'pointer', marginBottom:2, background:active?'rgba(99,102,241,0.12)':'transparent', color:active?'#6366F1':t.textSub, position:'relative', transition:'background 0.2s, color 0.2s' }}
-              onMouseEnter={e => { if (!active) { e.currentTarget.style.background=t.glass; e.currentTarget.style.color=t.text; } }}
-              onMouseLeave={e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=t.textSub; } }}>
-              {active && <div style={{ position:'absolute', left:0, top:'50%', transform:'translateY(-50%)', width:3, height:20, borderRadius:'0 3px 3px 0', background:'#6366F1' }}/>}
-              <span style={{ flexShrink:0 }}>{item.icon}</span>
-              {!collapsed && <span style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap' }}>{item.label}</span>}
-              {badge && !collapsed && <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(239,68,68,0.15)', color:'#EF4444' }}>{badge}</span>}
-              {badge && collapsed && <div style={{ position:'absolute', top:7, right:9, width:7, height:7, borderRadius:'50%', background:'#EF4444' }}/>}
-            </button>
-          );
-        })}
-      </nav>
-      <div style={{ padding:'12px 8px', borderTop:`1px solid ${t.sidebarBorder}` }}>
-        <button onClick={() => onCollapse(!collapsed)}
-          style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:collapsed?'center':'space-between', padding:collapsed?'9px 0':'9px 12px', borderRadius:12, border:'none', cursor:'pointer', background:t.glass, color:t.textSub }}>
-          {!collapsed && <span style={{ fontSize:12, fontWeight:600 }}>Collapse</span>}
-          {collapsed?<ChevronRight size={16}/>:<ChevronLeft size={16}/>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TopBar({ view, dark, onDark, t }) {
-  const [showSearch, setShowSearch] = useState(false);
-  const [query,      setQuery]      = useState('');
-  return (
-    <div style={{ height:56, background:t.surface, borderBottom:`1px solid ${t.border}`, display:'flex', alignItems:'center', paddingLeft:24, paddingRight:20, gap:12, flexShrink:0 }}>
-      <h2 style={{ fontFamily:'var(--font-syne), sans-serif', fontSize:16, fontWeight:800, color:t.text, margin:0, flex:1 }}>{VIEW_LABELS[view]||'Dashboard'}</h2>
-      {showSearch && (
-        <div style={{ position:'relative', flex:'0 0 280px' }}>
-          <Search size={13} style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:t.textSub }}/>
-          <input autoFocus value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Escape'&&setShowSearch(false)}
-            placeholder="Search everything…"
-            style={{ width:'100%', paddingLeft:32, paddingRight:30, paddingTop:8, paddingBottom:8, borderRadius:10, border:`1px solid ${t.borderMid}`, background:t.glass, color:t.text, fontSize:12, outline:'none' }}/>
-          {query && <button onClick={() => setQuery('')} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:t.textSub }}><X size={11}/></button>}
-        </div>
-      )}
-      <button onClick={() => setShowSearch(s=>!s)}
-        style={{ padding:8, borderRadius:9, border:`1px solid ${showSearch?'#6366F1':t.border}`, background:showSearch?'rgba(99,102,241,0.1)':t.glass, color:showSearch?'#6366F1':t.textSub, cursor:'pointer', display:'flex' }}>
-        <Search size={15}/>
-      </button>
-      <button onClick={onDark}
-        style={{ padding:8, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
-        {dark?<Sun size={15}/>:<Moon size={15}/>}
-      </button>
-      <div style={{ width:32, height:32, borderRadius:10, background:'linear-gradient(135deg, #6366F1, #22D3EE)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', flexShrink:0 }}>A</div>
-    </div>
-  );
-}
-
-function OnboardingTour({ onClose, onNav, t }) {
-  const [step, setStep] = useState(0);
-  const steps = [
-    { icon:<Zap size={32} color="#6366F1"/>,         title:'Welcome to AetherHub',    desc:'Your elite social intelligence command center. Track, analyze, and grow your presence across LinkedIn, X, Instagram, YouTube, and TikTok — from one premium dashboard.' },
-    { icon:<LayoutDashboard size={32} color="#22D3EE"/>,title:'Executive Dashboard',  desc:'AI-powered morning briefings, live KPI cards with sparklines, trending heat maps, and top signals from your entire network — at a glance.' },
-    { icon:<Brain size={32} color="#F0609E"/>,        title:'AI Intelligence Briefs',  desc:"Gemini-powered analysis of your inner circle's content. Know who to engage, what to post, and which trends to ride — before the crowd does." },
-    { icon:<TrendingUp size={32} color="#10B981"/>,   title:'Trending & Discovery',    desc:'Real-time trending topics across all platforms, sorted by velocity. Spot viral opportunities before they peak.' },
-    { icon:<Rocket size={32} color="#F59E0B"/>,       title:'Ready to Launch',         desc:'Add GROQ_API_KEY (free) or GOOGLE_AI_KEY in Vercel → Settings → Environment Variables to activate AI briefs. Then head to Sources to add your inner circle.' },
-  ];
-  const s = steps[step];
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(16px)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ width:'100%', maxWidth:460, borderRadius:24, background:t.surface, border:'1px solid rgba(99,102,241,0.3)', overflow:'hidden', boxShadow:'0 0 80px rgba(99,102,241,0.2)' }}>
-        <div style={{ height:3, background:t.border }}>
-          <div style={{ height:3, background:'linear-gradient(90deg, #6366F1, #22D3EE)', width:`${((step+1)/steps.length)*100}%`, transition:'width 0.4s ease' }}/>
-        </div>
-        <div style={{ padding:36, textAlign:'center' }}>
-          <div style={{ marginBottom:20 }}>{s.icon}</div>
-          <h2 style={{ fontFamily:'var(--font-syne), sans-serif', fontSize:22, fontWeight:800, color:t.text, marginBottom:10 }}>{s.title}</h2>
-          <p style={{ fontSize:14, lineHeight:1.7, color:t.textSub, marginBottom:28 }}>{s.desc}</p>
-          <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
-            {step>0 && (
-              <button onClick={() => setStep(s=>s-1)}
-                style={{ padding:'10px 20px', borderRadius:12, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', fontSize:13, fontWeight:600 }}>
-                Back
+        <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:20 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:14 }}>
+            <BellRing size={14} style={{ color:'#F59E0B' }}/><span style={{ fontSize:13, fontWeight:700, color:t.text }}>Alerts</span>
+          </div>
+          {[{ id:'spikes', label:'Spike Alerts', desc:'+200% velocity posts' },{ id:'sentiment', label:'Sentiment Alerts', desc:'Negative drops' },{ id:'growth', label:'Growth Milestones', desc:'Follower milestones' }].map(n=>(
+            <div key={n.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'9px 0', borderBottom:`1px solid ${t.border}` }}>
+              <div>
+                <p style={{ fontSize:12, color:t.text }}>{n.label}</p>
+                <p style={{ fontSize:10, color:t.textSub }}>{n.desc}</p>
+              </div>
+              <button onClick={()=>setNotif(prev=>({...prev,[n.id]:!prev[n.id]}))} style={{ width:38, height:21, borderRadius:10, background:notif[n.id]?'#6366F1':t.border, border:'none', cursor:'pointer', position:'relative', transition:'background 0.3s', flexShrink:0 }}>
+                <div style={{ position:'absolute', top:2.5, left:notif[n.id]?18:2.5, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left 0.3s' }}/>
               </button>
-            )}
-            <button onClick={() => { if (step<steps.length-1) setStep(s=>s+1); else { onClose(); onNav('dashboard'); } }}
-              style={{ padding:'10px 28px', borderRadius:12, border:'none', background:'linear-gradient(135deg, #6366F1, #22D3EE)', color:'#fff', cursor:'pointer', fontSize:13, fontWeight:700, boxShadow:'0 4px 20px rgba(99,102,241,0.4)' }}>
-              {step<steps.length-1?'Next':'Get Started →'}
-            </button>
-          </div>
-          <button onClick={onClose} style={{ marginTop:14, fontSize:11, color:t.textMuted, background:'none', border:'none', cursor:'pointer' }}>Skip tour</button>
+            </div>
+          ))}
         </div>
-        <div style={{ display:'flex', gap:5, justifyContent:'center', paddingBottom:16 }}>
-          {steps.map((_,i) => <div key={i} style={{ width:i===step?20:6, height:6, borderRadius:3, background:i===step?'#6366F1':t.border, transition:'width 0.3s' }}/>)}
-        </div>
+        <button onClick={()=>{ setSaved(true); setTimeout(()=>setSaved(false),2000); }}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, fontSize:12, fontWeight:700, padding:'10px 0', borderRadius:12, background:saved?'#10B981':'#6366F1', color:'#fff', border:'none', cursor:'pointer', transition:'background 0.3s' }}>
+          {saved?<><Check size={14}/>Saved!</>:<><Download size={14}/>Save Settings</>}
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── MAIN APP ──────────────────────────────────────────────────────────────────
+// ─── TOP NAV ──────────────────────────────────────────────────────────────────
+function TopNav({ view, onNav, dark, onDark, t, alertCount, isMobile }) {
+  return (
+    <div style={{ height:isMobile?52:58, background:t.navBg, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:`1px solid ${t.border}`, display:'flex', alignItems:'center', paddingLeft:isMobile?14:22, paddingRight:isMobile?14:18, gap:10, flexShrink:0, position:'sticky', top:0, zIndex:100 }}>
+      {/* Logo */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, marginRight:6 }}>
+        <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#6366F1,#22D3EE)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Zap size={14} color="#fff" fill="#fff"/>
+        </div>
+        <span style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:15, fontWeight:800, background:'linear-gradient(135deg,#6366F1,#22D3EE)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', whiteSpace:'nowrap' }}>
+          AetherHub
+        </span>
+      </div>
+
+      {/* Desktop tabs */}
+      {!isMobile && (
+        <nav style={{ display:'flex', gap:1, flex:1, overflow:'hidden' }}>
+          {NAV_TABS.map(tab=>{
+            const active = view===tab.id;
+            const badge  = tab.id==='alerts' && alertCount>0;
+            return (
+              <button key={tab.id} onClick={()=>onNav(tab.id)}
+                style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:active?700:500, padding:'6px 11px', borderRadius:9, border:'none', cursor:'pointer', background:active?t.accentSub:'transparent', color:active?t.accent:t.textSub, transition:'all 0.15s', position:'relative', whiteSpace:'nowrap', flexShrink:0 }}>
+                <span style={{ opacity:active?1:0.65 }}>{tab.icon}</span>
+                {tab.label}
+                {badge&&<span style={{ position:'absolute', top:5, right:5, width:5, height:5, borderRadius:'50%', background:'#EF4444' }}/>}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {isMobile && <div style={{ flex:1 }}/>}
+
+      {/* Right controls */}
+      <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+        {alertCount>0&&(
+          <button onClick={()=>onNav('alerts')} style={{ position:'relative', padding:7, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
+            <Bell size={14}/>
+            <span style={{ position:'absolute', top:3, right:3, width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>
+          </button>
+        )}
+        <button onClick={onDark} style={{ padding:7, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
+          {dark?<Sun size={14}/>:<Moon size={14}/>}
+        </button>
+        <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#6366F1,#22D3EE)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer' }}>A</div>
+      </div>
+    </div>
+  );
+}
+
+function BottomNav({ view, onNav, t, alertCount }) {
+  return (
+    <div style={{ height:58, background:t.navBg, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:`1px solid ${t.border}`, display:'flex', alignItems:'center', justifyContent:'space-around', flexShrink:0, position:'sticky', bottom:0, zIndex:100 }}>
+      {NAV_TABS.slice(0,5).map(tab=>{
+        const active = view===tab.id;
+        const badge  = tab.id==='alerts' && alertCount>0;
+        return (
+          <button key={tab.id} onClick={()=>onNav(tab.id)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'6px 0', border:'none', cursor:'pointer', background:'transparent', color:active?t.accent:t.textSub, position:'relative' }}>
+            <span style={{ opacity:active?1:0.55 }}>{tab.icon}</span>
+            <span style={{ fontSize:9, fontWeight:active?700:500 }}>{tab.label}</span>
+            {badge&&<div style={{ position:'absolute', top:4, right:'calc(50% - 12px)', width:5, height:5, borderRadius:'50%', background:'#EF4444' }}/>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AetherHub() {
-  const [view,       setView]       = useState('dashboard');
-  const [collapsed,  setCollapsed]  = useState(false);
-  const [dark,       setDark]       = useState(true);
-  const [circle,     setCircle]     = useState(DEFAULT_CIRCLE);
-  const [onboarding, setOnboarding] = useState(() => {
-    try { return !localStorage.getItem('aether_onboarded'); } catch { return true; }
-  });
+  const [view,         setView]         = useState('feed');
+  const [dark,         setDark]         = useState(true);
+  const [circle,       setCircle]       = useState(DEFAULT_CIRCLE);
+  const [activeFilter, setActiveFilter] = useState(null);
+  const [panelOpen,    setPanelOpen]    = useState(false);
+  const w = useWindowSize();
+  const isMobile   = w < 768;
+  const showPanel  = w >= 1120;
 
   const t = dark ? T.dark : T.light;
-  const unreadAlerts = ALERTS.filter(a => !a.read).length;
+  const unreadAlerts = ALERTS.filter(a=>!a.read).length;
 
-  const closeOnboarding = () => {
-    setOnboarding(false);
-    try { localStorage.setItem('aether_onboarded', '1'); } catch {}
-  };
+  const viewLabel = { feed:'Feed', discover:'Discover', intelligence:'Intelligence', studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings' };
 
   return (
-    <div style={{ display:'flex', height:'100vh', background:t.bg, color:t.text, fontFamily:"var(--font-inter), -apple-system, sans-serif", overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:t.bg, color:t.text, fontFamily:"var(--font-inter),-apple-system,sans-serif", overflow:'hidden' }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+        @keyframes spin  { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
         * { box-sizing: border-box; }
+        input::placeholder,textarea::placeholder { color: rgba(120,120,160,0.45); }
       `}</style>
-      <Sidebar collapsed={collapsed} onCollapse={setCollapsed} view={view} onNav={setView} t={t} alertCount={unreadAlerts}/>
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
-        <TopBar view={view} dark={dark} onDark={() => setDark(d=>!d)} t={t}/>
-        <main style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
-          {view==='dashboard'    && <DashboardView    t={t} onNav={setView}/>}
-          {view==='sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
-          {view==='intelligence' && <IntelligenceView t={t} circle={circle}/>}
-          {view==='trending'     && <TrendingView     t={t}/>}
-          {view==='content'      && <ContentView      t={t} circle={circle}/>}
+
+      <TopNav view={view} onNav={setView} dark={dark} onDark={()=>setDark(d=>!d)} t={t} alertCount={unreadAlerts} isMobile={isMobile}/>
+
+      <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
+        {/* Main content */}
+        <main style={{ flex:1, overflowY:'auto', padding:isMobile?'16px 14px':'22px 26px' }}>
+          {/* Page header */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+            <div>
+              <h1 style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:isMobile?17:20, fontWeight:800, color:t.text, margin:0, letterSpacing:'-0.02em' }}>{viewLabel[view]||'Feed'}</h1>
+              {activeFilter&&view==='feed'&&<p style={{ fontSize:11, color:t.accent, marginTop:2 }}>Filtered: {activeFilter}</p>}
+            </div>
+            {!showPanel&&(
+              <button onClick={()=>setPanelOpen(p=>!p)} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, padding:'6px 12px', borderRadius:10, border:`1px solid ${panelOpen?t.accent:t.border}`, background:panelOpen?t.accentSub:t.glass, color:panelOpen?t.accent:t.textSub, cursor:'pointer' }}>
+                <TrendingUp size={12}/>Trends
+              </button>
+            )}
+          </div>
+
+          {view==='feed'         && <FeedView         t={t} activeFilter={activeFilter} setActiveFilter={setActiveFilter} onNav={setView}/>}
+          {view==='discover'     && <DiscoverView     t={t} setActiveFilter={setActiveFilter} onNav={setView}/>}
+          {view==='intelligence' && <IntelligenceView t={t}/>}
+          {view==='studio'       && <StudioView       t={t}/>}
           {view==='alerts'       && <AlertsView       t={t}/>}
-          {view==='growth'       && <GrowthView       t={t}/>}
-          {view==='settings'     && <SettingsView     t={t} dark={dark} onDark={() => setDark(d=>!d)}/>}
+          {view==='sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
+          {view==='settings'     && <SettingsView     t={t} dark={dark} onDark={()=>setDark(d=>!d)}/>}
         </main>
+
+        {/* Right intelligence panel */}
+        {(showPanel||panelOpen) && (
+          <aside style={{ width:280, minWidth:280, borderLeft:`1px solid ${t.border}`, overflowY:'auto', padding:'18px 14px', flexShrink:0, position:panelOpen&&!showPanel?'absolute':'relative', right:0, top:0, bottom:0, background:t.bg, zIndex:panelOpen&&!showPanel?50:undefined }}>
+            {panelOpen&&!showPanel&&(
+              <button onClick={()=>setPanelOpen(false)} style={{ position:'absolute', top:10, right:10, background:'none', border:'none', cursor:'pointer', color:t.textSub }}><X size={14}/></button>
+            )}
+            <RightPanel t={t} activeFilter={activeFilter} setActiveFilter={f=>{ setActiveFilter(f); setView('feed'); }}/>
+          </aside>
+        )}
       </div>
-      {onboarding && <OnboardingTour onClose={closeOnboarding} onNav={setView} t={t}/>}
+
+      {isMobile&&<BottomNav view={view} onNav={setView} t={t} alertCount={unreadAlerts}/>}
     </div>
   );
 }
