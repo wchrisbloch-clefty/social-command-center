@@ -69,11 +69,70 @@ async function tryClaude(prompt, maxTokens) {
   } catch { return null; }
 }
 
+// Compose a chat-style single-prompt string from a running conversation +
+// extracted source. The provider fns above take one prompt string, so we flatten
+// the chat here rather than adding per-provider chat plumbing — this keeps the
+// existing single-prompt `type` path (MorningDigest, AIBriefPanel, SummarizePanel)
+// completely untouched while reusing the exact same Groq→Gemini→Claude fallback.
+//
+// LIBRARY HOOK: a future "save this source and re-query later" feature attaches
+// here — persist { title, context } keyed by an id, then hydrate `context` from
+// that store instead of the request body. No change to the message flow needed.
+function buildConversationPrompt({ context, title, messages }) {
+  const system =
+    'You are a focused reading assistant. Answer ONLY using the SOURCE below. ' +
+    "If the answer is not contained in the source, say so plainly (e.g. \"That's not " +
+    'covered in this source.") — do not use outside knowledge or guess. Be concise, ' +
+    'quote or reference specifics from the source when helpful.';
+
+  const convo = messages
+    .filter((m) => m && m.content && (m.role === 'user' || m.role === 'assistant'))
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${String(m.content).trim()}`)
+    .join('\n\n');
+
+  return (
+    `${system}\n\n` +
+    `=== SOURCE${title ? `: ${title}` : ''} ===\n` +
+    `${(context || '').slice(0, 12000)}\n` +
+    `=== END SOURCE ===\n\n` +
+    `${convo}\n\nAssistant:`
+  );
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { prompt, type } = body;
+    const { prompt, type, messages, context, title } = body;
 
+    // ── Conversation mode ("Ask Anything"): optional messages[] + context ──────
+    if (Array.isArray(messages) && messages.length > 0) {
+      const chatPrompt = buildConversationPrompt({ context, title, messages });
+      for (const { name, fn } of [
+        { name: 'Groq',   fn: tryGroq   },
+        { name: 'Gemini', fn: tryGemini },
+        { name: 'Claude', fn: tryClaude },
+      ]) {
+        const result = await fn(chatPrompt, 600);
+        if (result) return Response.json({ text: result, provider: name });
+      }
+      const configured = [
+        process.env.GROQ_API_KEY && 'Groq',
+        (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY) && 'Gemini',
+        process.env.ANTHROPIC_API_KEY && 'Claude',
+      ].filter(Boolean);
+      if (!configured.length) {
+        return Response.json(
+          { text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_KEY in Vercel → Settings → Environment Variables.' },
+          { status: 500 }
+        );
+      }
+      return Response.json(
+        { text: `All providers failed (tried: ${configured.join(', ')}). Please retry.` },
+        { status: 502 }
+      );
+    }
+
+    // ── Single-prompt mode (unchanged, backward compatible) ────────────────────
     if (!prompt) {
       return Response.json({ text: 'No prompt provided.' }, { status: 400 });
     }
