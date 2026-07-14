@@ -9,6 +9,7 @@ import {
   Key, Palette, Star, Flame, BellRing, Check, Bell, Settings, TrendingUp,
   BarChart2, FileText, Link, Copy, ChevronRight, Globe, Eye, Users,
   Heart, Filter, Menu, Compass, MoreHorizontal, Play, BookOpen, Layers,
+  MessageSquare, Send, Upload,
 } from 'lucide-react';
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -412,6 +413,254 @@ function SummarizePanel({ t }) {
   );
 }
 
+// ─── ASK ANYTHING PANEL ───────────────────────────────────────────────────────
+// Conversational Q&A over ANY source (URL / pasted text / uploaded .txt|.md file).
+// Flow:  extract via POST /api/extract  →  chat via POST /api/brief { messages, context }.
+// Reuses the existing Groq→Gemini→Claude fallback chain (no new AI providers).
+//
+// LIBRARY HOOK: `source` holds { title, text, sourceType }. A future
+// "save this source to a library and re-query later" feature attaches here —
+// persist `source` (and optionally `messages`) on load and add a picker to
+// rehydrate them. The chat/context flow below stays identical, so it's an
+// addition rather than a rewrite.
+const SOURCE_META = {
+  youtube: { label: 'YouTube',  color: '#FF4444' },
+  podcast: { label: 'Podcast',  color: '#22D3EE' },
+  article: { label: 'Article',  color: '#2D88FF' },
+  text:    { label: 'Text',     color: '#6366F1' },
+  file:    { label: 'File',     color: '#F0609E' },
+};
+
+function AskAnythingPanel({ t }) {
+  const [inputMode, setInputMode] = useState('url');   // 'url' | 'paste'
+  const [urlInput,  setUrlInput]  = useState('');
+  const [pasteText, setPasteText] = useState('');
+  const [source,    setSource]    = useState(null);    // { title, text, sourceType, truncated }
+  const [extracting,setExtracting]= useState(false);
+  const [error,     setError]     = useState('');
+  const [messages,  setMessages]  = useState([]);      // { role, content }
+  const [chatInput, setChatInput] = useState('');
+  const [sending,   setSending]   = useState(false);
+  const fileRef   = useRef(null);
+  const scrollRef = useRef(null);
+  const accent = '#6366F1';
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior:'smooth' });
+  }, [messages, sending]);
+
+  const reset = () => { setSource(null); setMessages([]); setError(''); setChatInput(''); };
+
+  const loadUrl = async () => {
+    const u = urlInput.trim();
+    if (!u) return;
+    setExtracting(true); setError(''); setSource(null); setMessages([]);
+    try {
+      const r = await fetch('/api/extract', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ url:u }) });
+      const d = await r.json();
+      if (d.error) setError(d.error);
+      else setSource(d);
+    } catch { setError('Could not extract that URL. Try pasting the text instead.'); }
+    setExtracting(false);
+  };
+
+  const loadPaste = () => {
+    const txt = pasteText.trim();
+    if (!txt) return;
+    setError(''); setMessages([]);
+    const title = (txt.split('\n').find(l=>l.trim()) || 'Pasted text').slice(0,60);
+    setSource({ title, text: txt.slice(0,12000), sourceType:'text', truncated: txt.length>12000 });
+  };
+
+  // Files are parsed client-side (no server round-trip needed for text formats).
+  const loadFile = (file) => {
+    if (!file) return;
+    setError('');
+    const name = file.name || 'file';
+    const ext  = (name.split('.').pop() || '').toLowerCase();
+    if (ext === 'txt' || ext === 'md' || (file.type||'').startsWith('text/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const txt = String(reader.result || '');
+        if (!txt.trim()) { setError('That file appears to be empty.'); return; }
+        setMessages([]);
+        setSource({ title:name, text:txt.slice(0,12000), sourceType:'file', truncated:txt.length>12000 });
+      };
+      reader.onerror = () => setError('Could not read that file.');
+      reader.readAsText(file);
+    } else if (ext === 'pdf') {
+      // PDF text extraction requires a parser (e.g. pdfjs-dist) we intentionally
+      // don't bundle per the "no heavy deps" constraint. For v1, ask the user to
+      // paste the text or upload a .txt/.md file.
+      setError('PDF parsing isn’t supported in v1 (avoids a heavy dependency) — copy the text and paste it, or upload a .txt/.md file.');
+    } else {
+      setError('Unsupported file type. Use .txt or .md, or paste the text.');
+    }
+  };
+
+  const send = async (text) => {
+    const q = (text ?? chatInput).trim();
+    if (!q || !source || sending) return;
+    const next = [...messages, { role:'user', content:q }];
+    setMessages(next); setChatInput(''); setSending(true);
+    try {
+      const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ messages: next, context: source.text, title: source.title }) });
+      const d = await r.json();
+      setMessages([...next, { role:'assistant', content: d.text || 'No response — please try again.' }]);
+    } catch {
+      setMessages([...next, { role:'assistant', content: 'Connection failed. Check your API key in Settings.' }]);
+    }
+    setSending(false);
+  };
+
+  const QUICK = [
+    { label:'Summarize',     q:'Summarize this source in 4-5 tight bullet points.' },
+    { label:'Key takeaways', q:'What are the key takeaways? List the most important points from the source.' },
+    { label:'Quiz me',       q:'Ask me 3 quiz questions about this source to test my understanding, one at a time.' },
+  ];
+
+  const meta = source ? (SOURCE_META[source.sourceType] || SOURCE_META.text) : null;
+
+  return (
+    <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:18, padding:18 }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        <div style={{ width:34, height:34, borderRadius:10, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.25)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <MessageSquare size={16} style={{ color:accent }}/>
+        </div>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:6 }}>
+            Ask Anything <Sparkles size={12} style={{ color:accent }}/>
+          </div>
+          <div style={{ fontSize:11, color:t.textSub }}>Load a URL, text, or file — then chat about it</div>
+        </div>
+      </div>
+
+      {/* ── Loader (no source yet) ── */}
+      {!source && (
+        <div>
+          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+            {['url','paste'].map(m=>(
+              <button key={m} onClick={()=>{setInputMode(m); setError('');}}
+                style={{ flex:1, fontSize:11, fontWeight:700, padding:'8px 10px', borderRadius:10, cursor:'pointer',
+                  border:`1px solid ${inputMode===m?t.accentBorder:t.border}`, background:inputMode===m?t.accentSub:t.glass,
+                  color:inputMode===m?accent:t.textSub, textTransform:'capitalize' }}>
+                {m==='url'?'URL':'Paste text'}
+              </button>
+            ))}
+            <button onClick={()=>fileRef.current?.click()}
+              style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, fontSize:11, fontWeight:700, padding:'8px 10px', borderRadius:10, cursor:'pointer', border:`1px solid ${t.border}`, background:t.glass, color:t.textSub }}>
+              <Upload size={13}/> File
+            </button>
+            <input ref={fileRef} type="file" accept=".txt,.md,.pdf,text/plain,text/markdown" style={{ display:'none' }}
+              onChange={e=>{ loadFile(e.target.files?.[0]); e.target.value=''; }}/>
+          </div>
+
+          {inputMode==='url' ? (
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <input value={urlInput} onChange={e=>setUrlInput(e.target.value)}
+                onKeyDown={e=>{ if(e.key==='Enter') loadUrl(); }}
+                placeholder="Paste an article, YouTube, or podcast URL…"
+                style={{ flex:'1 1 200px', minWidth:0, fontSize:12, padding:'10px 12px', borderRadius:10, border:`1px solid ${urlInput?t.borderMid:t.border}`, background:t.glass, color:t.text, outline:'none' }}/>
+              <button onClick={loadUrl} disabled={extracting||!urlInput.trim()}
+                style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'10px 18px', borderRadius:10, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:extracting||!urlInput.trim()?'not-allowed':'pointer', opacity:!urlInput.trim()?0.45:1 }}>
+                {extracting?<RefreshCw size={13} style={{ animation:'spin 1s linear infinite' }}/>:<ArrowUpRight size={13}/>}
+                {extracting?'Loading…':'Load'}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)}
+                placeholder="Paste an article, transcript, dev plan, or any text here…"
+                style={{ width:'100%', height:110, resize:'vertical', padding:'10px 12px', borderRadius:10, border:`1px solid ${pasteText?t.borderMid:t.border}`, background:t.glass, color:t.text, fontSize:12, lineHeight:1.6, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}/>
+              <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}>
+                <button onClick={loadPaste} disabled={!pasteText.trim()}
+                  style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'9px 18px', borderRadius:10, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:!pasteText.trim()?'not-allowed':'pointer', opacity:!pasteText.trim()?0.45:1 }}>
+                  <ArrowUpRight size={13}/> Load
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginTop:10, fontSize:11, color:'#F0609E', background:'rgba(240,96,158,0.08)', border:'1px solid rgba(240,96,158,0.2)', borderRadius:10, padding:'8px 12px', lineHeight:1.5 }}>
+              <AlertTriangle size={12} style={{ verticalAlign:'-2px', marginRight:5 }}/>{error}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Ready state + chat ── */}
+      {source && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:12, background:t.glass, border:`1px solid ${t.border}`, marginBottom:12 }}>
+            <span style={{ flexShrink:0, fontSize:9, fontWeight:800, letterSpacing:'0.04em', textTransform:'uppercase', padding:'3px 7px', borderRadius:7, color:meta.color, background:`${meta.color}1A`, border:`1px solid ${meta.color}33` }}>{meta.label}</span>
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:t.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{source.title}</div>
+              <div style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:5 }}>
+                <CheckCircle size={10} style={{ color:'#10B981' }}/> Ready{source.truncated?' · truncated to 12k chars':''}
+              </div>
+            </div>
+            <button onClick={reset} title="New source"
+              style={{ flexShrink:0, display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'6px 10px', borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer' }}>
+              <RefreshCw size={11}/> New
+            </button>
+          </div>
+
+          {/* Chat area */}
+          <div ref={scrollRef} style={{ maxHeight:340, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, padding:'2px', marginBottom:10 }}>
+            {messages.length===0 && (
+              <div style={{ fontSize:11, color:t.textSub, textAlign:'center', padding:'18px 8px', lineHeight:1.6 }}>
+                <Brain size={18} style={{ color:accent, opacity:0.7, marginBottom:6 }}/>
+                <div>Ask anything about this source, or tap a quick action below.</div>
+              </div>
+            )}
+            {messages.map((m,i)=>(
+              <div key={i} style={{ display:'flex', justifyContent:m.role==='user'?'flex-end':'flex-start' }}>
+                <div style={{ maxWidth:'86%', fontSize:12, lineHeight:1.65, padding:'9px 13px', borderRadius:14,
+                  borderBottomRightRadius:m.role==='user'?4:14, borderBottomLeftRadius:m.role==='user'?14:4,
+                  background:m.role==='user'?'linear-gradient(135deg,#6366F1,#22D3EE)':t.glass,
+                  color:m.role==='user'?'#fff':t.text, border:m.role==='user'?'none':`1px solid ${t.border}`, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {sending && (
+              <div style={{ display:'flex', justifyContent:'flex-start' }}>
+                <div style={{ fontSize:11, color:t.textSub, padding:'9px 13px', borderRadius:14, background:t.glass, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', gap:6 }}>
+                  <RefreshCw size={12} style={{ animation:'spin 1s linear infinite', color:accent }}/> Thinking…
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick-action chips */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            {QUICK.map(qa=>(
+              <button key={qa.label} onClick={()=>send(qa.q)} disabled={sending}
+                style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, padding:'6px 11px', borderRadius:999, cursor:sending?'not-allowed':'pointer', border:`1px solid ${t.accentBorder}`, background:t.accentSub, color:accent, opacity:sending?0.5:1 }}>
+                <Sparkles size={10}/>{qa.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sticky input row */}
+          <div style={{ position:'sticky', bottom:0, display:'flex', gap:8, alignItems:'flex-end', paddingTop:2, background:t.card }}>
+            <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } }}
+              placeholder="Ask a question…" disabled={sending}
+              style={{ flex:1, minWidth:0, fontSize:12, padding:'11px 14px', borderRadius:12, border:`1px solid ${chatInput?t.borderMid:t.border}`, background:t.glass, color:t.text, outline:'none' }}/>
+            <button onClick={()=>send()} disabled={sending||!chatInput.trim()} aria-label="Send"
+              style={{ flexShrink:0, width:42, height:42, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:12, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:sending||!chatInput.trim()?'not-allowed':'pointer', opacity:!chatInput.trim()?0.45:1 }}>
+              <Send size={16}/>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MORNING DIGEST ───────────────────────────────────────────────────────────
 function MorningDigest({ t }) {
   const [bullets, setBullets] = useState([]);
@@ -784,6 +1033,7 @@ function IntelligenceView({ t }) {
   const [activePlat, setActivePlat] = useState('LinkedIn');
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+      <AskAnythingPanel t={t}/>
       <SummarizePanel t={t}/>
       <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
         {Object.keys(PLAT).map(plat=>(
