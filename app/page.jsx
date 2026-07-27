@@ -17,7 +17,13 @@ const T = {
   dark: {
     bg:'#06060F', surface:'#0B0B1A', raised:'#0F0F26', card:'#0D0D20',
     border:'rgba(255,255,255,0.05)', borderMid:'rgba(255,255,255,0.09)', borderHigh:'rgba(255,255,255,0.16)',
-    text:'#EAEAFF', textSub:'#5C5C80', textMuted:'#21213F',
+    // textSub/textMuted are lighter than they look like they "should" be, on
+    // purpose. The originals (#5C5C80 / #21213F) measured 3.01:1 and 1.30:1
+    // against the worst-case dark surface — both below WCAG AA. Raising muted
+    // alone would have made it brighter than sub and inverted the hierarchy,
+    // so both moved. Hue and saturation are unchanged; only lightness. These
+    // match --ah-text-sub / --ah-text-muted in globals.css. See BRAND.md §9.6.
+    text:'#EAEAFF', textSub:'#9696B3', textMuted:'#7878B8',
     glass:'rgba(255,255,255,0.025)', glassBorder:'rgba(255,255,255,0.06)',
     navBg:'rgba(6,6,15,0.9)',
     accent:'#6366F1', accentSub:'rgba(99,102,241,0.12)', accentBorder:'rgba(99,102,241,0.28)',
@@ -25,7 +31,8 @@ const T = {
   light: {
     bg:'#ECEEF8', surface:'#FFFFFF', raised:'#F4F4FC', card:'#FFFFFF',
     border:'rgba(0,0,0,0.055)', borderMid:'rgba(0,0,0,0.09)', borderHigh:'rgba(0,0,0,0.15)',
-    text:'#0D0D1E', textSub:'#585878', textMuted:'#ABABCB',
+    // textSub already passed at 5.89:1 and is unchanged. textMuted was 1.93:1.
+    text:'#0D0D1E', textSub:'#585878', textMuted:'#6565A0',
     glass:'rgba(0,0,0,0.015)', glassBorder:'rgba(0,0,0,0.05)',
     navBg:'rgba(236,238,248,0.92)',
     accent:'#6366F1', accentSub:'rgba(99,102,241,0.08)', accentBorder:'rgba(99,102,241,0.22)',
@@ -221,6 +228,15 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
             <div style={{ fontSize:12, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:5 }}>
               <span style={{ color:cfg.color }}>{cfg.icon}</span>@{post.author}
               <span style={{ fontSize:9, fontWeight:600, padding:'1px 5px', borderRadius:4, background:cfg.bg, color:cfg.color }}>{platform}</span>
+              {/* Every MOCK_POSTS render path funnels through PostCard, so one
+                  chip here covers the feed, the inner circle, the studio list
+                  and every filtered/search result. Per-card rather than
+                  per-page on purpose: a cropped screenshot of a single card
+                  still carries it. */}
+              <span title="Sample content — not live platform data"
+                style={{ fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.14)', color:'#F59E0B', border:'1px solid rgba(245,158,11,0.32)', letterSpacing:'0.04em', whiteSpace:'nowrap' }}>
+                DEMO DATA
+              </span>
             </div>
             <div style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
               <Clock size={9}/>{post.time} · <span style={{ color:cfg.color }}>{post.eng}</span>

@@ -131,6 +131,29 @@ appears and disagrees with the column, it throws rather than guessing, because
 the wrong guess silently migrates or fails to migrate real data. An agreeing
 copy is tolerated so a hand-written seed row is not fatal.
 
+**Staleness is detected from `updatedAt`, never from a hash of the payload.**
+This is load-bearing. Do not "improve" it into a checksum.
+
+The obvious-looking upgrade is to hash the stored payload and compare it against
+a hash embedded in the generated file, so a sync becomes a no-op when nothing
+changed. It cannot work here. `jsonb` does not store the text it was given — it
+stores a parsed structure, normalizes key order, and collapses duplicate keys.
+Verified against PostgreSQL 16: `{zebra, apple, mango}` comes back as
+`{apple, mango, zebra}`, nested objects included.
+
+So a checksum taken over the payload as written will not match a checksum taken
+over the payload as read back, on the very first round trip, for a profile
+nobody touched. The mismatch is not a bug to fix downstream — it is the
+storage engine behaving correctly. A hash-based staleness check would report
+"changed" forever and every sync would rewrite both files while claiming a
+difference that does not exist.
+
+A timestamp has none of that trouble: the database assigns it with `now()` on
+write, and it compares against the banner without needing the payload to be
+byte-stable. If a content-level comparison is ever genuinely needed, it has to
+be taken over the *rendered markdown* — which is deterministic — and not over
+the stored JSON.
+
 **`schemaVersion` and `updatedAt` belong to the store.** Neither appears on
 `VoiceProfileInput`, so a client cannot backdate a write or claim a schema
 version it does not conform to. `schemaVersion` is stored per row so a future
