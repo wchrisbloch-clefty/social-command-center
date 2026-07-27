@@ -25,12 +25,23 @@ export {
 } from './validate.ts';
 
 export {
-  formatEvidence,
+  EMPTY_SECTION_PLACEHOLDER,
   renderAboutMe,
   renderMarkdown,
   renderSystemPreamble,
   renderVoice,
 } from './render.ts';
+
+export {
+  FILE_TITLES,
+  VOICE_SECTIONS,
+  describeSection,
+  escapeInline,
+  formatEvidence,
+  missingSections,
+  type VoiceFileName,
+  type VoiceSection,
+} from './sections.ts';
 
 export {
   VoiceStoreError,
@@ -40,6 +51,7 @@ export {
 
 export {
   createPostgresVoiceStore,
+  voiceProfileDDL,
   type PostgresVoiceStoreOptions,
   type SqlExecutor,
 } from './adapters/postgres.ts';
@@ -51,6 +63,7 @@ export {
 
 // Server-only. Touches node:fs — do not import from a client component.
 export {
+  IncompleteProfileError,
   renderSyncArtifacts,
   syncVoiceFiles,
   type FileWriter,

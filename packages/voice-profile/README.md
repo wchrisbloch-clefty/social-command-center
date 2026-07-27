@@ -122,6 +122,15 @@ treats it like a measurement too: whole numbers, non-zero denominator,
 letting it through would write "7 of 5 samples" into a file a skill reads as
 fact.
 
+**`schema_version` is a column, and the column wins.** It is not duplicated
+inside the `data` jsonb: the payload holds the profile, the columns hold
+metadata about the payload. A migration can then filter on the version without
+unpacking every row, and there is no second copy to disagree with the first.
+`getProfile()` asserts the separation still holds — if `data.schemaVersion`
+appears and disagrees with the column, it throws rather than guessing, because
+the wrong guess silently migrates or fails to migrate real data. An agreeing
+copy is tolerated so a hand-written seed row is not fatal.
+
 **`schemaVersion` and `updatedAt` belong to the store.** Neither appears on
 `VoiceProfileInput`, so a client cannot backdate a write or claim a schema
 version it does not conform to. `schemaVersion` is stored per row so a future
@@ -138,14 +147,72 @@ narrows the loose form and reports *every* problem it finds, not just the first.
 **Rows are validated on read, not trusted.** Stored JSON may predate a schema
 change or have been edited by hand in a SQL console.
 
-**Headings are the real contract.** The strings in `render.ts` must match
-`voice-builder`'s output exactly. A skill grepping for `## Signature phrases`
-finds nothing if it is renamed. The test suite asserts every heading in both
-files for this reason.
+**Headings are the real contract.** The strings in `src/sections.ts` must match
+`voice-builder`'s templates exactly. A skill grepping for `## Signature phrases`
+finds nothing if it is renamed, and nothing fails loudly when that happens —
+every skill keeps working, quietly reading a profile with a section it cannot
+see.
 
-**`renderMarkdown` is pure; the banner lives in `sync`.** The projection has no
-"generated file" preamble, so the same function can feed an LLM without shipping
-it a do-not-edit notice. The banner belongs to the artifact, not the content.
+`test/upstream-contract.test.ts` guards this by parsing headings straight out of
+`.agents/social-media-skills/skills/voice-builder/SKILL.md` and diffing them
+against what `renderMarkdown()` emits, in both directions. It reads the
+submodule rather than a copied fixture on purpose: a fixture freezes the
+contract at the moment it was copied and passes forever after upstream changes,
+which is the exact failure it exists to catch. It skips rather than fails when
+the submodule is absent, so the package stays extractable.
+
+Note `## Off limits` in `about-me.md` versus `## Off-limits` in `voice.md`.
+**That inconsistency is upstream's, and it is mirrored deliberately** —
+normalizing it would break the match.
+
+**Each projection owns its own framing; `renderMarkdown()` stays pure.** This is
+the rule, not an observation about the current code.
+
+`renderMarkdown()` emits headings and content. Nothing else. No banner, no
+do-not-edit notice, no "you are writing as this author" instruction, no
+destination-specific scaffolding of any kind. Whatever a particular consumer
+needs wrapped around the content belongs to that consumer:
+
+| Projection | Owns |
+|---|---|
+| disk artifact (`sync.ts`) | the generated-file banner, `schemaVersion` and `updatedAt` stamps |
+| system preamble (`render.ts`) | the voice-matching instruction, the `=== AUTHOR ===` delimiters |
+| *next: newsletter-voice* | whatever that format needs — and nothing it does not |
+
+The pressure to break this is real and it always looks reasonable in the moment:
+one consumer needs a header, `renderMarkdown()` is right there, and adding it
+saves a function. The cost lands on the *next* consumer, which now has to strip
+out framing meant for someone else — and stripping is guesswork, where composing
+is not. `newsletter-voice` is the next consumer, so this rule is about to be
+tested.
+
+The same rule decides empty sections, and the two projections resolve it
+differently:
+
+- **disk artifact** — keep the heading, fill with `_Not captured yet._`. A skill
+  grepping for `## Audience` and finding the heading followed by nothing is
+  worse off than one that finds an explicit placeholder.
+- **system preamble** — drop the section entirely. A heading with a placeholder
+  under it spends tokens asserting an absence, and hands the model a stock
+  phrase it may repeat back.
+
+Which is why empty-handling is a per-projection policy inside `buildFile()`
+rather than a property of the section itself. There is a test asserting
+`_Not captured yet._` never appears in preamble output, for a profile with 14 of
+15 sections empty.
+
+**Completeness is derived, never stored.** `missingSections(profile)` recomputes
+from the same section table the renderer uses, so a section is "missing"
+precisely when its body renders empty. A stored completeness flag would be a
+second source of truth that goes stale the moment something writes by another
+path. `syncVoiceFiles` reports `missing` on every run and refuses to write when
+`requireComplete` is set.
+
+**The section table is the single definition.** `src/sections.ts` holds every
+section once — key, file, heading, body renderer. Headings, file assembly,
+preamble assembly, and missing-section detection all derive from it, so adding
+a section cannot leave it silently unchecked, and renaming a heading cannot
+update one consumer and miss another.
 
 ---
 
@@ -155,14 +222,17 @@ it a do-not-edit notice. The banner belongs to the artifact, not the content.
 src/
   types.ts             types only — no logic, no I/O, no imports
   validate.ts          loose input → strict stored shape
-  render.ts            VoiceProfile → markdown / system preamble (pure)
+  sections.ts          THE section table: key, file, heading, body. One
+                       definition, four consumers. Also missingSections()
+  render.ts            assembles files and preambles from the table (pure)
   sync.ts              store → disk. Server-only; the one node:fs import
   store.ts             the VoiceStore interface
   adapters/
-    postgres.ts        plain SQL over an injected executor
+    postgres.ts        plain SQL over an injected executor; exports the DDL
     memory.ts          for tests, and proof the seam is real
 test/
-  voice-profile.test.ts
+  voice-profile.test.ts     behaviour
+  upstream-contract.test.ts headings, diffed against the live skill source
 ```
 
 ## Tests

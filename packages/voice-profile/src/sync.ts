@@ -12,8 +12,23 @@
  */
 
 import { renderMarkdown } from './render.ts';
+import { describeSection, missingSections } from './sections.ts';
 import type { VoiceStore } from './store.ts';
 import type { VoiceFiles, VoiceProfile } from './types.ts';
+
+/** Raised when `requireComplete` is set and the profile has empty sections. */
+export class IncompleteProfileError extends Error {
+  readonly missing: string[];
+
+  constructor(missing: string[]) {
+    super(
+      `Refusing to sync an incomplete profile — ${missing.length} section(s) empty:\n` +
+        missing.map((k) => `  - ${describeSection(k)}`).join('\n')
+    );
+    this.name = 'IncompleteProfileError';
+    this.missing = missing;
+  }
+}
 
 /** Injectable so tests can assert on writes without touching a filesystem. */
 export type FileWriter = (absolutePath: string, contents: string) => Promise<void>;
@@ -25,6 +40,18 @@ export interface SyncOptions {
   writeFile?: FileWriter;
   /** Defaults to `path.join`. Overridden only in tests. */
   join?: (dir: string, file: string) => string;
+  /**
+   * Throw `IncompleteProfileError` instead of writing a profile with empty
+   * sections.
+   *
+   * Off by default: a half-built profile on disk is still more useful to a
+   * skill than no file at all, and blocking the first sync of a work in
+   * progress would be obnoxious. Callers that would rather not ship a
+   * half-voice — a deploy step, a scheduled job — turn it on. Either way
+   * `SyncResult.missing` is populated, so a caller that does not opt in still
+   * has everything it needs to warn loudly.
+   */
+  requireComplete?: boolean;
 }
 
 export interface SyncResult {
@@ -34,6 +61,13 @@ export interface SyncResult {
   written: string[];
   /** The profile's `updatedAt`, stamped into each banner. */
   updatedAt?: string;
+  /**
+   * Section keys that rendered empty. Always populated when a profile was
+   * found, whether or not `requireComplete` was set — the caller decides how
+   * loud to be about it. Pass each through `describeSection()` for a
+   * human-readable `voice.md § Tone`.
+   */
+  missing: string[];
 }
 
 /**
@@ -95,7 +129,12 @@ export async function syncVoiceFiles(
   options: SyncOptions
 ): Promise<SyncResult> {
   const profile = await store.getProfile();
-  if (!profile) return { profileFound: false, written: [] };
+  if (!profile) return { profileFound: false, written: [], missing: [] };
+
+  const missing = missingSections(profile);
+  if (missing.length && options.requireComplete) {
+    throw new IncompleteProfileError(missing);
+  }
 
   const write = options.writeFile ?? defaultWriteFile;
   const join = options.join ?? (await nodeJoin());
@@ -109,5 +148,5 @@ export async function syncVoiceFiles(
     written.push(target);
   }
 
-  return { profileFound: true, written, updatedAt: profile.updatedAt };
+  return { profileFound: true, written, updatedAt: profile.updatedAt, missing };
 }

@@ -45,6 +45,35 @@ export interface PostgresVoiceStoreOptions {
 /** Guards the one place a caller-supplied string reaches SQL text. */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * The schema, as an explicit statement rather than a string buried in a method.
+ *
+ * Exported so it can be printed, code-reviewed, checked into a migrations
+ * directory, or applied by a tool that is not this adapter. `migrate()` runs
+ * exactly this and nothing else.
+ *
+ * `schema_version` is a COLUMN, and the column is authoritative. It is not
+ * duplicated inside `data`: the payload holds the profile, the columns hold the
+ * metadata about the payload. Keeping the version out of the jsonb means a
+ * migration can select and filter on it without unpacking every row, and means
+ * there is no second copy to disagree with the first. `getProfile` asserts that
+ * separation still holds — see below.
+ */
+export function voiceProfileDDL(table = 'voice_profile'): string {
+  if (!SAFE_IDENTIFIER.test(table)) {
+    throw new VoiceStoreError(
+      `Unsafe table name ${JSON.stringify(table)} — expected a bare SQL identifier.`
+    );
+  }
+  return `create table if not exists ${table} (
+  id             boolean     primary key default true,
+  data           jsonb       not null,
+  schema_version integer     not null,
+  updated_at     timestamptz not null default now(),
+  constraint ${table}_singleton check (id)
+)`;
+}
+
 interface ProfileRow {
   data: unknown;
   schema_version: number;
@@ -77,21 +106,12 @@ export function createPostgresVoiceStore(
 
   return {
     /**
-     * Idempotent DDL. Single-tenancy is enforced by the database, not by
-     * convention: `id` is a boolean primary key constrained to true, so the
-     * table physically cannot hold a second row.
+     * Apply `voiceProfileDDL()`. Idempotent. Single-tenancy is enforced by the
+     * database, not by convention: `id` is a boolean primary key constrained to
+     * true, so the table physically cannot hold a second row.
      */
     async migrate(): Promise<void> {
-      await run(
-        'migrate',
-        `create table if not exists ${table} (
-           id             boolean     primary key default true,
-           data           jsonb       not null,
-           schema_version integer     not null,
-           updated_at     timestamptz not null default now(),
-           constraint ${table}_singleton check (id)
-         )`
-      );
+      await run('migrate', voiceProfileDDL(table));
     },
 
     async getProfile(): Promise<VoiceProfile | null> {
@@ -104,8 +124,23 @@ export function createPostgresVoiceStore(
 
       // The row is validated on the way out, not trusted. It may predate a
       // schema change, or have been edited by hand in a SQL console.
+      const data = (row.data ?? {}) as Record<string, unknown>;
+
+      // The column is authoritative and `data` must not carry its own copy. If
+      // one appears and disagrees, something wrote this row by a path that is
+      // not this adapter, and guessing which value is right would be worse than
+      // stopping — the wrong guess silently migrates or fails to migrate real
+      // data. Agreement is tolerated so a hand-written seed row is not fatal.
+      if ('schemaVersion' in data && data.schemaVersion !== row.schema_version) {
+        throw new VoiceStoreError(
+          `voice-profile: schema_version column (${row.schema_version}) disagrees with ` +
+            `data.schemaVersion (${String(data.schemaVersion)}). The column is ` +
+            `authoritative; the payload should not contain the field at all.`
+        );
+      }
+
       return parseVoiceProfile({
-        ...(row.data as Record<string, unknown>),
+        ...data,
         schemaVersion: row.schema_version,
         updatedAt: toIso(row.updated_at),
       });

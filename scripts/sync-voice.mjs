@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 import { createPostgresVoiceStore } from '../packages/voice-profile/src/adapters/postgres.ts';
+import { describeSection } from '../packages/voice-profile/src/sections.ts';
 import { syncVoiceFiles } from '../packages/voice-profile/src/sync.ts';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,7 +42,13 @@ try {
     sql: (text, params) => pool.query(text, params ? [...params] : undefined),
   });
 
-  const result = await syncVoiceFiles(store, { dir: projectRoot });
+  // Warn rather than refuse: a partial profile on disk still beats no file at
+  // all, and this is the interactive path. Pass --require-complete in a deploy
+  // step or a scheduled job, where shipping half a voice is the worse outcome.
+  const result = await syncVoiceFiles(store, {
+    dir: projectRoot,
+    requireComplete: process.argv.includes('--require-complete'),
+  });
 
   if (!result.profileFound) {
     console.error(
@@ -56,6 +63,15 @@ try {
     const bytes = (await readFile(path, 'utf8')).length;
     console.log(`  wrote ${path.replace(projectRoot + '/', '')} (${bytes} bytes)`);
   }
+  if (result.missing.length) {
+    console.warn(
+      `\nvoice:sync — WARNING: ${result.missing.length} section(s) are empty and were ` +
+        'written as placeholders:'
+    );
+    for (const key of result.missing) console.warn(`    ${describeSection(key)}`);
+    console.warn('  Fill these in the app, then re-run. Re-run with --require-complete to fail instead.\n');
+  }
+
   console.log(`voice:sync — done. Profile last updated ${result.updatedAt}.`);
 } catch (error) {
   console.error('voice:sync — failed.');

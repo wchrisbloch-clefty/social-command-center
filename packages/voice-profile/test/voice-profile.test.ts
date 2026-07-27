@@ -2,21 +2,33 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  EMPTY_SECTION_PLACEHOLDER,
+  IncompleteProfileError,
   VoiceProfileValidationError,
   createMemoryVoiceStore,
   createPostgresVoiceStore,
+  describeSection,
   formatEvidence,
   isUsable,
+  missingSections,
   parseVoiceProfile,
   parseVoiceProfileInput,
   renderMarkdown,
   renderSyncArtifacts,
   renderSystemPreamble,
   syncVoiceFiles,
+  voiceProfileDDL,
   type SqlExecutor,
   type VoiceProfile,
   type VoiceProfileInput,
 } from '../src/index.ts';
+
+/** A profile with only the one required field — every other section empty. */
+const BARE: VoiceProfile = {
+  ...parseVoiceProfileInput({ aboutMe: { nameAndRole: 'Only a name' }, voice: {} }),
+  schemaVersion: 1,
+  updatedAt: new Date(0).toISOString(),
+};
 
 const FIXTURE: VoiceProfileInput = {
   aboutMe: {
@@ -382,4 +394,257 @@ test('the banner is an artifact concern and never leaks into the LLM preamble', 
   assert.ok(!renderSystemPreamble(profile).includes('GENERATED FILE'));
   assert.ok(!renderMarkdown(profile)['voice.md'].includes('GENERATED FILE'));
   assert.ok(renderSyncArtifacts(profile)['voice.md'].includes('GENERATED FILE'));
+});
+
+// ─── Per-projection empty handling ────────────────────────────────────────────
+
+test('the disk artifact keeps empty headings and fills them with a placeholder', () => {
+  const files = renderMarkdown(BARE);
+  assert.ok(files['about-me.md'].includes(`## Audience\n${EMPTY_SECTION_PLACEHOLDER}`));
+  assert.ok(files['voice.md'].includes(`## Tone\n${EMPTY_SECTION_PLACEHOLDER}`));
+});
+
+test('the placeholder never reaches the system preamble', () => {
+  // The bare profile is 14 of 15 sections empty — the worst case for a leak.
+  const preamble = renderSystemPreamble(BARE);
+  assert.ok(
+    !preamble.includes(EMPTY_SECTION_PLACEHOLDER),
+    'placeholder leaked into the preamble'
+  );
+  assert.ok(!preamble.includes('Not captured'), 'placeholder text leaked in some other form');
+
+  // And it holds for a fully populated profile too, which has no empties at all.
+  const full: VoiceProfile = {
+    ...parseVoiceProfileInput(FIXTURE),
+    schemaVersion: 1,
+    updatedAt: new Date(0).toISOString(),
+  };
+  assert.ok(!renderSystemPreamble(full).includes(EMPTY_SECTION_PLACEHOLDER));
+});
+
+test('the preamble drops empty sections entirely rather than emitting the heading', () => {
+  const preamble = renderSystemPreamble(BARE);
+  assert.ok(preamble.includes('## Name and role'), 'the one populated section survives');
+  assert.ok(!preamble.includes('## Audience'), 'an empty heading must not appear at all');
+  assert.ok(!preamble.includes('## Tone'));
+  // The file titles still frame the two halves.
+  assert.ok(preamble.includes('# About Me'));
+  assert.ok(preamble.includes('# Voice Profile'));
+});
+
+// ─── missingSections ──────────────────────────────────────────────────────────
+
+test('missingSections reports every empty section, and nothing when full', () => {
+  assert.deepEqual(missingSections({
+    ...parseVoiceProfileInput(FIXTURE),
+    schemaVersion: 1,
+    updatedAt: new Date(0).toISOString(),
+  }), []);
+
+  const missing = missingSections(BARE);
+  assert.ok(!missing.includes('aboutMe.nameAndRole'), 'the populated section is not missing');
+  assert.ok(missing.includes('aboutMe.audience'));
+  assert.ok(missing.includes('voice.tone'));
+  assert.ok(missing.includes('voice.hookPatterns'));
+  assert.equal(missing.length, 14, 'one section populated out of fifteen');
+});
+
+test('missingSections is derived, so it tracks a write without being told', async () => {
+  const store = createMemoryVoiceStore();
+  await store.saveProfile({ aboutMe: { nameAndRole: 'X' }, voice: {} });
+  assert.equal(missingSections((await store.getProfile())!).length, 14);
+
+  await store.saveProfile(FIXTURE);
+  assert.deepEqual(missingSections((await store.getProfile())!), []);
+});
+
+test('describeSection turns a key into something a human can act on', () => {
+  assert.equal(describeSection('voice.tone'), 'voice.md § Tone');
+  assert.equal(describeSection('aboutMe.offLimits'), 'about-me.md § Off limits');
+  assert.equal(describeSection('voice.offLimits'), 'voice.md § Off-limits');
+  assert.equal(describeSection('nonsense'), 'nonsense', 'unknown keys pass through');
+});
+
+// ─── Sync gating ──────────────────────────────────────────────────────────────
+
+test('sync reports missing sections without being asked to enforce', async () => {
+  const store = createMemoryVoiceStore({ initial: { aboutMe: { nameAndRole: 'X' }, voice: {} } });
+  const result = await syncVoiceFiles(store, {
+    dir: '/p',
+    join: (d, f) => `${d}/${f}`,
+    writeFile: async () => {},
+  });
+  assert.equal(result.profileFound, true);
+  assert.equal(result.written.length, 2, 'a partial profile still writes by default');
+  assert.equal(result.missing.length, 14);
+});
+
+test('requireComplete refuses to write, and names what is missing', async () => {
+  const store = createMemoryVoiceStore({ initial: { aboutMe: { nameAndRole: 'X' }, voice: {} } });
+  let wrote = false;
+
+  await assert.rejects(
+    () =>
+      syncVoiceFiles(store, {
+        dir: '/p',
+        join: (d, f) => `${d}/${f}`,
+        writeFile: async () => {
+          wrote = true;
+        },
+        requireComplete: true,
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof IncompleteProfileError);
+      assert.equal(err.missing.length, 14);
+      assert.match(err.message, /voice\.md § Tone/);
+      return true;
+    }
+  );
+  assert.equal(wrote, false, 'nothing may be written when the gate refuses');
+});
+
+test('requireComplete passes a complete profile through', async () => {
+  const store = createMemoryVoiceStore({ initial: FIXTURE });
+  const result = await syncVoiceFiles(store, {
+    dir: '/p',
+    join: (d, f) => `${d}/${f}`,
+    writeFile: async () => {},
+    requireComplete: true,
+  });
+  assert.deepEqual(result.missing, []);
+  assert.equal(result.written.length, 2);
+});
+
+// ─── Markdown escaping ────────────────────────────────────────────────────────
+
+test('hook rendering escapes characters that would break the markup it sits in', () => {
+  const profile: VoiceProfile = {
+    ...parseVoiceProfileInput({
+      aboutMe: { nameAndRole: 'X' },
+      voice: {
+        hookPatterns: {
+          observed: [
+            { type: 'the *actual* number', example: 'She said "no" and left [immediately]' },
+          ],
+          absent: [],
+        },
+      },
+    }),
+    schemaVersion: 1,
+    updatedAt: new Date(0).toISOString(),
+  };
+
+  const voice = renderMarkdown(profile)['voice.md'];
+  const line = voice.split('\n').find((l) => l.includes('actual'))!;
+
+  // The bold delimiters must be the only unescaped asterisks on the line, or
+  // the emphasis closes early and the rest of the line is mangled.
+  assert.ok(line.includes('**the \\*actual\\* number**'), `got: ${line}`);
+  assert.ok(line.includes('\\"no\\"'), `got: ${line}`);
+  assert.ok(line.includes('\\[immediately\\]'), `got: ${line}`);
+});
+
+test('a backslash in user text is escaped before anything else', () => {
+  const profile: VoiceProfile = {
+    ...parseVoiceProfileInput({
+      aboutMe: { nameAndRole: 'X' },
+      voice: { hookPatterns: { observed: [{ type: 'a\\b', example: '' }], absent: [] } },
+    }),
+    schemaVersion: 1,
+    updatedAt: new Date(0).toISOString(),
+  };
+  assert.ok(renderMarkdown(profile)['voice.md'].includes('**a\\\\b**'));
+});
+
+// ─── DDL and schema_version authority ─────────────────────────────────────────
+
+test('the DDL is an explicit, inspectable statement', () => {
+  const ddl = voiceProfileDDL();
+  assert.match(ddl, /create table if not exists voice_profile/);
+  assert.match(ddl, /id\s+boolean\s+primary key default true/);
+  assert.match(ddl, /schema_version integer\s+not null/);
+  assert.match(ddl, /check \(id\)/);
+  assert.throws(() => voiceProfileDDL('bad; drop table users'), /Unsafe table name/);
+});
+
+test('migrate() runs exactly the exported DDL', async () => {
+  const { sql, calls } = fakeSql();
+  await createPostgresVoiceStore({ sql }).migrate();
+  assert.equal(calls[0].text, voiceProfileDDL());
+});
+
+test('the schema_version column is authoritative and a disagreeing payload is fatal', async () => {
+  const sql: SqlExecutor = async (text) => {
+    if (/^\s*select/i.test(text)) {
+      return {
+        rows: [
+          {
+            data: {
+              ...parseVoiceProfileInput(FIXTURE),
+              schemaVersion: 99, // a second copy, written by some other path
+            },
+            schema_version: 1,
+            updated_at: '2026-07-27T00:00:00.000Z',
+          },
+        ] as never[],
+      };
+    }
+    throw new Error('unexpected');
+  };
+
+  await assert.rejects(
+    () => createPostgresVoiceStore({ sql }).getProfile(),
+    /schema_version column \(1\) disagrees with data\.schemaVersion \(99\)/
+  );
+});
+
+test('an agreeing payload copy is tolerated, and the column still wins', async () => {
+  const sql: SqlExecutor = async (text) => {
+    if (/^\s*select/i.test(text)) {
+      return {
+        rows: [
+          {
+            data: { ...parseVoiceProfileInput(FIXTURE), schemaVersion: 1 },
+            schema_version: 1,
+            updated_at: '2026-07-27T00:00:00.000Z',
+          },
+        ] as never[],
+      };
+    }
+    throw new Error('unexpected');
+  };
+  const profile = await createPostgresVoiceStore({ sql }).getProfile();
+  assert.equal(profile?.schemaVersion, 1);
+});
+
+test('saveProfile does not write schemaVersion into the jsonb payload', async () => {
+  const { sql, calls } = fakeSql();
+  await createPostgresVoiceStore({ sql }).saveProfile(FIXTURE);
+  const insert = calls.find((c) => /insert/i.test(c.text))!;
+  const payload = JSON.parse(String(insert.params?.[0]));
+  assert.ok(!('schemaVersion' in payload), 'the version belongs to the column, not the payload');
+  assert.ok(!('updatedAt' in payload), 'likewise updatedAt — now() is server-side');
+  assert.deepEqual(Object.keys(payload).sort(), ['aboutMe', 'samples', 'voice']);
+});
+
+// ─── Evidence bounds (explicit confirmation) ──────────────────────────────────
+
+test('Evidence.total must be at least 1', () => {
+  for (const total of [0, -1]) {
+    assert.throws(
+      () =>
+        parseVoiceProfileInput({
+          aboutMe: { nameAndRole: 'X' },
+          voice: { offLimits: [{ rule: 'r', evidence: { observed: 0, total } }] },
+        }),
+      total === 0 ? /at least 1/ : /cannot be negative/
+    );
+  }
+  // 1 is accepted, and renders in the singular.
+  const ok = parseVoiceProfileInput({
+    aboutMe: { nameAndRole: 'X' },
+    voice: { offLimits: [{ rule: 'r', evidence: { observed: 0, total: 1 } }] },
+  });
+  assert.deepEqual(ok.voice.offLimits[0].evidence, { observed: 0, total: 1 });
+  assert.equal(formatEvidence({ observed: 0, total: 1 }), '0 of 1 sample');
 });
