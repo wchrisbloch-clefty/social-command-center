@@ -280,6 +280,42 @@ they survive a refactor.
 6. **Icon sizing** — 9–10px inside badges, 12–14px in buttons and nav, 16px in panel
    header tiles. From `lucide-react` throughout.
 7. **Scrollbars** — 4px, transparent track, brand thumb at `0.3` → `0.5` on hover.
+8. **Fabricated data must be visibly marked.** This is a rule, not a
+   description of what the code happens to do today.
+
+   **Nothing renders a fabricated number without a `<DemoChip/>` next to it.**
+   Not a footnote, not a page-level disclaimer, not a note in the README — a
+   visible amber marker adjacent to the number itself.
+
+   The reasoning is about screenshots. Every part of this UI is a card or a
+   panel that someone can crop and paste into Slack, and a cropped screenshot
+   carries none of its page context. So the marker has to travel with the
+   smallest unit anyone would plausibly capture:
+
+   | Surface | Placement | Why |
+   |---|---|---|
+   | Post card, alert row, topic card | per item | Each stands alone in a crop |
+   | Trending Now, Buzzwords, Recommended, AI Content Ideas | panel header | 9–11px dense rows; a chip per row would outweigh the row it annotates, and the header travels with any crop of the panel |
+   | Simulated-activity banner | inline | See below |
+
+   **Never assert liveness over fabricated data.** The activity banner used to
+   read `LIVE` in green with a pulsing dot, over numbers a `setInterval` nudged
+   every 3.5 seconds — the ticking existed purely to make them look live.
+   Marking that was not enough, because the word itself was the false claim.
+   It now reads `Simulated`, in amber, with the chip. The same applies to any
+   future "real-time", "now", or "last hour" framing: if the number is made up,
+   the framing has to say so.
+
+   `DemoChip` is a single component (`app/page.jsx`) so the treatment cannot
+   drift between surfaces, and so grepping `DemoChip` enumerates every
+   fabricated surface in the app. When mock data is replaced by a real feed,
+   removing the chip is the deliberate act that marks the data as trustworthy.
+
+9. **The answering LLM provider is shown, not hidden.** `/api/brief` returns
+   `provider`; `ProviderBadge` renders it on the AI Brief panel and the Morning
+   Digest. Green and cyan are the free tiers (Groq, Gemini), amber is Claude —
+   the paid one. A silently misnamed credential demotes the whole app to the
+   paid provider and nothing else on screen would say so.
 
 ---
 

@@ -197,6 +197,32 @@ function postsForFilter(filter) {
 }
 
 // ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
+
+/**
+ * Marks fabricated data as fabricated. See BRAND.md §7.8.
+ *
+ * The rule: nothing in this app renders a fabricated number without one of
+ * these visible next to it. Amber rather than a neutral grey because this is a
+ * caveat, not a label — it has to survive being glanced past.
+ *
+ * `compact` drops the wordmark to "DEMO" for tight rows where "DEMO DATA"
+ * would wrap or crowd out the content it is annotating.
+ */
+function DemoChip({ compact = false, style }) {
+  return (
+    <span title="Sample content — not live platform data"
+      style={{
+        fontSize: compact ? 8 : 9, fontWeight: 800, letterSpacing: '0.04em',
+        padding: compact ? '1px 4px' : '1px 5px', borderRadius: 4,
+        background: 'rgba(245,158,11,0.14)', color: '#F59E0B',
+        border: '1px solid rgba(245,158,11,0.32)',
+        whiteSpace: 'nowrap', flexShrink: 0, ...style,
+      }}>
+      {compact ? 'DEMO' : 'DEMO DATA'}
+    </span>
+  );
+}
+
 function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
   const [expanded, setExpanded] = useState(false);
   const [copied,   setCopied]   = useState(false);
@@ -233,10 +259,7 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
                   and every filtered/search result. Per-card rather than
                   per-page on purpose: a cropped screenshot of a single card
                   still carries it. */}
-              <span title="Sample content — not live platform data"
-                style={{ fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.14)', color:'#F59E0B', border:'1px solid rgba(245,158,11,0.32)', letterSpacing:'0.04em', whiteSpace:'nowrap' }}>
-                DEMO DATA
-              </span>
+              <DemoChip/>
             </div>
             <div style={{ fontSize:10, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
               <Clock size={9}/>{post.time} · <span style={{ color:cfg.color }}>{post.eng}</span>
@@ -298,21 +321,56 @@ function TopicCard({ topic, t, active, onClick }) {
         </span>
       </div>
       <div style={{ fontSize:20, fontWeight:800, color:t.text, letterSpacing:'-0.02em', marginBottom:2 }}>{fmt(topic.mentions)}</div>
-      <div style={{ fontSize:11, color:t.textSub, fontWeight:600 }}>{topic.label}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, color:t.textSub, fontWeight:600 }}>{topic.label}</span>
+        <DemoChip compact/>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Which provider actually answered — Groq, Gemini or Claude.
+ *
+ * `/api/brief` has always returned `provider`; every caller discarded it. That
+ * is precisely how a misnamed env var fails silently: the fallback chain
+ * quietly skips a tier, everything still works, and the only evidence is a
+ * bill. Rendering it makes the chain observable at a glance.
+ *
+ * Colour carries the meaning: Groq and Gemini are the free tiers, Claude is
+ * paid, so Claude is amber. Seeing amber when you expected green is the whole
+ * point of the component.
+ */
+const PROVIDER_STYLE = {
+  Groq:   { color:'#10B981', note:'free tier' },
+  Gemini: { color:'#22D3EE', note:'free tier' },
+  Claude: { color:'#F59E0B', note:'paid tier — the free providers did not answer' },
+};
+
+function ProviderBadge({ provider, t }) {
+  if (!provider) return null;
+  const cfg = PROVIDER_STYLE[provider] || { color: t.textSub, note: 'unrecognised provider' };
+  return (
+    <span title={`Answered by ${provider} — ${cfg.note}`}
+      style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:4, letterSpacing:'0.04em',
+               background:`${cfg.color}1A`, color:cfg.color, border:`1px solid ${cfg.color}40`,
+               whiteSpace:'nowrap', flexShrink:0 }}>
+      via {provider}
+    </span>
   );
 }
 
 // ─── AI BRIEF ─────────────────────────────────────────────────────────────────
 function AIBriefPanel({ platform, t }) {
-  const [brief,   setBrief]   = useState('');
-  const [loading, setLoading] = useState(false);
-  const [ts,      setTs]      = useState(null);
+  const [brief,    setBrief]    = useState('');
+  const [provider, setProvider] = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [ts,       setTs]       = useState(null);
   const prevPlat = useRef(null);
   const cfg = PLAT[platform] || {};
 
   const generate = useCallback(async () => {
-    setLoading(true); setBrief('');
+    setLoading(true); setBrief(''); setProvider(null);
     const posts = MOCK_POSTS[platform] || [];
     const summary = posts.map((p,i)=>`${i+1}. @${p.author}: "${p.content.slice(0,100)}" — Signal: ${p.signal}, Velocity: ${p.velocity}`).join('\n');
     const prompt = `Social intelligence analyst. Platform: ${platform}.\n\nTop posts:\n${summary}\n\nWrite exactly 3 bullet points (use • character):\n• Dominant narrative on ${platform} right now\n• Which account to engage TODAY and exactly why\n• One concrete 24-hour action\n\nSharp, chief-of-staff tone. No fluff.`;
@@ -320,6 +378,7 @@ function AIBriefPanel({ platform, t }) {
       const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'brief' }) });
       const d = await r.json();
       setBrief(d.text || 'Unable to generate brief.');
+      setProvider(d.provider || null);
     } catch { setBrief('Connection failed. Add an API key in Settings → Environment Variables.'); }
     setLoading(false);
     setTs(new Date().toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' }));
@@ -335,6 +394,7 @@ function AIBriefPanel({ platform, t }) {
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <Brain size={13} style={{ color:cfg.color||'#6366F1' }}/>
           <span style={{ fontSize:11, fontWeight:700, color:cfg.color||'#6366F1', textTransform:'uppercase', letterSpacing:'0.04em' }}>AI Brief · {platform}</span>
+          <ProviderBadge provider={provider} t={t}/>
           {ts && <span style={{ fontSize:10, color:t.textSub }}>{ts}</span>}
         </div>
         <button onClick={generate} disabled={loading} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:8, background:cfg.color||'#6366F1', color:platform==='X'?'#0d0d12':'#fff', border:'none', cursor:'pointer', opacity:loading?0.6:1 }}>
@@ -679,13 +739,14 @@ function AskAnythingPanel({ t }) {
 
 // ─── MORNING DIGEST ───────────────────────────────────────────────────────────
 function MorningDigest({ t }) {
-  const [bullets, setBullets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [ts,      setTs]      = useState(null);
+  const [bullets,  setBullets]  = useState([]);
+  const [provider, setProvider] = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [ts,       setTs]       = useState(null);
   const done = useRef(false);
 
   const generate = useCallback(async () => {
-    setLoading(true); setBullets([]);
+    setLoading(true); setBullets([]); setProvider(null);
     const summaries = Object.entries(MOCK_POSTS).map(([plat,posts])=>{
       const top = posts[0];
       return `${plat}: @${top.author} — "${top.content.slice(0,80)}" (${top.signal} signal, ${top.velocity})`;
@@ -695,6 +756,7 @@ function MorningDigest({ t }) {
       const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'digest' }) });
       const d = await r.json();
       setBullets((d.text||'').split('\n').filter(l=>l.trim()&&l.includes('•')));
+      setProvider(d.provider || null);
     } catch { setBullets(['• Unable to generate digest. Check your API configuration.']); }
     setLoading(false);
     setTs(new Date().toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' }));
@@ -710,6 +772,7 @@ function MorningDigest({ t }) {
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
           <span style={{ fontSize:11, fontWeight:700, color:'#10B981', letterSpacing:'0.06em', textTransform:'uppercase' }}>Morning Digest</span>
+          <ProviderBadge provider={provider} t={t}/>
           {ts && <span style={{ fontSize:10, color:t.textSub }}>{ts}</span>}
         </div>
         <button onClick={generate} style={{ fontSize:10, color:t.textSub, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
@@ -744,6 +807,7 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
         <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
           <Flame size={13} style={{ color:'#EF4444' }}/>
           <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Trending Now</span>
+          <DemoChip compact style={{ marginLeft:'auto' }}/>
         </div>
         {topTrending.map((item,i)=>{
           const cfg = PLAT[item.plat];
@@ -773,6 +837,7 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
           <div style={{ display:'flex', alignItems:'center', gap:7 }}>
             <Hash size={13} style={{ color:'#6366F1' }}/>
             <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Buzzwords</span>
+            <DemoChip compact/>
           </div>
           {activeFilter && <button onClick={()=>setActiveFilter(null)} style={{ fontSize:9, padding:'2px 7px', borderRadius:5, background:'rgba(99,102,241,0.15)', color:'#818CF8', border:'none', cursor:'pointer' }}>Clear ×</button>}
         </div>
@@ -794,6 +859,7 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
         <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
           <Star size={13} style={{ color:'#F59E0B' }}/>
           <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Recommended</span>
+          <DemoChip compact style={{ marginLeft:'auto' }}/>
         </div>
         {RECOMMENDED.map(item=>{
           const cfg = PLAT[item.platform];
@@ -846,9 +912,16 @@ function FeedView({ t, activeFilter, setActiveFilter, onNav, isMobile }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-      <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'rgba(16,185,129,0.07)', border:'1px solid rgba(16,185,129,0.18)', width:'fit-content' }}>
-        <div style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', animation:'pulse 2s ease-in-out infinite' }}/>
-        <span style={{ fontSize:11, fontWeight:600, color:'#10B981' }}>LIVE · {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active</span>
+      {/* This banner used to read "LIVE" in green with a pulsing dot, over
+          numbers a setInterval nudges every 3.5s. Nothing about it was real —
+          the ticking existed purely to look live. Marking it was not enough:
+          the word itself was the false claim, so the word is gone and the
+          whole pill is amber. The dot still pulses because the numbers still
+          move; it just no longer pretends to mean something. */}
+      <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.28)', width:'fit-content', flexWrap:'wrap' }}>
+        <div style={{ width:7, height:7, borderRadius:'50%', background:'#F59E0B', animation:'pulse 2s ease-in-out infinite' }}/>
+        <DemoChip/>
+        <span style={{ fontSize:11, fontWeight:600, color:'#F59E0B' }}>Simulated · {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active</span>
       </div>
 
       <div>
@@ -899,6 +972,7 @@ function FeedView({ t, activeFilter, setActiveFilter, onNav, isMobile }) {
           <div style={{ padding:16, borderRadius:16, background:t.card, border:`1px solid ${t.border}` }}>
             <div style={{ fontSize:11, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
               <Target size={13} style={{ color:'#22D3EE' }}/>Quick Actions
+              <DemoChip compact style={{ marginLeft:'auto' }}/>
             </div>
             {[
               { label:"Engage @sama's AGI thread — +520% velocity", color:'#6366F1' },
@@ -1029,7 +1103,10 @@ function DiscoverView({ t, setActiveFilter, onNav }) {
               <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg,${topic.color},transparent)` }}/>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <span style={{ fontSize:20 }}>{topic.icon}</span>
-                <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{topic.delta}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <DemoChip compact/>
+                  <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{topic.delta}</span>
+                </div>
               </div>
               <div style={{ fontSize:13, fontWeight:700, color:t.text, marginBottom:6 }}>{topic.label}</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
@@ -1091,7 +1168,7 @@ function StudioView({ t, isMobile }) {
       <div>
         <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-            <Sparkles size={13} style={{ color:'#6366F1' }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>AI Content Ideas</span>
+            <Sparkles size={13} style={{ color:'#6366F1' }}/><span style={{ fontSize:11, fontWeight:700, color:t.text }}>AI Content Ideas</span><DemoChip compact style={{ marginLeft:'auto' }}/>
           </div>
           <button onClick={()=>{ setGenerating(true); setTimeout(()=>setGenerating(false),1500); }} disabled={generating}
             style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:7, fontSize:12, fontWeight:700, padding:'10px 0', borderRadius:10, background:'linear-gradient(135deg,#6366F1,#22D3EE)', color:'#fff', border:'none', cursor:'pointer', opacity:generating?0.7:1, marginBottom:12 }}>
@@ -1153,6 +1230,7 @@ function AlertsView({ t }) {
             <div style={{ flex:1 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, flexWrap:'wrap' }}>
                 <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:4, background:s.bg, color:s.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{alert.sev}</span>
+                <DemoChip/>
                 {alert.plat!=='all'&&PLAT[alert.plat]&&<span style={{ color:PLAT[alert.plat].color, display:'flex', alignItems:'center', gap:3, fontSize:10 }}>{PLAT[alert.plat].icon}{alert.plat}</span>}
                 {!alert.read&&<div style={{ width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>}
                 {alert.read&&<span style={{ fontSize:9, color:t.textSub, fontStyle:'italic' }}>read</span>}
