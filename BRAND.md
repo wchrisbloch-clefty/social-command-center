@@ -512,9 +512,11 @@ point of tokenizing.
 
 These are recorded, not fixed.
 
-1. **Name collision.** The UI, `<title>`, and default export all say *AetherHub*; the
-   package, the repo, and the deploy target all say *social-command-center*. Needs a
-   decision.
+1. **Name collision — resolved: AetherHub wins.** The UI, `<title>`, and default export
+   already say *AetherHub*; the package, the repo, and the deploy target say
+   *social-command-center*. **AetherHub** is the canonical product name. Still to do:
+   rename `package.json` `"name"` to `aetherhub`, and decide separately whether to
+   rename the GitHub repo and Vercel project (both are cosmetic and can lag).
 2. **Radius drift.** 5, 8, 9, 12, and 18px are single- or double-use values sitting
    between rungs of an otherwise clean ladder.
 3. **Two alpha notations.** `rgba(r,g,b,a)` for theme colors, 8-digit hex suffixes
