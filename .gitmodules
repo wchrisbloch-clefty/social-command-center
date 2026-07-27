@@ -1,0 +1,12 @@
+[submodule ".agents/social-media-skills"]
+	path = .agents/social-media-skills
+	url = https://github.com/charlie947/social-media-skills.git
+[submodule ".agents/anthropic-skills"]
+	path = .agents/anthropic-skills
+	url = https://github.com/anthropics/skills.git
+[submodule ".agents/taste-skill"]
+	path = .agents/taste-skill
+	url = https://github.com/Leonxlnx/taste-skill.git
+[submodule ".agents/ui-ux-pro-max"]
+	path = .agents/ui-ux-pro-max
+	url = https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git
