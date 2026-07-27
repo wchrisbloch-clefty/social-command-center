@@ -2,21 +2,17 @@
 // Providers: Groq (free) → Gemini (free) → Claude (paid)
 // Env vars: GROQ_API_KEY, GOOGLE_AI_API_KEY, ANTHROPIC_API_KEY
 //
-// GOOGLE_AI_API_KEY is the canonical Gemini credential name across the whole
-// project. It is dictated by the vendored skills — .agents/social-media-skills
-// (reels-scripting, post-scorer) read GOOGLE_AI_API_KEY and are upstream repos
-// we do not control, so the app conforms to them rather than the reverse.
+// ONE name for the Gemini credential: GOOGLE_AI_API_KEY. The old GOOGLE_AI_KEY
+// and GEMINI_API_KEY aliases have been removed — three names for one key meant
+// a missing credential could look like three different problems.
 //
-// GOOGLE_AI_KEY / GEMINI_API_KEY are DEPRECATED aliases, still read so that an
-// existing Vercel environment keeps working. Rename the var in Vercel →
-// Settings → Environment Variables, then delete googleAIKey()'s fallbacks.
+// GOOGLE_AI_API_KEY is the name, rather than something prettier, because the
+// vendored skills pick it: .agents/social-media-skills (reels-scripting,
+// post-scorer) read GOOGLE_AI_API_KEY and are upstream repos we do not
+// control. The app conforms to them rather than the reverse.
 
 function googleAIKey() {
-  return (
-    process.env.GOOGLE_AI_API_KEY ||
-    process.env.GOOGLE_AI_KEY ||   // deprecated
-    process.env.GEMINI_API_KEY     // deprecated
-  );
+  return process.env.GOOGLE_AI_API_KEY;
 }
 
 async function tryGroq(prompt, maxTokens) {

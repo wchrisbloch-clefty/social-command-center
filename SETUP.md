@@ -153,9 +153,45 @@ Also confirmed: node-postgres hands back `jsonb` **pre-parsed as an object**.
 string instead, that spread would silently produce a character map and
 validation would report every field missing. Now asserted.
 
-Still outstanding: none of this ran against **Vercel** Postgres specifically.
-It is standard Postgres behind a pooled connection string, so the risk is low,
-but the pooler is the one component not exercised here.
+### The one thing to watch on the first Vercel deploy
+
+Not "the pooler is untested" in the abstract. The specific risk is **Vercel
+Postgres in transaction pooling mode, combined with prepared statements.**
+
+In transaction pooling, a client does not own a backend connection for the life
+of the session — it borrows one per transaction and gives it back. Prepared
+statements are *session* state. So a driver that prepares a statement on one
+borrowed session and later executes it by name can be handed a different
+session that has never seen it, and the query fails with something like
+`prepared statement "s1" does not exist`.
+
+Why it will not show up before then:
+
+- **Stock Postgres 16 direct-connect cannot reproduce it.** One client, one
+  session, state always present. Every one of the 8 integration tests passes
+  for exactly that reason, and would keep passing forever while production
+  fails.
+- **It is intermittent by construction.** It depends on which backend the
+  pooler hands out, so it correlates with concurrency and idle time rather
+  than with any particular query. Low traffic can hide it for days.
+- **It is invisible in the adapter's own code.** Nothing in
+  `adapters/postgres.ts` prepares anything explicitly; whether statements get
+  prepared at all is a driver decision.
+
+What to do about it:
+
+1. Prefer Vercel's **pooled** connection string for the app, and its
+   **direct/unpooled** string for one-off DDL — `migrate()` and
+   `npm run voice:sync` are both better off on a direct connection anyway.
+2. If `prepared statement ... does not exist` appears in production logs, that
+   is this, not a code bug. Fix it at the driver: node-postgres only prepares
+   when a query is given a `name`, and this adapter never sets one, so plain
+   `pool.query(text, params)` should already be in the safe path. Confirm that
+   the wiring in `scripts/sync-voice.mjs` — and whatever Step 3 adds — has not
+   introduced named queries or a `PgPreparedStatement` wrapper.
+3. Verify on first deploy under real concurrency, not with a single request.
+
+Everything else about the adapter is exercised; this is the gap.
 
 ---
 

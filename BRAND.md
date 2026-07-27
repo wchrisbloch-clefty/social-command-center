@@ -75,8 +75,8 @@ Brand alpha ladder actually in use (all `rgba(99,102,241, α)`):
 | `border-mid` | `rgba(255,255,255,0.09)` |
 | `border-high` | `rgba(255,255,255,0.16)` |
 | `text` | `#EAEAFF` |
-| `text-sub` | `#9696B3` — **token layer**; `T` still holds `#5C5C80` (see §9.6) |
-| `text-muted` | `#7878B8` — **token layer**; `T` still holds `#21213F` (see §9.6) |
+| `text-sub` | `#9696B3` (was `#5C5C80` — see §9.6) |
+| `text-muted` | `#7878B8` (was `#21213F` — see §9.6) |
 
 ### 2.3 Surfaces — light
 
@@ -94,7 +94,7 @@ Brand alpha ladder actually in use (all `rgba(99,102,241, α)`):
 | `border-high` | `rgba(0,0,0,0.15)` |
 | `text` | `#0D0D1E` |
 | `text-sub` | `#585878` (passes AA, unchanged) |
-| `text-muted` | `#6565A0` — **token layer**; `T` still holds `#ABABCB` (see §9.6) |
+| `text-muted` | `#6565A0` (was `#ABABCB` — see §9.6) |
 
 Note: `bg` is a cool blue-grey, not white. The light theme is a *tinted* light theme —
 it keeps the indigo cast of the dark theme rather than going neutral.
@@ -353,10 +353,22 @@ These are recorded, not fixed.
    and the "Add source" affordance (`app/page.jsx:384, 740, 988, 996, 1145, 1191,
    1196, 1253`), so 4.5:1 (WCAG AA, normal text) is the right bar.
 
-   **These values live in `globals.css` only.** The `T` object in `app/page.jsx` is
-   untouched, so the running UI is unchanged — Phase 1 is additive by design. The
-   divergence closes in Phase 2, and that is when the app visibly gets lighter
-   secondary text. Expect it; it is not a regression.
+   **Now applied in both places.** The values landed in `globals.css` first
+   (additive, no visual change), and `T` in `app/page.jsx` has since been moved
+   to match — so the running app passes AA, not just the token layer. Verified
+   against every surface each colour actually sits on:
+
+   | Token | Worst case |
+   |---|---|
+   | dark `text` | 15.86:1 |
+   | dark `textSub` | 6.55:1 |
+   | dark `textMuted` | 4.64:1 |
+   | light `text` | 16.60:1 |
+   | light `textSub` | 5.89:1 |
+   | light `textMuted` | 4.63:1 |
+
+   Secondary text is visibly lighter than it was. That is the fix, not a
+   regression.
 
 7. ~~Keyframes inlined in the component tree.~~ **Fixed** — `spin`, `pulse` and the
    placeholder rule moved from the `<style>` tag in `app/page.jsx` into
