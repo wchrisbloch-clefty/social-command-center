@@ -1374,14 +1374,7 @@ export default function AetherHub() {
   const viewLabel = { feed:'Feed', discover:'Discover', intelligence:'Intelligence', studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings' };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100vh', background:t.bg, color:t.text, fontFamily:"var(--font-inter),-apple-system,sans-serif", overflow:'hidden' }}>
-      <style>{`
-        @keyframes spin  { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
-        * { box-sizing: border-box; }
-        input::placeholder,textarea::placeholder { color: rgba(120,120,160,0.45); }
-      `}</style>
-
+    <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:t.bg, color:t.text, fontFamily:"var(--font-inter),-apple-system,sans-serif", overflow:'hidden' }}>
       <TopNav view={view} onNav={setView} dark={dark} onDark={()=>setDark(d=>!d)} t={t} alertCount={unreadAlerts} isMobile={isMobile}/>
 
       <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
