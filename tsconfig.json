@@ -21,8 +21,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@voice-profile": ["./packages/voice-profile/src/index.ts"],
-      "@voice-profile/*": ["./packages/voice-profile/src/*"]
+      "voice-profile-core": ["./packages/voice-profile/src/index.ts"],
+      "voice-profile-core/*": ["./packages/voice-profile/src/*"]
     }
   },
   "include": [

@@ -9,13 +9,12 @@
  */
 
 import {
-  parseVoiceProfile,
-  parseVoiceProfileInput,
-  VOICE_PROFILE_VERSION,
+  VOICE_PROFILE_SCHEMA_VERSION,
   type VoiceFiles,
   type VoiceProfile,
   type VoiceProfileInput,
-} from '../schema.ts';
+} from '../types.ts';
+import { parseVoiceProfile, parseVoiceProfileInput } from '../validate.ts';
 import { renderMarkdown } from '../render.ts';
 import type { VoiceStore } from '../store.ts';
 
@@ -38,7 +37,7 @@ export function createMemoryVoiceStore(
       aboutMe: clean.aboutMe,
       voice: clean.voice,
       samples: clean.samples,
-      version: VOICE_PROFILE_VERSION,
+      schemaVersion: VOICE_PROFILE_SCHEMA_VERSION,
       updatedAt: now().toISOString(),
     });
   }

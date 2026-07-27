@@ -12,13 +12,15 @@ Registered in `.mcp.json` at project scope:
 { "mcpServers": { "context7": { "type": "http", "url": "https://mcp.context7.com/mcp" } } }
 ```
 
-**Not usable yet.** Two separate blockers, in order:
+**Not usable yet, but no longer a hard gate.** Two blockers, in order:
 
 1. The proxy refused `CONNECT mcp.context7.com:443` with a 403 policy denial.
-2. The host is now reachable, but the server reports it **requires
-   authorization**, and this session is non-interactive so the OAuth flow cannot
-   be run here. Authorize it from an interactive session (`claude mcp` or
-   `/mcp`) before it will serve requests.
+2. The host is now reachable, but the server **requires authorization**, and a
+   non-interactive session cannot run the OAuth flow. Authorize it from an
+   interactive session (`claude mcp` or `/mcp`).
+
+The docs fallback is confirmed working (see below), so the allowlist is a
+convenience rather than a blocker for post-cutoff API work.
 
 The original policy denial:
 
@@ -28,10 +30,23 @@ The original policy denial:
   "host": "mcp.context7.com:443" }
 ```
 
-**Fallback in use, and it works.** `npm install` has been run, so
-`node_modules/next/dist/docs/` (421 files) is available for Next 16.2.6, and the
-installed `tailwindcss` package itself is the reference for Tailwind 4. Phase 1's
-`@theme` block was verified this way — against tailwindcss 4.3.0's own
+**Fallback confirmed readable.** `node_modules/next/dist/docs/` holds 421
+markdown files for Next 16.2.6, laid out as:
+
+- `01-app/01-getting-started/` — 18 guides, including `11-css.md`,
+  `13-fonts.md`, `15-route-handlers.md`, `16-proxy.md`, `18-upgrading.md`
+- `01-app/02-guides/` — 50 guides. Relevant to what is coming:
+  `environment-variables.md`, `authentication.md`, `data-security.md`,
+  `backend-for-frontend.md`, `forms.md`, `testing/`, `self-hosting.md`,
+  `deploying-to-platforms.md`, `mcp.md`, `ai-agents.md`
+- `01-app/02-guides/upgrading/` — `version-14/15/16.md` plus `codemods.md`
+- `01-app/03-api-reference/` — `01-directives`, `02-components`,
+  `03-file-conventions`, `04-functions`, `05-config`, `06-cli`, `07-adapters`,
+  `08-turbopack.md`
+- `02-pages/**` — the Pages Router equivalents, not used here
+
+The installed `tailwindcss` package is the equivalent reference for Tailwind 4.
+Phase 1's `@theme` block was verified against tailwindcss 4.3.0's own
 `theme.css` and compiled output — not from memory and not from Context7.
 
 ---
@@ -101,7 +116,38 @@ fallbacks.
 
 ---
 
-## 3. Style architecture debt — Phase 1 done, 2–4 proposed
+## 3. Open tasks
+
+### Step 3, first task: exercise the Postgres adapter against a real database
+
+`packages/voice-profile/src/adapters/postgres.ts` has **never run against
+Postgres.** Its tests use a fake `SqlExecutor`. That proves the SQL is
+parameterized, that the profile never reaches SQL text, that validation runs
+before any write, and that the shapes round-trip. It proves nothing about the
+database.
+
+Specifically unverified:
+
+- whether `migrate()`'s DDL actually applies, and is genuinely idempotent on a
+  second run
+- whether the `check (id)` singleton constraint rejects a second row as
+  intended
+- whether `jsonb` round-trips the payload unchanged — key order, unicode, and
+  the em dashes and curly quotes that a voice profile is *full of*
+- whether `$1::jsonb` binds correctly through node-postgres given we pass a
+  pre-stringified value
+- whether `updated_at timestamptz` comes back as a `Date` or a string through
+  this driver (`toIso()` handles both, but which one happens is untested)
+- upsert behaviour on a live connection, including the `on conflict` path
+
+`npm run voice:sync` is wired end to end and fails cleanly at connection time
+with no `POSTGRES_URL`, so the only missing piece is a database. Provision
+Vercel Postgres, set `POSTGRES_URL`, run `migrate()`, and drive a real
+save/read/render cycle before building UI on top of it.
+
+---
+
+## 4. Style architecture debt — Phase 1 done, 2–4 proposed
 
 **The situation.** Tailwind 4 and `@tailwindcss/postcss` are installed and wired
 (`postcss.config.mjs`, `@import "tailwindcss"` in `app/globals.css`) — and produce

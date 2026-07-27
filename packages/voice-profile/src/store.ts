@@ -11,7 +11,7 @@
  * the host app.
  */
 
-import type { VoiceFiles, VoiceProfile, VoiceProfileInput } from './schema.ts';
+import type { VoiceFiles, VoiceProfile, VoiceProfileInput } from './types.ts';
 
 export interface VoiceStore {
   /** The stored profile, or null if none has been saved yet. */
@@ -19,7 +19,7 @@ export interface VoiceStore {
 
   /**
    * Validate and persist. Returns the stored profile, including the
-   * `updatedAt` and `version` the store assigned.
+   * `updatedAt` and `schemaVersion` the store assigned.
    *
    * Throws `VoiceProfileValidationError` if the input is structurally invalid.
    */

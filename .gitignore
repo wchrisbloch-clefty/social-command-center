@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# voice-profile build artifacts — generated from the app database, one-way.
+# The app is canonical; these are overwritten by `npm run voice:sync`.
+/about-me.md
+/voice.md

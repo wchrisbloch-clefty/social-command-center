@@ -1,26 +1,31 @@
 export {
-  VOICE_PROFILE_VERSION,
-  VoiceProfileValidationError,
-  isUsable,
-  parseVoiceProfile,
-  parseVoiceProfileInput,
+  VOICE_PROFILE_SCHEMA_VERSION,
   type AboutMe,
   type AboutMeInput,
+  type Evidence,
   type HookPattern,
-  type ValidationIssue,
   type NormalizedVoiceProfile,
+  type ValidationIssue,
   type Voice,
-  type VoiceInput,
   type VoiceFiles,
+  type VoiceInput,
   type VoiceProfile,
   type VoiceProfileInput,
   type VoiceRule,
   type VoiceRuleInput,
   type WritingSample,
   type WritingSampleInput,
-} from './schema.ts';
+} from './types.ts';
 
 export {
+  VoiceProfileValidationError,
+  isUsable,
+  parseVoiceProfile,
+  parseVoiceProfileInput,
+} from './validate.ts';
+
+export {
+  formatEvidence,
   renderAboutMe,
   renderMarkdown,
   renderSystemPreamble,
@@ -43,3 +48,12 @@ export {
   createMemoryVoiceStore,
   type MemoryVoiceStoreOptions,
 } from './adapters/memory.ts';
+
+// Server-only. Touches node:fs — do not import from a client component.
+export {
+  renderSyncArtifacts,
+  syncVoiceFiles,
+  type FileWriter,
+  type SyncOptions,
+  type SyncResult,
+} from './sync.ts';

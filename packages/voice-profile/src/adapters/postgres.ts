@@ -15,13 +15,12 @@
  */
 
 import {
-  parseVoiceProfile,
-  parseVoiceProfileInput,
-  VOICE_PROFILE_VERSION,
+  VOICE_PROFILE_SCHEMA_VERSION,
   type VoiceFiles,
   type VoiceProfile,
   type VoiceProfileInput,
-} from '../schema.ts';
+} from '../types.ts';
+import { parseVoiceProfile, parseVoiceProfileInput } from '../validate.ts';
 import { renderMarkdown } from '../render.ts';
 import { VoiceStoreError, type MigratableVoiceStore } from '../store.ts';
 
@@ -48,7 +47,7 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 interface ProfileRow {
   data: unknown;
-  version: number;
+  schema_version: number;
   updated_at: Date | string;
 }
 
@@ -86,10 +85,10 @@ export function createPostgresVoiceStore(
       await run(
         'migrate',
         `create table if not exists ${table} (
-           id         boolean primary key default true,
-           data       jsonb       not null,
-           version    integer     not null,
-           updated_at timestamptz not null default now(),
+           id             boolean     primary key default true,
+           data           jsonb       not null,
+           schema_version integer     not null,
+           updated_at     timestamptz not null default now(),
            constraint ${table}_singleton check (id)
          )`
       );
@@ -98,7 +97,7 @@ export function createPostgresVoiceStore(
     async getProfile(): Promise<VoiceProfile | null> {
       const { rows } = await run<ProfileRow>(
         'getProfile',
-        `select data, version, updated_at from ${table} where id = true`
+        `select data, schema_version, updated_at from ${table} where id = true`
       );
       const row = rows[0];
       if (!row) return null;
@@ -107,7 +106,7 @@ export function createPostgresVoiceStore(
       // schema change, or have been edited by hand in a SQL console.
       return parseVoiceProfile({
         ...(row.data as Record<string, unknown>),
-        version: row.version,
+        schemaVersion: row.schema_version,
         updatedAt: toIso(row.updated_at),
       });
     },
@@ -124,14 +123,14 @@ export function createPostgresVoiceStore(
 
       const { rows } = await run<ProfileRow>(
         'saveProfile',
-        `insert into ${table} (id, data, version, updated_at)
+        `insert into ${table} (id, data, schema_version, updated_at)
          values (true, $1::jsonb, $2, now())
          on conflict (id) do update
-           set data = excluded.data,
-               version = excluded.version,
-               updated_at = excluded.updated_at
-         returning data, version, updated_at`,
-        [JSON.stringify(payload), VOICE_PROFILE_VERSION]
+           set data           = excluded.data,
+               schema_version = excluded.schema_version,
+               updated_at     = excluded.updated_at
+         returning data, schema_version, updated_at`,
+        [JSON.stringify(payload), VOICE_PROFILE_SCHEMA_VERSION]
       );
 
       const row = rows[0];
@@ -141,7 +140,7 @@ export function createPostgresVoiceStore(
 
       return parseVoiceProfile({
         ...(row.data as Record<string, unknown>),
-        version: row.version,
+        schemaVersion: row.schema_version,
         updatedAt: toIso(row.updated_at),
       });
     },
