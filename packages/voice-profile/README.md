@@ -244,11 +244,27 @@ npm test          # from the repo root
 Node's built-in runner with native TypeScript stripping. No test framework, no
 build step, no database.
 
-**The Postgres adapter has never touched a real Postgres.** Its tests run
-against a fake executor, which proves the SQL is parameterized and the shapes
-round-trip — and proves nothing about whether the DDL applies, whether `jsonb`
-round-trips as expected, or whether the upsert behaves under a real connection.
-That is the first task of Step 3, tracked in `SETUP.md`.
+Integration tests against a real Postgres are separate and opt-in:
+
+```bash
+POSTGRES_TEST_URL=postgres://... npm run test:pg
+```
+
+`POSTGRES_TEST_URL`, not `POSTGRES_URL`: these tests create and drop tables, and
+sharing the variable the app uses would mean one absent-minded `npm test` could
+take a DDL statement to production. `npm test` skips them.
+
+Verified against PostgreSQL 16.13: the DDL applies and is idempotent, the
+singleton constraint refuses a second row by both the check and the primary key,
+`$1::jsonb` binds a pre-stringified payload with em dashes / curly quotes /
+Cyrillic / emoji intact, `timestamptz` returns a `Date`, and the upsert updates
+in place. Full results in `SETUP.md` §3.
+
+**One behaviour worth knowing: `jsonb` does not preserve key order.** It stores
+a parsed structure, not the text it was handed. Every consumer here reads named
+fields off a parsed object so it does not matter — but it means the payload
+round-trips by *value*, not by *byte*, and nothing downstream may hash or diff
+the raw JSON and expect stability. There is a test pinning that.
 
 ## Extracting this package
 

@@ -118,32 +118,44 @@ fallbacks.
 
 ## 3. Open tasks
 
-### Step 3, first task: exercise the Postgres adapter against a real database
+### ~~Step 3, first task: exercise the Postgres adapter against a real database~~ — DONE
 
-`packages/voice-profile/src/adapters/postgres.ts` has **never run against
-Postgres.** Its tests use a fake `SqlExecutor`. That proves the SQL is
-parameterized, that the profile never reaches SQL text, that validation runs
-before any write, and that the shapes round-trip. It proves nothing about the
-database.
+Verified against **PostgreSQL 16.13**. `npm run test:pg`, 8 tests, all passing.
+Gated on `POSTGRES_TEST_URL` — deliberately *not* `POSTGRES_URL`, because the
+file creates and drops tables and sharing the app's variable would mean one
+absent-minded `npm test` could take a DDL statement to production. `npm test`
+skips them.
 
-Specifically unverified:
+Each of the six previously-unverified behaviours, and what was found:
 
-- whether `migrate()`'s DDL actually applies, and is genuinely idempotent on a
-  second run
-- whether the `check (id)` singleton constraint rejects a second row as
-  intended
-- whether `jsonb` round-trips the payload unchanged — key order, unicode, and
-  the em dashes and curly quotes that a voice profile is *full of*
-- whether `$1::jsonb` binds correctly through node-postgres given we pass a
-  pre-stringified value
-- whether `updated_at timestamptz` comes back as a `Date` or a string through
-  this driver (`toIso()` handles both, but which one happens is untested)
-- upsert behaviour on a live connection, including the `on conflict` path
+| Was unverified | Result |
+|---|---|
+| `migrate()` DDL applies and is idempotent | **Confirmed.** Runs twice cleanly; columns assert as `boolean, jsonb, integer, timestamptz` |
+| `check (id)` refuses a second row | **Confirmed.** `id = false` violates the check constraint; a second `id = true` violates the primary key. Both paths tested |
+| `jsonb` round-trips the payload | **Values yes, bytes no** — see below |
+| `$1::jsonb` binds a pre-stringified value | **Confirmed**, including em dashes, curly quotes, `½`, Cyrillic, astral-plane emoji, non-breaking spaces, and embedded newlines |
+| `timestamptz` returns `Date` or string | **`Date`.** So `toIso()`'s `instanceof Date` branch is the live one and the string branch is defensive. Asserted, not assumed |
+| upsert / `on conflict` behaviour | **Confirmed.** Row count stays at 1 across writes, `now()` advances on the update path |
 
-`npm run voice:sync` is wired end to end and fails cleanly at connection time
-with no `POSTGRES_URL`, so the only missing piece is a database. Provision
-Vercel Postgres, set `POSTGRES_URL`, run `migrate()`, and drive a real
-save/read/render cycle before building UI on top of it.
+**The one real finding: `jsonb` does not preserve key order.** It stores a
+parsed structure, not the text it was given — keys are normalized and duplicates
+collapse. Verified directly: `{zebra, apple, mango}` comes back as
+`{apple, mango, zebra}`, nested objects too.
+
+Harmless here, because every consumer reads named fields off a parsed object.
+But it means "the payload round-trips unchanged" is true of *values* and false
+of *bytes*, so nothing downstream may hash, diff, or checksum the raw JSON and
+expect stability. There is a test pinning this so the assumption is recorded
+rather than rediscovered.
+
+Also confirmed: node-postgres hands back `jsonb` **pre-parsed as an object**.
+`getProfile()` spreads `row.data` directly — if the driver ever returned a
+string instead, that spread would silently produce a character map and
+validation would report every field missing. Now asserted.
+
+Still outstanding: none of this ran against **Vercel** Postgres specifically.
+It is standard Postgres behind a pooled connection string, so the risk is low,
+but the pooler is the one component not exercised here.
 
 ---
 
