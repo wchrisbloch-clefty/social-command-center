@@ -1,6 +1,23 @@
 // app/api/brief/route.js — AetherHub Social Intelligence Brief API
 // Providers: Groq (free) → Gemini (free) → Claude (paid)
-// Env vars: GROQ_API_KEY, GOOGLE_AI_KEY (or GEMINI_API_KEY), ANTHROPIC_API_KEY
+// Env vars: GROQ_API_KEY, GOOGLE_AI_API_KEY, ANTHROPIC_API_KEY
+//
+// GOOGLE_AI_API_KEY is the canonical Gemini credential name across the whole
+// project. It is dictated by the vendored skills — .agents/social-media-skills
+// (reels-scripting, post-scorer) read GOOGLE_AI_API_KEY and are upstream repos
+// we do not control, so the app conforms to them rather than the reverse.
+//
+// GOOGLE_AI_KEY / GEMINI_API_KEY are DEPRECATED aliases, still read so that an
+// existing Vercel environment keeps working. Rename the var in Vercel →
+// Settings → Environment Variables, then delete googleAIKey()'s fallbacks.
+
+function googleAIKey() {
+  return (
+    process.env.GOOGLE_AI_API_KEY ||
+    process.env.GOOGLE_AI_KEY ||   // deprecated
+    process.env.GEMINI_API_KEY     // deprecated
+  );
+}
 
 async function tryGroq(prompt, maxTokens) {
   const key = process.env.GROQ_API_KEY;
@@ -24,7 +41,7 @@ async function tryGroq(prompt, maxTokens) {
 }
 
 async function tryGemini(prompt, maxTokens) {
-  const key = process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY;
+  const key = googleAIKey();
   if (!key) return null;
   try {
     const r = await fetch(
@@ -117,12 +134,12 @@ export async function POST(request) {
       }
       const configured = [
         process.env.GROQ_API_KEY && 'Groq',
-        (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY) && 'Gemini',
+        googleAIKey() && 'Gemini',
         process.env.ANTHROPIC_API_KEY && 'Claude',
       ].filter(Boolean);
       if (!configured.length) {
         return Response.json(
-          { text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_KEY in Vercel → Settings → Environment Variables.' },
+          { text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_API_KEY in Vercel → Settings → Environment Variables.' },
           { status: 500 }
         );
       }
@@ -160,13 +177,13 @@ export async function POST(request) {
 
     const configured = [
       process.env.GROQ_API_KEY && 'Groq',
-      (process.env.GOOGLE_AI_KEY || process.env.GEMINI_API_KEY) && 'Gemini',
+      googleAIKey() && 'Gemini',
       process.env.ANTHROPIC_API_KEY && 'Claude',
     ].filter(Boolean);
 
     if (!configured.length) {
       return Response.json({
-        text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_KEY in Vercel → Settings → Environment Variables.',
+        text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_API_KEY in Vercel → Settings → Environment Variables.',
       }, { status: 500 });
     }
     return Response.json({

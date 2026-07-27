@@ -10,8 +10,8 @@ codebase. Nothing here is a new design direction.
 - `app/page.jsx:163-167` — `sigColor()` signal semantics
 - `app/page.jsx:1111-1116` — `sevStyle()` alert severity semantics
 - `app/layout.tsx:5-16` — Inter + Syne font variables
-- `app/globals.css:17-20` — scrollbar treatment
-- `app/page.jsx:1378-1383` — inline `@keyframes` (spin, pulse)
+- `app/globals.css` — reset, keyframes, scrollbar treatment, and (as of Phase 1)
+  the token + `@theme` blocks
 
 ---
 
@@ -20,7 +20,7 @@ codebase. Nothing here is a new design direction.
 | | |
 |---|---|
 | Product name in UI | **AetherHub** (`app/page.jsx:1306`) |
-| Package name | `social-command-center` — **collision, unresolved** (see §9) |
+| Package name | `social-command-center` — collision, **resolved in favour of AetherHub** (see §9.1) |
 | Positioning line | "Elite Social Intelligence & Growth Command Center" (`app/layout.tsx:20`) |
 | Logo mark | 28×28, `borderRadius: 8`, brand gradient fill, white `Zap` glyph (filled) |
 | Wordmark | Syne 800, 15px, brand gradient clipped to text (`WebkitBackgroundClip: 'text'`) |
@@ -75,8 +75,8 @@ Brand alpha ladder actually in use (all `rgba(99,102,241, α)`):
 | `border-mid` | `rgba(255,255,255,0.09)` |
 | `border-high` | `rgba(255,255,255,0.16)` |
 | `text` | `#EAEAFF` |
-| `text-sub` | `#5C5C80` |
-| `text-muted` | `#21213F` |
+| `text-sub` | `#9696B3` — **token layer**; `T` still holds `#5C5C80` (see §9.6) |
+| `text-muted` | `#7878B8` — **token layer**; `T` still holds `#21213F` (see §9.6) |
 
 ### 2.3 Surfaces — light
 
@@ -93,8 +93,8 @@ Brand alpha ladder actually in use (all `rgba(99,102,241, α)`):
 | `border-mid` | `rgba(0,0,0,0.09)` |
 | `border-high` | `rgba(0,0,0,0.15)` |
 | `text` | `#0D0D1E` |
-| `text-sub` | `#585878` |
-| `text-muted` | `#ABABCB` |
+| `text-sub` | `#585878` (passes AA, unchanged) |
+| `text-muted` | `#6565A0` — **token layer**; `T` still holds `#ABABCB` (see §9.6) |
 
 Note: `bg` is a cool blue-grey, not white. The light theme is a *tinted* light theme —
 it keeps the indigo cast of the dark theme rather than going neutral.
@@ -285,228 +285,36 @@ they survive a refactor.
 
 ## 8. Tokens
 
-### 8.1 CSS custom properties
+**Source of truth: `app/globals.css`.** Both token blocks are live there as of
+Phase 1. They are not duplicated here — a second copy would drift.
 
-Drop into `app/globals.css` **below** the `@import "tailwindcss";` line. Values are
-transcribed 1:1 from `T`, `PLAT`, `sigColor()`, `sevStyle()` and `TOPIC_AREAS`.
+- `:root` / `[data-theme="dark"]` / `[data-theme="light"]` carry the `--ah-*`
+  custom properties: every value in §2–§6 above, plus `color-scheme` per theme.
+- `@theme { … }` carries the static Tailwind theme: brand, signal, severity,
+  platform and topic colors, the type scale, tracking, and the radius ladder.
+- `@theme inline { … }` carries the surface colors, which resolve through the
+  `--ah-*` vars so one set of utilities serves both themes.
 
-```css
-:root {
-  /* ── Brand ─────────────────────────────────────────────── */
-  --ah-brand:           #6366F1;
-  --ah-brand-cyan:      #22D3EE;
-  --ah-brand-300:       #A5B4FC;
-  --ah-brand-400:       #818CF8;
-  --ah-gradient:        linear-gradient(135deg, #6366F1, #22D3EE);
+Four decisions worth knowing before you edit that file:
 
-  /* ── Semantic: signal ──────────────────────────────────── */
-  --ah-signal-high:     #10B981;
-  --ah-signal-rising:   #F59E0B;
-  --ah-signal-moderate: #52525B;
+1. **The type scale resets its namespace** (`--text-*: initial`) rather than
+   overriding piecemeal. Overriding `--text-sm: 11px` alone would leave Tailwind's
+   default `--text-sm--line-height` of ~1.43 silently attached to it. Each size now
+   ships an explicit paired line-height, and `text-3xl` upward no longer exist —
+   the app has no use for them and their presence invites drift.
+2. **`--radius-*` is reset the same way.** `rounded-full` is a static utility, not a
+   theme value, so it survives.
+3. **Surfaces use `@theme inline`, not plain `@theme`.** Plain `@theme` would emit
+   `--color-canvas: var(--ah-bg)` as a second indirection resolved once at `:root`;
+   `inline` puts the `var()` into the utility itself, which is what makes the
+   `[data-theme]` flip work reliably regardless of which element carries the
+   attribute.
+4. **The type scale deliberately overrides Tailwind's defaults rather than adding to
+   them.** AetherHub's `text-sm` is 11px, not 14px. Anything else means every
+   component reaching for `text-[11px]`, which defeats the point of tokenizing.
 
-  /* ── Semantic: severity ────────────────────────────────── */
-  --ah-sev-critical:    #EF4444;
-  --ah-sev-high:        #F59E0B;
-  --ah-sev-medium:      #6366F1;
-  --ah-sev-low:         #10B981;
-
-  /* ── Platform accents ──────────────────────────────────── */
-  --ah-plat-linkedin:   #2D88FF;
-  --ah-plat-x:          #E8EAF0;
-  --ah-plat-x-on:       #0D0D12;  /* label color on a filled X surface */
-  --ah-plat-instagram:  #F0609E;
-  --ah-plat-youtube:    #FF4444;
-  --ah-plat-tiktok:     #69C9D0;
-
-  /* ── Topic accents ─────────────────────────────────────── */
-  --ah-topic-ai:        #6366F1;
-  --ah-topic-biz:       #22D3EE;
-  --ah-topic-creator:   #F0609E;
-  --ah-topic-finance:   #10B981;
-  --ah-topic-sports:    #F59E0B;
-
-  /* ── Radius ladder ─────────────────────────────────────── */
-  --ah-radius-xs:   4px;
-  --ah-radius-sm:   7px;
-  --ah-radius-md:  10px;
-  --ah-radius-lg:  14px;
-  --ah-radius-xl:  16px;
-  --ah-radius-pill: 20px;
-  --ah-radius-full: 9999px;
-
-  /* ── Motion ────────────────────────────────────────────── */
-  --ah-dur-fast:   0.15s;
-  --ah-dur-card:   0.18s;
-  --ah-dur-input:  0.2s;
-  --ah-dur-toggle: 0.3s;
-
-  /* ── Elevation ─────────────────────────────────────────── */
-  --ah-blur-nav:      20px;
-  --ah-blur-scrim:    10px;
-  --ah-shadow-pop:    0 20px 60px rgba(0, 0, 0, 0.45);
-  --ah-ring-focus:    0 0 0 3px rgba(99, 102, 241, 0.10);
-  --ah-glow-spread:   28px;
-
-  /* ── Type ──────────────────────────────────────────────── */
-  --ah-font-display: var(--font-syne), sans-serif;
-  --ah-font-body:    var(--font-inter), -apple-system, sans-serif;
-  --ah-track-tight:  -0.02em;
-  --ah-track-label:   0.04em;
-  --ah-track-section: 0.05em;
-  --ah-track-eyebrow: 0.06em;
-}
-
-/* ── Surfaces: dark (default) ────────────────────────────── */
-:root,
-[data-theme="dark"] {
-  --ah-bg:           #06060F;
-  --ah-surface:      #0B0B1A;
-  --ah-card:         #0D0D20;
-  --ah-raised:       #0F0F26;
-  --ah-nav-bg:       rgba(6, 6, 15, 0.9);
-  --ah-glass:        rgba(255, 255, 255, 0.025);
-  --ah-glass-border: rgba(255, 255, 255, 0.06);
-  --ah-border:       rgba(255, 255, 255, 0.05);
-  --ah-border-mid:   rgba(255, 255, 255, 0.09);
-  --ah-border-high:  rgba(255, 255, 255, 0.16);
-  --ah-text:         #EAEAFF;
-  --ah-text-sub:     #5C5C80;
-  --ah-text-muted:   #21213F;
-  --ah-accent-sub:    rgba(99, 102, 241, 0.12);
-  --ah-accent-border: rgba(99, 102, 241, 0.28);
-}
-
-/* ── Surfaces: light ─────────────────────────────────────── */
-[data-theme="light"] {
-  --ah-bg:           #ECEEF8;
-  --ah-surface:      #FFFFFF;
-  --ah-card:         #FFFFFF;
-  --ah-raised:       #F4F4FC;
-  --ah-nav-bg:       rgba(236, 238, 248, 0.92);
-  --ah-glass:        rgba(0, 0, 0, 0.015);
-  --ah-glass-border: rgba(0, 0, 0, 0.05);
-  --ah-border:       rgba(0, 0, 0, 0.055);
-  --ah-border-mid:   rgba(0, 0, 0, 0.09);
-  --ah-border-high:  rgba(0, 0, 0, 0.15);
-  --ah-text:         #0D0D1E;
-  --ah-text-sub:     #585878;
-  --ah-text-muted:   #ABABCB;
-  --ah-accent-sub:    rgba(99, 102, 241, 0.08);
-  --ah-accent-border: rgba(99, 102, 241, 0.22);
-}
-```
-
-The theme switch currently lives in React state (`const [dark, setDark] = useState(true)`,
-`app/page.jsx:1363`). To use the block above, that state needs to write
-`data-theme` onto `<html>` instead of selecting a JS object. That is a one-line change
-but it is a **product-code change** — not made here.
-
-### 8.2 Tailwind 4 theme extension
-
-Tailwind 4 has no `tailwind.config.js`; the theme is declared in CSS via `@theme`.
-This goes in `app/globals.css`, after `@import "tailwindcss";`.
-
-> **Not verified against installed Tailwind.** `node_modules/` is absent in this
-> checkout and the Context7 MCP endpoint is blocked by this environment's network
-> policy (see the setup notes). Re-verify the `@theme` directive against Tailwind
-> 4's own docs before relying on this block.
-
-```css
-@theme {
-  /* Brand */
-  --color-brand:        #6366F1;
-  --color-brand-cyan:   #22D3EE;
-  --color-brand-300:    #A5B4FC;
-  --color-brand-400:    #818CF8;
-
-  /* Signal */
-  --color-signal-high:     #10B981;
-  --color-signal-rising:   #F59E0B;
-  --color-signal-moderate: #52525B;
-
-  /* Severity */
-  --color-sev-critical: #EF4444;
-  --color-sev-high:     #F59E0B;
-  --color-sev-medium:   #6366F1;
-  --color-sev-low:      #10B981;
-
-  /* Platform */
-  --color-linkedin:  #2D88FF;
-  --color-x:         #E8EAF0;
-  --color-instagram: #F0609E;
-  --color-youtube:   #FF4444;
-  --color-tiktok:    #69C9D0;
-
-  /* Topic */
-  --color-topic-ai:      #6366F1;
-  --color-topic-biz:     #22D3EE;
-  --color-topic-creator: #F0609E;
-  --color-topic-finance: #10B981;
-  --color-topic-sports:  #F59E0B;
-
-  /* Surfaces — these read the runtime vars so one set of utilities
-     serves both themes and flips with [data-theme]. */
-  --color-bg:           var(--ah-bg);
-  --color-surface:      var(--ah-surface);
-  --color-card:         var(--ah-card);
-  --color-raised:       var(--ah-raised);
-  --color-glass:        var(--ah-glass);
-  --color-line:         var(--ah-border);
-  --color-line-mid:     var(--ah-border-mid);
-  --color-line-high:    var(--ah-border-high);
-  --color-ink:          var(--ah-text);
-  --color-ink-sub:      var(--ah-text-sub);
-  --color-ink-muted:    var(--ah-text-muted);
-
-  /* Type */
-  --font-display: var(--font-syne), sans-serif;
-  --font-body:    var(--font-inter), -apple-system, sans-serif;
-
-  /* Dense information scale — matches actual usage, not Tailwind defaults */
-  --text-2xs:  9px;
-  --text-xs:  10px;
-  --text-sm:  11px;
-  --text-base:12px;
-  --text-md:  13px;
-  --text-lg:  14px;
-  --text-xl:  15px;
-  --text-2xl: 20px;
-
-  --tracking-tight:   -0.02em;
-  --tracking-label:    0.04em;
-  --tracking-section:  0.05em;
-  --tracking-eyebrow:  0.06em;
-
-  /* Radius ladder */
-  --radius-xs:   4px;
-  --radius-sm:   7px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
-  --radius-xl:  16px;
-  --radius-pill:20px;
-
-  /* Motion */
-  --animate-spin-slow: spin 1s linear infinite;
-}
-
-@utility bg-brand-gradient {
-  background-image: linear-gradient(135deg, #6366F1, #22D3EE);
-}
-
-@utility text-brand-gradient {
-  background-image: linear-gradient(135deg, #6366F1, #22D3EE);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-```
-
-Deliberate deviation: the type scale **overrides** Tailwind's defaults rather than
-adding to them. AetherHub's `text-sm` is 11px, not 14px. Anything else would mean
-every component reaching for arbitrary values like `text-[11px]`, which defeats the
-point of tokenizing.
-
----
+Two custom utilities are defined alongside: `bg-brand-gradient` and
+`text-brand-gradient` (the clipped-to-text wordmark treatment).
 
 ## 9. Open issues found during the audit
 
@@ -527,10 +335,32 @@ These are recorded, not fixed.
 5. **Theme is JS state, not a CSS attribute.** `t.*` object lookups mean no CSS-only
    surface can participate in theming, and there is no `prefers-color-scheme` support
    at all — the app hard-defaults to dark on every load with no persistence.
-6. **Contrast.** `--ah-text-muted: #21213F` on `--ah-bg: #06060F` is roughly 1.6:1.
-   It is used for de-emphasized counters, but it is below any WCAG threshold.
-7. **Keyframes are inlined** in a `<style>` tag inside the component tree
-   (`app/page.jsx:1378-1383`) rather than living in `globals.css`.
-8. **`body { overflow: hidden }`** in `globals.css:14` plus `height: 100vh` on the
-   root: on mobile browsers with dynamic toolbars this clips the bottom nav. `100dvh`
-   is the fix.
+6. **Contrast — fixed in the token layer, `T` still diverges.** Measured against the
+   worst-case surface in each theme (`raised #0F0F26` dark, `bg #ECEEF8` light):
+
+   | Token | Was | Ratio | Now | Ratio |
+   |---|---|---|---|---|
+   | dark `text-muted` | `#21213F` | **1.30:1** | `#7878B8` | 4.64:1 |
+   | dark `text-sub` | `#5C5C80` | **3.01:1** | `#9696B3` | 6.55:1 |
+   | light `text-muted` | `#ABABCB` | **1.93:1** | `#6565A0` | 4.63:1 |
+   | light `text-sub` | `#585878` | 5.89:1 | unchanged | 5.89:1 |
+
+   `text-sub` had to move too. `text-muted` alone could not be lifted to 4.5:1
+   without becoming *brighter* than `text-sub` and inverting the hierarchy. Both
+   replacements preserve the original hue and saturation; only lightness moved.
+
+   `text-muted` is not decorative — it carries rank numerals, timestamps, hint copy
+   and the "Add source" affordance (`app/page.jsx:384, 740, 988, 996, 1145, 1191,
+   1196, 1253`), so 4.5:1 (WCAG AA, normal text) is the right bar.
+
+   **These values live in `globals.css` only.** The `T` object in `app/page.jsx` is
+   untouched, so the running UI is unchanged — Phase 1 is additive by design. The
+   divergence closes in Phase 2, and that is when the app visibly gets lighter
+   secondary text. Expect it; it is not a regression.
+
+7. ~~Keyframes inlined in the component tree.~~ **Fixed** — `spin`, `pulse` and the
+   placeholder rule moved from the `<style>` tag in `app/page.jsx` into
+   `app/globals.css`. The tag is gone.
+8. ~~`height: 100vh` clips the bottom nav on mobile.~~ **Fixed** — the app root now
+   uses `100dvh` (`app/page.jsx:1371`). `body { overflow: hidden }` stays; the dead
+   Pages-Router `#__next` selector was dropped from `globals.css`.

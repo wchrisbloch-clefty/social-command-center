@@ -1,6 +1,6 @@
 # AetherHub — Agent Tooling Setup
 
-What was installed, what it needs, and what is blocked. No product code was changed.
+What was installed, what it needs, and what is blocked.
 
 ---
 
@@ -12,8 +12,15 @@ Registered in `.mcp.json` at project scope:
 { "mcpServers": { "context7": { "type": "http", "url": "https://mcp.context7.com/mcp" } } }
 ```
 
-**Blocked in this environment.** The proxy refuses `CONNECT mcp.context7.com:443`
-with a 403 policy denial:
+**Not usable yet.** Two separate blockers, in order:
+
+1. The proxy refused `CONNECT mcp.context7.com:443` with a 403 policy denial.
+2. The host is now reachable, but the server reports it **requires
+   authorization**, and this session is non-interactive so the OAuth flow cannot
+   be run here. Authorize it from an interactive session (`claude mcp` or
+   `/mcp`) before it will serve requests.
+
+The original policy denial:
 
 ```
 { "kind": "connect_rejected",
@@ -21,14 +28,11 @@ with a 403 policy denial:
   "host": "mcp.context7.com:443" }
 ```
 
-To make it usable, `mcp.context7.com` has to be allowed by the environment's network
-policy. The config is already in place, so once the host is reachable the server
-connects on the next session start (MCP servers are loaded at startup, not mid-session).
-
-Until then, post-cutoff API verification for Next 16.2.6 / React 19.2.4 / Tailwind 4
-has to come from `node_modules/next/dist/docs/` — which is also unavailable right now,
-because `node_modules/` is not present in this checkout. **`npm install` is a
-prerequisite for any product code work.**
+**Fallback in use, and it works.** `npm install` has been run, so
+`node_modules/next/dist/docs/` (421 files) is available for Next 16.2.6, and the
+installed `tailwindcss` package itself is the reference for Tailwind 4. Phase 1's
+`@theme` block was verified this way — against tailwindcss 4.3.0's own
+`theme.css` and compiled output — not from memory and not from Context7.
 
 ---
 
@@ -87,17 +91,22 @@ total. UI/UX Pro Max's skills are prefixed `uupm-` because its generic names (`d
 | `reels-scripting` | `GOOGLE_AI_API_KEY` | Gemini 2.5 Flash video analysis |
 | `post-scorer` | Apify access | Pulls LinkedIn post history (falls back to cached `*-all-posts.json` / `*-posts.txt`, or prompts) |
 
-Note the near-collision: `post-scorer` and `reels-scripting` want `GOOGLE_AI_API_KEY`,
-while `app/api/brief/route.js` reads `GOOGLE_AI_KEY` (or `GEMINI_API_KEY`). Same
-credential, three names. Worth normalizing before either side ships.
+**Gemini credential — standardized on `GOOGLE_AI_API_KEY`.** The skills are upstream
+repos we do not control, so the app conformed to them rather than the reverse.
+`app/api/brief/route.js` now reads it through a single `googleAIKey()` helper.
+`GOOGLE_AI_KEY` and `GEMINI_API_KEY` are still read as deprecated aliases so a live
+Vercel deployment does not silently lose Gemini the moment this ships — rename the
+variable in Vercel → Settings → Environment Variables, then delete the two
+fallbacks.
 
 ---
 
-## 3. Style architecture debt — proposal only, not executed
+## 3. Style architecture debt — Phase 1 done, 2–4 proposed
 
 **The situation.** Tailwind 4 and `@tailwindcss/postcss` are installed and wired
 (`postcss.config.mjs`, `@import "tailwindcss"` in `app/globals.css`) — and produce
-almost nothing. `globals.css` is 20 lines of hand-written reset and scrollbar CSS. All
+almost nothing before Phase 1 — `globals.css` was 20 lines of hand-written reset and
+scrollbar CSS. All
 1,423 lines of `app/page.jsx` style through inline objects: ~150 `borderRadius:`
 literals, ~140 `fontSize:`, ~85 `fontWeight:`, plus every color threaded through a `t`
 prop passed to all 14 components.
@@ -118,13 +127,23 @@ prop passed to all 14 components.
 
 | Phase | Work | Risk | Blast radius |
 |---|---|---|---|
-| **1. Tokens** | Land BRAND.md §8.1 vars and §8.2 `@theme` into `globals.css`. Change nothing else. | None — additive only. | 1 file |
+| **1. Tokens** ✅ | **Done.** `--ah-*` vars + `@theme` / `@theme inline` / `@utility` in `globals.css`. Additive: `page.jsx` still styles from `T`, so the UI is unchanged. | None | 1 file |
 | **2. Theme flips to CSS** | `dark` state writes `data-theme` on `<html>`; `T` keeps working but its values become `var(--ah-*)` reads. Add `localStorage` persistence + `prefers-color-scheme` seed. | Low | `layout.tsx`, theme state |
 | **3. Leaf components** | Convert `PostCard`, `TopicCard`, chips, badges to Tailwind classes. Hover becomes `hover:`, deleting the `onMouseEnter` handlers. | Low — leaves are self-contained. | ~6 components |
 | **4. Layout & responsive** | Convert shells (`TopNav`, `BottomNav`, `RightPanel`, `main`) to utilities, replace `useWindowSize()` with `md:` / `xl:` breakpoints, delete the hook. | Medium — this is the real behavioral change. | ~4 components |
 
-Recommended sequencing against product work: **do phase 1 now** (it is additive, it
-unblocks everything else, and it makes BRAND.md executable rather than documentary).
+Phase 1 shipped alongside two fixes from the audit:
+
+- **`100dvh`** — the app root was `height: 100vh`, which clips the bottom nav on
+  mobile browsers with dynamic toolbars (`app/page.jsx:1371`).
+- **Contrast** — `text-muted` measured **1.30:1** in dark and **1.93:1** in light.
+  Fixing it required moving `text-sub` too (itself **3.01:1**), because lifting
+  `muted` to AA alone would have made it brighter than `sub` and inverted the
+  hierarchy. Corrected values live in the token layer only; `T` is untouched, so
+  the change lands visually in Phase 2. Full measurements in BRAND.md §9.6.
+- The inline `<style>` tag inside the component tree is gone; `spin`, `pulse` and
+  the placeholder rule now live in `globals.css`.
+
 Hold 2–4 until the first real feature is built, then convert whatever that feature
 touches as you go. A big-bang rewrite of 1,423 lines buys nothing and risks the one
 working thing in the repo.
