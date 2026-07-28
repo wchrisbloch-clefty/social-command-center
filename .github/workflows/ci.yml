@@ -1,0 +1,91 @@
+name: CI
+
+# The three checks that existed before this file were all Vercel build/deploy
+# statuses. A green PR meant "it builds", never "the tests pass" — nothing ran
+# them outside a developer's terminal.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test + typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The skills live in .agents/* submodules. Without them
+          # test/upstream-contract.test.ts skips instead of failing — and that
+          # test exists specifically to catch an upstream heading rename, so
+          # letting it skip in CI would defeat the point of having it.
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Type stripping runs the TypeScript sources directly — no build step.
+      # A skipped test is a green test, so the log is checked as well as the
+      # exit code: the upstream contract test skips when the submodule is
+      # missing, and that test exists specifically to catch an upstream
+      # heading rename. Letting it skip in CI would defeat the point.
+      - name: Tests
+        run: |
+          npm test 2>&1 | tee /tmp/test.log
+          if grep -q "social-media-skills submodule not checked out" /tmp/test.log; then
+            echo "::error::The upstream contract test skipped — submodules did not check out."
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Catches a broken import or a Tailwind/@theme change that typechecks
+      # but will not compile. Vercel would catch it too, several minutes later.
+      - name: Build
+        run: npm run build
+
+  postgres:
+    name: postgres integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Postgres integration tests
+        env:
+          POSTGRES_TEST_URL: postgres://postgres@localhost:5432/postgres
+        run: |
+          npm run test:pg 2>&1 | tee /tmp/pg.log
+          if grep -q "set POSTGRES_TEST_URL to run" /tmp/pg.log; then
+            echo "::error::Integration tests skipped — POSTGRES_TEST_URL did not reach them."
+            exit 1
+          fi
