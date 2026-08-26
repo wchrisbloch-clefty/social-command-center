@@ -36,6 +36,7 @@
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { CATEGORIES } from '../config/sources.js';
 
 // ── The contract ────────────────────────────────────────────────────────────
@@ -120,7 +121,17 @@ async function waitForServer(url, timeoutMs = 60_000) {
 
 function startApp(rsshubBase) {
   const port = 3000 + Math.floor(Math.random() * 900) + 100;
-  const child = spawn('npx', ['next', 'start', '-p', String(port)], {
+  // Run the Next binary directly under this Node, and DETACHED so the child
+  // leads its own process group.
+  //
+  // Both details are load-bearing. Going through `npx` left a shell between us
+  // and next-server, so child.kill() killed the shell and orphaned the server —
+  // the audit printed PASSED, then hung until CI's job timeout killed it, and a
+  // passing audit was reported as a failing build. Detaching lets us signal the
+  // whole group with kill(-pid).
+  const nextBin = fileURLToPath(import.meta.resolve('next/dist/bin/next'));
+  const child = spawn(process.execPath, [nextBin, 'start', '-p', String(port)], {
+    detached: true,
     env: {
       ...process.env,
       RSSHUB_BASE_URL: rsshubBase,
@@ -339,8 +350,18 @@ async function main() {
     }
   } finally {
     await browser.close().catch(() => {});
-    if (app) { app.child.kill('SIGKILL'); }
-    if (fixture) { fixture.server.close(); }
+    if (app) {
+      // Signal the GROUP (negative pid), not just the direct child.
+      try { process.kill(-app.child.pid, 'SIGKILL'); }
+      catch { try { app.child.kill('SIGKILL'); } catch { /* already gone */ } }
+    }
+    if (fixture) {
+      // close() only stops accepting; established keep-alive sockets would keep
+      // the event loop alive on their own.
+      fixture.server.closeAllConnections?.();
+      fixture.server.close();
+      fixture.server.unref();
+    }
   }
 
   // ── Report ────────────────────────────────────────────────────────────────
@@ -412,7 +433,13 @@ async function main() {
   process.stdout.write('\nPASSED\n');
 }
 
-main().catch(err => {
-  process.stderr.write(`\nresponsive-audit crashed: ${err?.stack || err}\n`);
-  process.exitCode = 1;
-});
+main()
+  .catch(err => {
+    process.stderr.write(`\nresponsive-audit crashed: ${err?.stack || err}\n`);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    // Belt and braces: the verdict is printed and cleanup has run, so leave now
+    // rather than waiting on whatever handle is still open.
+    process.exit(process.exitCode ?? 0);
+  });
