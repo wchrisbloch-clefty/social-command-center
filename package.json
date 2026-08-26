@@ -2,6 +2,7 @@
   "name": "aetherhub",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +10,8 @@
     "test": "node --test packages/voice-profile/test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "voice:sync": "node scripts/sync-voice.mjs",
-    "test:pg": "node --test packages/voice-profile/test/postgres-integration.test.ts"
+    "test:pg": "node --test packages/voice-profile/test/postgres-integration.test.ts",
+    "probe:rsshub": "node scripts/probe-rsshub.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

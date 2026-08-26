@@ -12,32 +12,26 @@ import {
   MessageSquare, Send, Upload,
 } from 'lucide-react';
 
+import { getFeed } from '../lib/adapters.js';
+import { CATEGORIES, DEFAULT_CATEGORY } from '../config/sources.js';
+
 // ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  dark: {
-    bg:'#06060F', surface:'#0B0B1A', raised:'#0F0F26', card:'#0D0D20',
-    border:'rgba(255,255,255,0.05)', borderMid:'rgba(255,255,255,0.09)', borderHigh:'rgba(255,255,255,0.16)',
-    // textSub/textMuted are lighter than they look like they "should" be, on
-    // purpose. The originals (#5C5C80 / #21213F) measured 3.01:1 and 1.30:1
-    // against the worst-case dark surface — both below WCAG AA. Raising muted
-    // alone would have made it brighter than sub and inverted the hierarchy,
-    // so both moved. Hue and saturation are unchanged; only lightness. These
-    // match --ah-text-sub / --ah-text-muted in globals.css. See BRAND.md §9.6.
-    text:'#EAEAFF', textSub:'#9696B3', textMuted:'#7878B8',
-    glass:'rgba(255,255,255,0.025)', glassBorder:'rgba(255,255,255,0.06)',
-    navBg:'rgba(6,6,15,0.9)',
-    accent:'#6366F1', accentSub:'rgba(99,102,241,0.12)', accentBorder:'rgba(99,102,241,0.28)',
-  },
-  light: {
-    bg:'#ECEEF8', surface:'#FFFFFF', raised:'#F4F4FC', card:'#FFFFFF',
-    border:'rgba(0,0,0,0.055)', borderMid:'rgba(0,0,0,0.09)', borderHigh:'rgba(0,0,0,0.15)',
-    // textSub already passed at 5.89:1 and is unchanged. textMuted was 1.93:1.
-    text:'#0D0D1E', textSub:'#585878', textMuted:'#6565A0',
-    glass:'rgba(0,0,0,0.015)', glassBorder:'rgba(0,0,0,0.05)',
-    navBg:'rgba(236,238,248,0.92)',
-    accent:'#6366F1', accentSub:'rgba(99,102,241,0.08)', accentBorder:'rgba(99,102,241,0.22)',
-  },
+// The palette now lives in app/globals.css as the MyNewsHub editorial token set.
+// `T` reads those tokens rather than carrying hex literals, so the whole app —
+// all seven views, not just the feed — retheme from one file and the dark-mode
+// toggle is a single data-theme swap on <html> instead of a JS branch.
+//
+// Both entries are identical because the CSS vars already resolve per theme.
+// The shape is kept so every existing view's `t.bg` / `t.textSub` still works.
+const TOKENS = {
+  bg:'var(--bg)', surface:'var(--surface)', raised:'var(--surface2)', card:'var(--surface)',
+  border:'var(--border)', borderMid:'var(--border)', borderHigh:'var(--text4)',
+  text:'var(--text)', textSub:'var(--text2)', textMuted:'var(--text3)',
+  glass:'var(--surface2)', glassBorder:'var(--border2)',
+  navBg:'var(--surface)',
+  accent:'var(--accent)', accentSub:'var(--accent-bg)', accentBorder:'var(--border)',
 };
+const T = { dark: TOKENS, light: TOKENS };
 
 // ─── PLATFORM CONFIG ──────────────────────────────────────────────────────────
 const PLAT = {
@@ -45,6 +39,7 @@ const PLAT = {
   X:         { color:'#E8EAF0', glow:'rgba(232,234,240,0.12)', bg:'rgba(232,234,240,0.05)', border:'rgba(232,234,240,0.12)', icon:<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.713 5.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
   Instagram: { color:'#F0609E', glow:'rgba(240,96,158,0.22)',  bg:'rgba(240,96,158,0.07)',  border:'rgba(240,96,158,0.17)', icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg> },
   YouTube:   { color:'#FF4444', glow:'rgba(255,68,68,0.18)',   bg:'rgba(255,68,68,0.06)',   border:'rgba(255,68,68,0.16)',  icon:<svg width="14" height="10" viewBox="0 0 24 17" fill="currentColor"><path d="M23.495 2.205a3.02 3.02 0 0 0-2.122-2.136C19.505 0 12 0 12 0s-7.505 0-9.374.069A3.02 3.02 0 0 0 .505 2.205 31.247 31.247 0 0 0 0 8.465a31.247 31.247 0 0 0 .505 6.26 3.02 3.02 0 0 0 2.121 2.136C4.495 17 12 17 12 17s7.505 0 9.373-.069a3.02 3.02 0 0 0 2.122-2.136A31.247 31.247 0 0 0 24 8.465a31.247 31.247 0 0 0-.505-6.26zM9.609 12.093V4.837l6.264 3.628-6.264 3.628z"/></svg> },
+  Reddit:    { color:'#D93900', glow:'rgba(217,57,0,0.18)',     bg:'rgba(217,57,0,0.06)',    border:'rgba(217,57,0,0.16)',   icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-6.991 4.87-3.861 0-6.99-2.176-6.99-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12.5c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.688-.56-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg> },
   TikTok:    { color:'#69C9D0', glow:'rgba(105,201,208,0.18)', bg:'rgba(105,201,208,0.06)', border:'rgba(105,201,208,0.16)',icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.94a8.24 8.24 0 0 0 4.83 1.55V7.04a4.85 4.85 0 0 1-1.06-.35z"/></svg> },
 };
 
@@ -883,114 +878,265 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
   );
 }
 
+// ─── LIVE FEED PLUMBING ───────────────────────────────────────────────────────
+// Everything below renders from getFeed() → normalizeSignal(). No signal reaches
+// a card without a tier, because normalizeSignal is the only way in.
+
+const PLAT_VAR = {
+  LinkedIn:  'var(--ah-plat-linkedin)',
+  X:         'var(--ah-plat-x)',
+  Instagram: 'var(--ah-plat-instagram)',
+  YouTube:   'var(--ah-plat-youtube)',
+  Reddit:    'var(--ah-plat-reddit)',
+  TikTok:    'var(--ah-plat-tiktok)',
+};
+const platVar = p => PLAT_VAR[p] || 'var(--text3)';
+
+/** Fetches the feed for a category. Never throws — an error is a render state. */
+function useLiveFeed(category) {
+  const [state, setState] = useState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, loading: true });
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    let alive = true;
+    setState(s => ({ ...s, loading: true }));
+
+    getFeed({ category, signal: ac.signal })
+      .then(res => { if (alive) setState({ ...res, loading: false }); })
+      .catch(err => {
+        // getFeed already fails soft; this is the belt-and-braces path.
+        console.warn('[feed] getFeed threw', err?.message);
+        if (alive) setState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, loading: false });
+      });
+
+    return () => { alive = false; ac.abort(); };
+  }, [category, nonce]);
+
+  return { ...state, refresh: () => setNonce(n => n + 1) };
+}
+
+/** Tier + LIVE/MANUAL, on every card. Both are unconditional by construction. */
+function SignalBadges({ item, showSignal = false }) {
+  return (
+    <span className="badge-row">
+      <span className={`badge badge-tier badge-${item.tier}`}>{item.tier}</span>
+      <span className={`badge ${item.live ? 'badge-live' : 'badge-manual'}`}>
+        {item.live ? 'Live' : 'Manual'}
+      </span>
+      <span className="badge badge-plat" style={{ '--plat': platVar(item.platform) }}>
+        {item.platform}
+      </span>
+      {showSignal && (
+        <span className={`badge badge-signal-${item.signal}`} style={{ border: '1px solid currentColor' }}>
+          {item.signal}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function CardMeta({ item }) {
+  return (
+    <div className="gn-card-meta">
+      <span className="gn-card-source">{item.sourceLabel}</span>
+      <span>·</span>
+      <time dateTime={item.publishedAt}>{item.time}</time>
+      {item.engagement && <><span>·</span><span>{item.engagement}</span></>}
+    </div>
+  );
+}
+
+const openItem = item => { if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer'); };
+
+/** Top Stories — one row: hero (~53%) + a vertical rail of compact secondaries. */
+function TopStories({ lead, rail }) {
+  if (!lead) return null;
+  return (
+    <div className="gn-grid">
+      <article className="gn-lead" onClick={() => openItem(lead)}>
+        {lead.thumbnail
+          ? <div className="gn-lead-img" style={{ backgroundImage:`url(${lead.thumbnail})` }}/>
+          : <div className="media-img-ph" style={{ aspectRatio:'16/10' }}>{lead.platform}</div>}
+        <div className="gn-lead-text">
+          <SignalBadges item={lead} showSignal/>
+          <h2 className="gn-lead-title" style={{ marginTop:8 }}>{lead.title}</h2>
+          {lead.content && <p className="gn-lead-desc">{lead.content}</p>}
+          <div className="gn-lead-meta">
+            <span className="gn-lead-source">{lead.sourceLabel}</span>
+            <span>·</span>
+            <time dateTime={lead.publishedAt}>{lead.time}</time>
+            {lead.engagement && <><span>·</span><span>{lead.engagement}</span></>}
+          </div>
+        </div>
+      </article>
+
+      <div className="gn-row">
+        {rail.map(item => (
+          <article key={item.id} className="gn-card" data-platform={item.platform}
+            style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
+            {item.thumbnail
+              ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
+              : <div className="gn-card-img"/>}
+            <h3 className="gn-card-title">{item.title}</h3>
+            <div className="gn-card-meta">
+              <SignalBadges item={item}/>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Everything past the lead row, as a stacked card list. */
+function MoreStories({ items }) {
+  if (!items.length) return null;
+  return (
+    <>
+      <div className="section-head">
+        <span className="section-label">More Signal</span>
+        <span className="section-sub">{items.length} more</span>
+      </div>
+      <div className="gn-row" style={{ gap:18, marginBottom:28 }}>
+        {items.map(item => (
+          <article key={item.id} className="gn-card" data-platform={item.platform}
+            style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
+            {item.thumbnail
+              ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
+              : <div className="gn-card-img"/>}
+            <h3 className="gn-card-title">{item.title}</h3>
+            <div className="gn-card-meta">
+              <SignalBadges item={item}/>
+              <span>·</span>
+              <time dateTime={item.publishedAt}>{item.time}</time>
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** Right rail — the ranked "what's driving the feed right now" list. */
+function LiveSignalRail({ items }) {
+  const top = items.slice(0, 8);
+  if (!top.length) return null;
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">Live Signal</span>
+      </div>
+      <div className="sop-list">
+        {top.map((item, i) => (
+          <button key={item.id} className="sop-item" onClick={() => openItem(item)}>
+            <span className="sop-num">{String(i + 1).padStart(2, '0')}</span>
+            <span className="sop-item-title">{item.title}</span>
+            <span className="sop-item-meta">
+              <span className={`badge badge-tier badge-${item.tier}`}>{item.tier}</span>
+              <span className={`badge ${item.live ? 'badge-live' : 'badge-manual'}`}>{item.live ? 'Live' : 'Manual'}</span>
+              <span className="sop-item-time">{item.sourceLabel} · {item.time}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Which feeds answered and which didn't. Degradation is visible, not silent. */
+function SourceHealth({ sources, youtubeNeedsKey }) {
+  if (!sources.length && !youtubeNeedsKey) return null;
+  const ok = sources.filter(s => s.ok).length;
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">Sources</span>
+        <span className="section-sub">{ok}/{sources.length} live</span>
+      </div>
+      <div className="src-health">
+        {youtubeNeedsKey && (
+          <div className="src-row">
+            <span className="src-dot fail"/>
+            <span className="src-name">YouTube</span>
+            <span className="src-note">YOUTUBE_API_KEY not set</span>
+          </div>
+        )}
+        {sources.map((s, i) => (
+          <div className="src-row" key={`${s.platform}-${s.label}-${i}`}>
+            <span className={`src-dot ${s.ok ? 'ok' : 'fail'}`}/>
+            <span className="src-name">{s.label}</span>
+            <span className="src-note">{s.ok ? `${s.count} items` : (s.error || `HTTP ${s.status}`)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
-function FeedView({ t, activeFilter, setActiveFilter, onNav, isMobile }) {
-  const [bookmarks,   setBookmarks]   = useState([]);
-  const [activeTopic, setActiveTopic] = useState(null);
-  const [liveStats,   setLiveStats]   = useState({ reach:2410000, mentions:4782, active:31 });
+function FeedView({ t, category, search, isMobile }) {
+  const { items, sources, degraded, youtubeNeedsKey, loading, refresh } = useLiveFeed(category);
 
-  useEffect(()=>{
-    const iv = setInterval(()=>{
-      setLiveStats(s=>({
-        reach:    s.reach    + Math.floor(Math.random()*50-10),
-        mentions: s.mentions + Math.floor(Math.random()*8-2),
-        active:   Math.max(20, s.active+Math.floor(Math.random()*6-3)),
-      }));
-    }, 3500);
-    return ()=>clearInterval(iv);
-  }, []);
+  // Expose refresh to the masthead's refresh icon without threading it through
+  // every view — the feed owns its own fetch, the nav just pokes it.
+  useEffect(() => {
+    window.__aetherRefreshFeed = refresh;
+    return () => { delete window.__aetherRefreshFeed; };
+  }, [refresh]);
 
-  const toggleBk = (post,plat) => setBookmarks(prev=>prev.some(b=>b.id===post.id)?prev.filter(b=>b.id!==post.id):[...prev,{...post,platform:plat}]);
+  const q = (search || '').trim().toLowerCase();
+  const visible = q
+    ? items.filter(i =>
+        i.title.toLowerCase().includes(q) ||
+        i.content.toLowerCase().includes(q) ||
+        i.sourceLabel.toLowerCase().includes(q))
+    : items;
 
-  const handleTopicClick = (topic) => {
-    if (activeTopic===topic.id) { setActiveTopic(null); setActiveFilter(null); }
-    else { setActiveTopic(topic.id); setActiveFilter(topic.keywords[0]); }
-  };
-
-  const filterKey = activeFilter || (activeTopic ? TOPIC_AREAS.find(x=>x.id===activeTopic)?.keywords[0] : null);
-  const filtered  = postsForFilter(filterKey);
+  const [lead, ...rest] = visible;
+  const rail = rest.slice(0, 4);
+  const more = rest.slice(4, 20);
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-      {/* This banner used to read "LIVE" in green with a pulsing dot, over
-          numbers a setInterval nudges every 3.5s. Nothing about it was real —
-          the ticking existed purely to look live. Marking it was not enough:
-          the word itself was the false claim, so the word is gone and the
-          whole pill is amber. The dot still pulses because the numbers still
-          move; it just no longer pretends to mean something. */}
-      <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.28)', width:'fit-content', flexWrap:'wrap' }}>
-        <div style={{ width:7, height:7, borderRadius:'50%', background:'#F59E0B', animation:'pulse 2s ease-in-out infinite' }}/>
-        <DemoChip/>
-        <span style={{ fontSize:11, fontWeight:600, color:'#F59E0B' }}>Simulated · {fmt(liveStats.reach)} reach · {fmt(liveStats.mentions)} mentions · {liveStats.active} active</span>
+    <div className="page-grid">
+      <div className="feed-col">
+        <div className="section-head">
+          <span className="section-label">Top Signal</span>
+          <span className="section-sub">
+            {loading ? 'Loading…' : `${visible.length} signal${visible.length === 1 ? '' : 's'}`}
+            {degraded > 0 && ` · ${degraded} source${degraded === 1 ? '' : 's'} degraded`}
+          </span>
+        </div>
+
+        {loading && (
+          <div className="empty-note" style={{ animation:'pulse 1.4s ease-in-out infinite' }}>
+            Pulling live signal…
+          </div>
+        )}
+
+        {!loading && !visible.length && (
+          // Graceful fallback: the app renders, and it says exactly WHY it is
+          // empty rather than quietly substituting invented posts.
+          <div className="empty-note">
+            <strong style={{ color:'var(--text2)' }}>No live signal for this category.</strong>
+            <div style={{ marginTop:8 }}>
+              {q
+                ? <>Nothing matches “{search}”. Clear the search to see the full feed.</>
+                : <>Every configured source for this category came back empty or unreachable.
+                   The source list on the right shows which ones and why. Edit{' '}
+                   <code>config/sources.js</code> to change what is pulled.</>}
+            </div>
+          </div>
+        )}
+
+        {!loading && lead && <TopStories lead={lead} rail={rail}/>}
+        {!loading && <MoreStories items={more}/>}
       </div>
 
-      <div>
-        <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Your Topics — click to filter</div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(130px, 1fr))', gap:10 }}>
-          {TOPIC_AREAS.map(topic=>(
-            <TopicCard key={topic.id} topic={topic} t={t} active={activeTopic===topic.id} onClick={()=>handleTopicClick(topic)}/>
-          ))}
-        </div>
-      </div>
-
-      {filterKey && (
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:11, color:t.textSub }}>Showing:</span>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 10px', borderRadius:20, background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.3)' }}>
-            <span style={{ fontSize:11, fontWeight:700, color:'#818CF8' }}>{activeFilter||TOPIC_AREAS.find(x=>x.id===activeTopic)?.label}</span>
-            <button onClick={()=>{setActiveFilter(null);setActiveTopic(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:'#818CF8', padding:0, display:'flex' }}><X size={11}/></button>
-          </div>
-          <span style={{ fontSize:11, color:t.textSub }}>{filtered.length} posts</span>
-        </div>
-      )}
-
-      <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:16 }}>
-        <div>
-          <MorningDigest t={t}/>
-          <div style={{ marginTop:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-              <Zap size={13} style={{ color:'#6366F1' }}/>
-              {filterKey ? 'Filtered Posts' : 'Top Signals — All Platforms'}
-            </div>
-            {(filtered.length
-              ? filtered
-              : Object.entries(MOCK_POSTS).flatMap(([plat,ps])=>ps.slice(0,1).map(p=>({...p,platform:plat})))
-            ).slice(0,6).map(post=>(
-              <PostCard key={post.id} post={post} platform={post.platform} t={t} bookmarks={bookmarks} onBookmark={toggleBk}/>
-            ))}
-          </div>
-        </div>
-        <div>
-          {bookmarks.length>0 && (
-            <div style={{ marginBottom:14, padding:16, borderRadius:16, background:t.card, border:`1px solid ${t.border}` }}>
-              <div style={{ fontSize:11, fontWeight:700, color:t.text, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-                <BookmarkCheck size={13} style={{ color:'#F59E0B' }}/>Saved ({bookmarks.length})
-              </div>
-              {bookmarks.slice(0,3).map(p=><PostCard key={p.id} post={p} platform={p.platform} t={t} bookmarks={bookmarks} onBookmark={toggleBk} compact/>)}
-            </div>
-          )}
-          <div style={{ padding:16, borderRadius:16, background:t.card, border:`1px solid ${t.border}` }}>
-            <div style={{ fontSize:11, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-              <Target size={13} style={{ color:'#22D3EE' }}/>Quick Actions
-              <DemoChip compact style={{ marginLeft:'auto' }}/>
-            </div>
-            {[
-              { label:"Engage @sama's AGI thread — +520% velocity", color:'#6366F1' },
-              { label:'Post on LinkedIn 8–10am — peak engagement window', color:'#2D88FF' },
-              { label:'Create Reel using #ContentCreator audio trend', color:'#F0609E' },
-              { label:'Comment on 5x #BuildInPublic posts today', color:'#22D3EE' },
-            ].map((a,i)=>(
-              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:7, padding:'8px 10px', borderRadius:10, background:t.glass, border:`1px solid ${t.border}` }}>
-                <div style={{ width:6, height:6, borderRadius:'50%', background:a.color, flexShrink:0, marginTop:4 }}/>
-                <span style={{ fontSize:11, lineHeight:1.5, color:t.textSub }}>{a.label}</span>
-              </div>
-            ))}
-            <button onClick={()=>onNav('studio')} style={{ width:'100%', fontSize:11, fontWeight:600, padding:'8px 0', borderRadius:10, background:t.accentSub, color:t.accent, border:`1px solid ${t.accentBorder}`, cursor:'pointer', marginTop:4 }}>
-              Open Content Studio →
-            </button>
-          </div>
-        </div>
-      </div>
+      <aside>
+        <LiveSignalRail items={visible}/>
+        <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>
+      </aside>
     </div>
   );
 }
@@ -1388,123 +1534,199 @@ function SettingsView({ t, dark, onDark, isMobile }) {
   );
 }
 
-// ─── TOP NAV ──────────────────────────────────────────────────────────────────
-function TopNav({ view, onNav, dark, onDark, t, alertCount, isMobile }) {
+// ─── TOP BAR ──────────────────────────────────────────────────────────────────
+// Two stacked rows, MyNewsHub's masthead:
+//   1. status strip  — live flag · market ticker · weather chip
+//   2. nav bar       — serif logo · category tabs w/ active underline · controls
+
+// ASSUMPTION: the ticker and weather are still placeholders. AetherHub has no
+// markets or weather adapter, and inventing numbers would contradict the
+// "label all fabricated data" rule — so the strip is badged DEMO and carries
+// the same values the old dashboard showed.
+const TICKER_DEMO = [
+  { sym:'S&P 500', val:'5,842.91', chg:'+0.42%', up:true  },
+  { sym:'NASDAQ',  val:'19,218.17', chg:'+0.68%', up:true  },
+  { sym:'DOW',     val:'43,870.35', chg:'-0.11%', up:false },
+  { sym:'BTC',     val:'97,412',    chg:'+1.84%', up:true  },
+  { sym:'10Y',     val:'4.28%',     chg:'-0.03',  up:false },
+];
+
+function StatusStrip({ liveCount }) {
   return (
-    <div style={{ height:isMobile?52:58, background:t.navBg, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:`1px solid ${t.border}`, display:'flex', alignItems:'center', paddingLeft:isMobile?14:22, paddingRight:isMobile?14:18, gap:10, flexShrink:0, position:'sticky', top:0, zIndex:100 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, marginRight:6 }}>
-        <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#6366F1,#22D3EE)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <Zap size={14} color="#fff" fill="#fff"/>
+    <div className="status-strip">
+      <div className="status-strip-inner">
+        {liveCount > 0
+          ? <span className="ss-flag ss-flag-live"><span className="ss-pulse"/>Live</span>
+          : <span className="ss-flag ss-flag-markets">Markets</span>}
+        <div className="ss-ticker">
+          <div className="ss-ticker-inner">
+            {TICKER_DEMO.map(tk => (
+              <span className="ss-tk" key={tk.sym}>
+                <span className="ss-tk-sym">{tk.sym}</span>
+                <span className="ss-tk-val tnum">{tk.val}</span>
+                <span className={`ss-tk-chg tnum ${tk.up ? 'up' : 'down'}`}>{tk.chg}</span>
+              </span>
+            ))}
+            <span className="ss-tk"><span className="ss-tk-sym">demo data</span></span>
+          </div>
         </div>
-        <span style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:15, fontWeight:800, background:'linear-gradient(135deg,#6366F1,#22D3EE)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', whiteSpace:'nowrap' }}>
-          AetherHub
+        <span className="ss-wx">
+          <span className="ss-wx-temp tnum">72°</span>
+          <span>Houston</span>
         </span>
-      </div>
-      {!isMobile && (
-        <nav style={{ display:'flex', gap:1, flex:1, overflow:'hidden' }}>
-          {NAV_TABS.map(tab=>{
-            const active = view===tab.id;
-            const badge  = tab.id==='alerts' && alertCount>0;
-            return (
-              <button key={tab.id} onClick={()=>onNav(tab.id)}
-                style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:active?700:500, padding:'6px 11px', borderRadius:9, border:'none', cursor:'pointer', background:active?t.accentSub:'transparent', color:active?t.accent:t.textSub, transition:'all 0.15s', position:'relative', whiteSpace:'nowrap', flexShrink:0 }}>
-                <span style={{ opacity:active?1:0.65 }}>{tab.icon}</span>
-                {tab.label}
-                {badge&&<span style={{ position:'absolute', top:5, right:5, width:5, height:5, borderRadius:'50%', background:'#EF4444' }}/>}
-              </button>
-            );
-          })}
-        </nav>
-      )}
-      {isMobile && <div style={{ flex:1 }}/>}
-      <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-        {alertCount>0&&(
-          <button onClick={()=>onNav('alerts')} style={{ position:'relative', padding:7, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
-            <Bell size={14}/>
-            <span style={{ position:'absolute', top:3, right:3, width:6, height:6, borderRadius:'50%', background:'#EF4444' }}/>
-          </button>
-        )}
-        <button onClick={onDark} style={{ padding:7, borderRadius:9, border:`1px solid ${t.border}`, background:t.glass, color:t.textSub, cursor:'pointer', display:'flex' }}>
-          {dark?<Sun size={14}/>:<Moon size={14}/>}
-        </button>
-        <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#6366F1,#22D3EE)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer' }}>A</div>
       </div>
     </div>
   );
 }
 
-function BottomNav({ view, onNav, t, alertCount }) {
+function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav, liveCount }) {
   return (
-    <div style={{ height:58, background:t.navBg, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:`1px solid ${t.border}`, display:'flex', alignItems:'center', justifyContent:'space-around', flexShrink:0, position:'sticky', bottom:0, zIndex:100 }}>
-      {NAV_TABS.slice(0,5).map(tab=>{
-        const active = view===tab.id;
-        const badge  = tab.id==='alerts' && alertCount>0;
-        return (
-          <button key={tab.id} onClick={()=>onNav(tab.id)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'6px 0', border:'none', cursor:'pointer', background:'transparent', color:active?t.accent:t.textSub, position:'relative' }}>
-            <span style={{ opacity:active?1:0.55 }}>{tab.icon}</span>
-            <span style={{ fontSize:9, fontWeight:active?700:500 }}>{tab.label}</span>
-            {badge&&<div style={{ position:'absolute', top:4, right:'calc(50% - 12px)', width:5, height:5, borderRadius:'50%', background:'#EF4444' }}/>}
-          </button>
-        );
-      })}
+    <div className="topbar-wrap">
+      <StatusStrip liveCount={liveCount}/>
+      <div className="nav-bar">
+        <div className="nav-bar-inner">
+          <div className="logo-wrap">
+            <div className="logo">Aether<span>Hub</span></div>
+            <div className="logo-tag">Social Intelligence</div>
+          </div>
+
+          <nav className="nav-tabs" aria-label="Categories">
+            {CATEGORIES.map(c => (
+              <button key={c.id}
+                className={`nav-tab${category === c.id ? ' active' : ''}`}
+                aria-current={category === c.id ? 'page' : undefined}
+                onClick={() => onCategory(c.id)}>
+                {c.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="nav-right">
+            <input className="search-input" type="search" placeholder="Search"
+              value={search} onChange={e => onSearch(e.target.value)} aria-label="Search the feed"/>
+            <button className="nav-btn-blue" onClick={() => onNav('intelligence')}>
+              <Sparkles size={12}/>Analyze
+            </button>
+            <button className="nav-icon-btn" onClick={onRefresh} aria-label="Refresh feed" title="Refresh feed">
+              <RefreshCw size={14}/>
+            </button>
+            <button className="nav-icon-btn" onClick={onDark}
+              aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={dark ? 'Light mode' : 'Dark mode'}>
+              {dark ? <Sun size={14}/> : <Moon size={14}/>}
+            </button>
+            <button className="nav-avatar" onClick={() => onNav('settings')} aria-label="Profile">CB</button>
+            <button className="nav-btn" onClick={() => onNav('sources')}>Customize</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Secondary nav for the non-feed views (Discover, Intelligence, Studio, …).
+// The category tabs own the masthead, so the app sections sit just below it.
+function SectionNav({ view, onNav, alertCount }) {
+  return (
+    <div style={{ borderBottom:'1px solid var(--border)', background:'var(--surface)' }}>
+      <div style={{ maxWidth:1400, margin:'0 auto', padding:'0 var(--s4)', display:'flex', gap:2, overflowX:'auto' }}>
+        {NAV_TABS.map(tab => {
+          const active = view === tab.id;
+          return (
+            <button key={tab.id} onClick={() => onNav(tab.id)}
+              style={{
+                display:'flex', alignItems:'center', gap:6, padding:'10px 12px',
+                background:'transparent', border:'none', cursor:'pointer', whiteSpace:'nowrap',
+                fontFamily:'var(--ah-sans)', fontSize:12, fontWeight:active ? 700 : 500,
+                color: active ? 'var(--accent)' : 'var(--text3)',
+                borderBottom:`2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+                position:'relative',
+              }}>
+              <span style={{ opacity: active ? 1 : 0.7 }}>{tab.icon}</span>
+              {tab.label}
+              {tab.id === 'alerts' && alertCount > 0 && (
+                <span style={{ width:5, height:5, borderRadius:'50%', background:'var(--red)' }}/>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AetherHub() {
-  const [view,         setView]         = useState('feed');
-  const [dark,         setDark]         = useState(true);
-  const [circle,       setCircle]       = useState(DEFAULT_CIRCLE);
+  const [view,     setView]     = useState('feed');
+  const [dark,     setDark]     = useState(false); // light is the primary target
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [search,   setSearch]   = useState('');
+  const [circle,   setCircle]   = useState(DEFAULT_CIRCLE);
   const [activeFilter, setActiveFilter] = useState(null);
-  const [panelOpen,    setPanelOpen]    = useState(false);
   const w = useWindowSize();
-  const isMobile   = w < 768;
-  const showPanel  = w >= 1120;
+  const isMobile = w < 768;
 
-  const t = dark ? T.dark : T.light;
-  const unreadAlerts = ALERTS.filter(a=>!a.read).length;
+  // One toggle, one attribute — every view follows because they all read the
+  // same CSS custom properties.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
-  const viewLabel = { feed:'Feed', discover:'Discover', intelligence:'Intelligence', studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings' };
+  const t = T.light; // both entries resolve through CSS vars; kept for the view API
+  const unreadAlerts = ALERTS.filter(a => !a.read).length;
+
+  const viewLabel = {
+    feed:'Feed', discover:'Discover', intelligence:'Intelligence',
+    studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings',
+  };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100dvh', background:t.bg, color:t.text, fontFamily:"var(--font-inter),-apple-system,sans-serif", overflow:'hidden' }}>
-      <TopNav view={view} onNav={setView} dark={dark} onDark={()=>setDark(d=>!d)} t={t} alertCount={unreadAlerts} isMobile={isMobile}/>
+    <>
+      <TopBar
+        category={category}
+        onCategory={id => { setCategory(id); setView('feed'); }}
+        dark={dark}
+        onDark={() => setDark(d => !d)}
+        search={search}
+        onSearch={setSearch}
+        onRefresh={() => window.__aetherRefreshFeed?.()}
+        onNav={setView}
+        liveCount={view === 'feed' ? 1 : 0}
+      />
 
-      <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
-        <main style={{ flex:1, overflowY:'auto', padding:isMobile?'16px 14px':'22px 26px' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
-            <div>
-              <h1 style={{ fontFamily:'var(--font-syne),sans-serif', fontSize:isMobile?17:20, fontWeight:800, color:t.text, margin:0, letterSpacing:'-0.02em' }}>{viewLabel[view]||'Feed'}</h1>
-              {activeFilter&&view==='feed'&&<p style={{ fontSize:11, color:t.accent, marginTop:2 }}>Filtered: {activeFilter}</p>}
-            </div>
-            {!showPanel&&(
-              <button onClick={()=>setPanelOpen(p=>!p)} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, padding:'6px 12px', borderRadius:10, border:`1px solid ${panelOpen?t.accent:t.border}`, background:panelOpen?t.accentSub:t.glass, color:panelOpen?t.accent:t.textSub, cursor:'pointer' }}>
-                <TrendingUp size={12}/>Trends
-              </button>
-            )}
+      {view !== 'feed' && <SectionNav view={view} onNav={setView} alertCount={unreadAlerts}/>}
+
+      <main className="page">
+        {view !== 'feed' && (
+          <div style={{ display:'flex', alignItems:'baseline', gap:12, marginBottom:18 }}>
+            <h1 style={{ fontFamily:'var(--ah-archivo)', fontSize:22, fontWeight:800,
+                         color:'var(--text)', margin:0, letterSpacing:'-0.02em' }}>
+              {viewLabel[view]}
+            </h1>
+            <button onClick={() => setView('feed')}
+              style={{ background:'none', border:'none', cursor:'pointer', padding:0,
+                       fontSize:12, fontWeight:600, color:'var(--accent)' }}>
+              ← Back to feed
+            </button>
           </div>
-
-          {view==='feed'         && <FeedView         t={t} activeFilter={activeFilter} setActiveFilter={setActiveFilter} onNav={setView} isMobile={isMobile}/>}
-          {view==='discover'     && <DiscoverView     t={t} setActiveFilter={setActiveFilter} onNav={setView}/>}
-          {view==='intelligence' && <IntelligenceView t={t}/>}
-          {view==='studio'       && <StudioView       t={t} isMobile={isMobile}/>}
-          {view==='alerts'       && <AlertsView       t={t}/>}
-          {view==='sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
-          {view==='settings'     && <SettingsView     t={t} dark={dark} onDark={()=>setDark(d=>!d)} isMobile={isMobile}/>}
-        </main>
-
-        {(showPanel||panelOpen) && (
-          <aside style={{ width:280, minWidth:280, borderLeft:`1px solid ${t.border}`, overflowY:'auto', padding:'18px 14px', flexShrink:0, position:panelOpen&&!showPanel?'absolute':'relative', right:0, top:0, bottom:0, background:t.bg, zIndex:panelOpen&&!showPanel?50:undefined }}>
-            {panelOpen&&!showPanel&&(
-              <button onClick={()=>setPanelOpen(false)} style={{ position:'absolute', top:10, right:10, background:'none', border:'none', cursor:'pointer', color:t.textSub }}><X size={14}/></button>
-            )}
-            <RightPanel t={t} activeFilter={activeFilter} setActiveFilter={f=>{ setActiveFilter(f); setView('feed'); }}/>
-          </aside>
         )}
-      </div>
 
-      {isMobile&&<BottomNav view={view} onNav={setView} t={t} alertCount={unreadAlerts}/>}
-    </div>
+        {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}/>}
+        {view === 'discover'     && <DiscoverView     t={t} setActiveFilter={setActiveFilter} onNav={setView}/>}
+        {view === 'intelligence' && <IntelligenceView t={t}/>}
+        {view === 'studio'       && <StudioView       t={t} isMobile={isMobile}/>}
+        {view === 'alerts'       && <AlertsView       t={t}/>}
+        {view === 'sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
+        {view === 'settings'     && <SettingsView     t={t} dark={dark} onDark={() => setDark(d => !d)} isMobile={isMobile}/>}
+      </main>
+
+      {view === 'feed' && (
+        <div style={{ borderTop:'1px solid var(--border)', background:'var(--surface)', marginTop:8 }}>
+          <div style={{ maxWidth:1400, margin:'0 auto', padding:'14px var(--s4)' }}>
+            <SectionNav view={view} onNav={setView} alertCount={unreadAlerts}/>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,5 +1,28 @@
 # AetherHub — Brand & Design System
 
+> ## ⚠ SUPERSEDED — §2 (colour), §3 (type) and §1 (identity)
+>
+> AetherHub moved from the **dark-first indigo/cyan neon** system described below
+> to the **MyNewsHub editorial system**: light-first warm newsprint, a single
+> editorial-blue accent (`#12558c`), Playfair/Archivo/Inter/Public Sans, and an
+> 8px radius. Saturated red is now reserved as a *signal* (live/breaking) and is
+> never decorative.
+>
+> **`app/globals.css` is the source of truth for colour, type and radius.**
+> The `--ah-*` variable *names* in this document still resolve — they are aliased
+> onto the new palette — but their *values* have all changed, and the indigo
+> gradient (`#6366F1 → #22D3EE`) is retired.
+>
+> What is still accurate below: the *structure* — the semantic roles (signal
+> strength, alert severity, platform accents), the labeling rule in §7.8, and the
+> contrast reasoning in §9.6. What is stale: every hex value, the Syne wordmark,
+> and the gradient.
+>
+> Rewriting this document against the new palette is tracked as follow-up work.
+> Two additions it does not yet cover: the **tier badge** (`mainstream` /
+> `street`) and the **LIVE / MANUAL** badge, which appear on every card in the
+> Feed. See README §Social ingestion.
+
 **Status:** extracted, not invented. Every value below was read out of the existing
 codebase. Nothing here is a new design direction.
 

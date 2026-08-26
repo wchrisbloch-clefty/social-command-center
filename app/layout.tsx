@@ -1,17 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Syne } from "next/font/google";
+import { Inter, Archivo, Playfair_Display, Public_Sans } from "next/font/google";
 import "./globals.css";
 
+// Editorial type system, ported from MyNewsHub:
+//   Playfair Display — masthead only
+//   Archivo          — headlines, ranked numbers (heavy + tight)
+//   Inter            — body
+//   Public Sans      — meta: source, timestamp, ticker
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
 });
 
-const syne = Syne({
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["700", "800"],
-  variable: "--font-syne",
+  weight: ["600", "700", "800", "900"],
+  variable: "--font-archivo",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["700", "900"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-public-sans",
   display: "swap",
 });
 
@@ -21,7 +40,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366F1",
+  themeColor: "#12558c",
 };
 
 export default function RootLayout({
@@ -30,7 +49,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${syne.variable}`}>
+    // Light is the primary target; the toggle swaps data-theme on this element.
+    <html
+      lang="en"
+      data-theme="light"
+      className={`${inter.variable} ${archivo.variable} ${playfair.variable} ${publicSans.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

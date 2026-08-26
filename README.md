@@ -13,25 +13,33 @@ Next 16.2.6 · React 19.2.4 · Tailwind 4 · deployed on Vercel.
 
 ## Current state — read this first
 
-**The dashboard is deployed and working. All of its data is fabricated.**
+**The Feed is live. The other six views are still fabricated.**
 
-Every post, trend, alert, topic count and activity figure is mock data checked
-into `app/page.jsx`. There is no platform API integration. That is a deliberate
-stage, not an oversight, and the UI says so: every fabricated number carries a
-visible amber `DEMO DATA` marker, and the activity banner reads *Simulated*
-rather than *LIVE*. The rule is written down in BRAND.md §7.8 so it holds for
-components that do not exist yet.
+The Feed pulls real posts from Instagram, LinkedIn, X and Reddit through
+RSSHub, plus YouTube through its official Data API — see *Social ingestion*
+below. Every signal on it carries a tier badge (`mainstream` / `street`) and a
+`LIVE` badge, and the right rail names any source that failed and why.
+
+Discover, Intelligence, Studio, Alerts, Sources and Settings still render mock
+data checked into `app/page.jsx`. That is a deliberate stage, not an oversight,
+and the UI says so: fabricated numbers carry a visible amber `DEMO DATA` marker.
+The market ticker in the status strip is fabricated too and is labelled as such.
+The rule is written down in BRAND.md §7.8 so it holds for components that do not
+exist yet.
 
 What is real:
 
 | Area | State |
 |---|---|
-| UI shell, navigation, all five views | Working, responsive, deployed |
+| UI shell, navigation, all seven views | Working, responsive, deployed |
+| **Feed — live social signal** | **Working.** RSSHub + YouTube Data API, category-filtered |
+| `/api/social` — Instagram, LinkedIn, X, Reddit | Working. Fails soft per source |
+| `/api/youtube` — official Data API v3 | Working. Needs `YOUTUBE_API_KEY`, degrades without it |
 | `/api/brief` — Groq → Gemini → Claude | Working. The answering provider is shown in the UI |
 | `/api/extract` — URL/article/YouTube ingest | Working |
-| Design tokens (`--ah-*`, Tailwind `@theme`) | Landed. Additive — components still style inline |
+| Design tokens (editorial palette, Tailwind `@theme`) | Landed. Drives every view via `data-theme` |
 | `packages/voice-profile` | Built and tested. **Not wired into the app** |
-| Feed / trend / alert data | Fabricated, labeled |
+| Trend / alert / ticker data | Fabricated, labeled |
 | Voice UI (Settings → Voice) | Not built. Step 3 |
 | Auth | None. Single-tenant by design |
 
@@ -60,6 +68,8 @@ is configured.
 
 | Variable | Required | Purpose |
 |---|---|---|
+| `RSSHUB_BASE_URL` | no | RSSHub instance. Defaults to `https://rsshub.app` |
+| `YOUTUBE_API_KEY` | no | YouTube Data API v3. Without it YouTube signals are off |
 | `GROQ_API_KEY` | no | First AI provider. Free tier |
 | `GOOGLE_AI_API_KEY` | no | Second provider. Free tier |
 | `ANTHROPIC_API_KEY` | no | Last resort. **Paid** |
@@ -78,10 +88,11 @@ are upstream repos we do not control.
 ```bash
 npm run dev         # dev server
 npm run build       # production build
-npm test            # 41 tests. The 8 Postgres ones skip without a database
+npm test            # 49 tests. The 10 Postgres ones skip without a database
 npm run test:pg     # those 8, against POSTGRES_TEST_URL
 npm run typecheck   # tsc --noEmit
 npm run voice:sync  # voice profile → about-me.md + voice.md (needs POSTGRES_URL)
+npm run probe:rsshub # which configured feeds actually respond, and with how many items
 ```
 
 Tests run on Node's built-in runner with native TypeScript stripping — no test
@@ -128,23 +139,126 @@ It is deliberately not imported by any app code yet. Wiring it up is Step 3.
 
 ---
 
+## Social ingestion
+
+### The pipeline
+
+```
+config/sources.js ──▶ /api/social  ──┐
+                      /api/youtube ──┴──▶ normalizeSignal() ──▶ getFeed() ──▶ Feed view
+```
+
+`normalizeSignal()` in `lib/adapters.js` is the only way a signal enters the UI,
+and it is the only place a tier is assigned. It cannot return an un-tiered
+signal, so the cards render their tier badge unconditionally rather than
+defensively. Tier is derived from the platform and never set per source:
+
+| Platform | Tier | Transport |
+|---|---|---|
+| Instagram | `mainstream` | RSSHub |
+| LinkedIn | `mainstream` | RSSHub |
+| YouTube | `mainstream` | Official Data API v3 |
+| X | `street` | RSSHub |
+| Reddit | `street` | Reddit's own RSS — **not** RSSHub |
+
+Sources that carry engagement numbers (YouTube) score on views-per-hour.
+Sources that do not (everything over RSS) score on recency instead — otherwise
+every RSS item would land on `moderate` and flatten the feed.
+
+### Editing what gets pulled
+
+Everything lives in **`config/sources.js`**. One line per source:
+
+```js
+{ platform: 'LinkedIn', route: '/linkedin/company/openai/posts',
+  label: 'OpenAI', category: 'tech', limit: 5 },
+```
+
+- `route` — relative (`/twitter/...`) is joined onto `RSSHUB_BASE_URL`; absolute
+  (`https://...`) is fetched directly and skips RSSHub entirely.
+- `category` — one of General, Business & Markets, Energy, AI & Tech, Sports,
+  Health, Pop Culture. Drives the category nav.
+- `limit` — max items this source contributes per refresh, default 5. This is
+  load-bearing: without it a busy subreddit floods a category and buries the
+  platforms that only return two or three items.
+
+The seeded entries are placeholders marked `// ASSUMPTION:` — replace them.
+
+### RSSHub route patterns
+
+Read out of the RSSHub source (`lib/routes/*`), not guessed. `requireConfig` is
+what decides whether the **free public instance** can serve a route at all.
+
+| Platform | Route | Config needed |
+|---|---|---|
+| Instagram | `/instagram/2/user/:username` | none, but `antiCrawler` — rate-limits hard |
+| Instagram | `/instagram/2/tags/:hashtag` | same |
+| Instagram | `/instagram/user/:username` | `IG_USERNAME` + `IG_PASSWORD` — self-hosted only |
+| LinkedIn | `/linkedin/company/:company_id/posts` | **none** — the best free-tier bet |
+| X | `/twitter/user/:id` | **`TWITTER_AUTH_TOKEN`** on the RSSHub instance |
+| X | `/twitter/keyword/:keyword` | same |
+| Reddit | `https://www.reddit.com/r/:sub/hot/.rss` | none — native RSS, no RSSHub |
+
+Two things worth knowing before you extend the list:
+
+- **LinkedIn's `/posts` suffix is required.** `/linkedin/company/google` is a 404.
+- **There is no LinkedIn person route.** RSSHub only exposes company pages. To
+  follow a person, follow the company they post under.
+- **RSSHub has no Reddit namespace at all.** Reddit serves RSS itself, so those
+  sources use absolute URLs and never touch RSSHub.
+
+Run `npm run probe:rsshub` to see which of your configured routes actually
+respond right now, and with how many items.
+
+### Swapping to a self-hosted RSSHub
+
+Change one environment variable. No code edits:
+
+```bash
+RSSHUB_BASE_URL=https://rsshub.your-domain.com
+```
+
+Every relative route in `config/sources.js` re-points automatically. Absolute
+routes (Reddit) are unaffected.
+
+You will probably need to. The public instance is shared, aggressively
+rate-limited, and cannot serve routes that need credentials — `/twitter/*` needs
+a `TWITTER_AUTH_TOKEN` configured *on the RSSHub instance*, which is exactly the
+kind of thing a public instance will not do for you. LinkedIn company posts need
+no config and are the most likely to work for free.
+
+### When a feed breaks
+
+Nothing throws. A dead source contributes zero items, logs a warning naming the
+source and status, and reports itself in the response so the right rail can show
+it as degraded. The feed renders regardless. Degradation is visible, never
+silent, and the app never substitutes invented posts for missing live ones.
+
+---
+
 ## Repository layout
 
 ```
 app/
-  page.jsx              the entire dashboard — 14 components, one file
-  layout.tsx            fonts (Syne + Inter), metadata
-  globals.css           reset + the --ah-* token layer + Tailwind @theme
+  page.jsx              the entire dashboard — one file
+  layout.tsx            fonts (Playfair + Archivo + Inter + Public Sans), metadata
+  globals.css           reset + the editorial token layer + Tailwind @theme
+  api/social/route.js   RSSHub → Instagram, LinkedIn, X; direct → Reddit
+  api/youtube/route.js  official YouTube Data API v3
   api/brief/route.js    Groq → Gemini → Claude, returns which one answered
   api/extract/route.js  URL / article / YouTube ingest
+config/sources.js       ★ the only file you edit to change what gets pulled
+lib/adapters.js         normalizeSignal / scoreSignal / getFeed — the pipeline
 packages/voice-profile/ voice-profile-core — see above
+scripts/probe-rsshub.mjs  checks which configured feeds actually respond
 scripts/sync-voice.mjs  the only place a database driver is imported
 .agents/                four skill repos as git submodules
 .claude/skills/         26 symlinks into .agents, the layout Claude Code scans
 ```
 
-`app/page.jsx` being one ~1,400-line file is known and tracked. Splitting it is
-a prerequisite for phase 3 of the style migration — see SETUP.md §4.
+`app/page.jsx` being one ~1,700-line file is known and tracked. Splitting it is
+a prerequisite for phase 3 of the style migration — see SETUP.md §4. The live
+feed components at the top of it are the natural first extraction.
 
 ## Further reading
 
