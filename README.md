@@ -35,7 +35,7 @@ What is real:
 | **Feed — live social signal** | **Working.** RSSHub + YouTube Data API, category-filtered |
 | `/api/social` — Instagram, LinkedIn, X, Reddit | Working. Fails soft per source |
 | `/api/youtube` — official Data API v3 | Working. Needs `YOUTUBE_API_KEY`, degrades without it |
-| `/api/brief` — Groq → Gemini → Claude | Working. The answering provider is shown in the UI |
+| `/api/brief` — Groq → Gemini → Claude | Working. Shows which provider answered; 200 + `needsKey` when none configured |
 | `/api/extract` — URL/article/YouTube ingest | Working |
 | Design tokens (editorial palette, Tailwind `@theme`) | Landed. Drives every view via `data-theme` |
 | `packages/voice-profile` | Built and tested. **Not wired into the app** |
@@ -93,15 +93,34 @@ npm run test:pg     # those 8, against POSTGRES_TEST_URL
 npm run typecheck   # tsc --noEmit
 npm run voice:sync  # voice profile → about-me.md + voice.md (needs POSTGRES_URL)
 npm run probe:rsshub # which configured feeds actually respond, and with how many items
+npm run audit:responsive # the responsive geometry gate — see docs/RESPONSIVE.md
 ```
 
 Tests run on Node's built-in runner with native TypeScript stripping — no test
 framework, no build step. CI (`.github/workflows/ci.yml`) runs `npm test`,
 `typecheck` and `build` on every PR, plus the Postgres suite against a
-`postgres:16` service container.
+`postgres:16` service container, plus the responsive geometry audit.
+
+`npm run audit:responsive` needs a browser once: `npx playwright install --with-deps chromium`.
+It boots its own fixture feed and `next start`, so there is nothing to manage —
+but run `npm run build` first, because it audits the production build.
 
 **A skipped test is a green test**, so CI greps its own logs and fails if either
-suite reports skipping rather than running.
+suite reports skipping rather than running. The responsive job applies the same
+reasoning: it fails if the audit never printed a PASSED/FAILED verdict, because
+a crash that prints nothing would otherwise look like success.
+
+## Responsive contract
+
+**[`docs/RESPONSIVE.md`](docs/RESPONSIVE.md) is the layout contract — read it
+before touching a view.** Mobile-first is a hard requirement and it is enforced,
+not advisory: `npm run audit:responsive` drives a real Chromium across
+**3 breakpoints × 2 themes × 7 views = 42 cases** and fails CI on horizontal
+overflow, an element wider than its parent, a collapsed nav/tab strip, a
+sub-34px tap target at a touch breakpoint, or a console error.
+
+Targets are **mobile 390px · iPad 820px · desktop 1280px+**. A new view must be
+registered in `VIEWS` in `scripts/responsive-audit.mjs`, or nothing checks it.
 
 ---
 
@@ -251,6 +270,8 @@ config/sources.js       ★ the only file you edit to change what gets pulled
 lib/adapters.js         normalizeSignal / scoreSignal / getFeed — the pipeline
 packages/voice-profile/ voice-profile-core — see above
 scripts/probe-rsshub.mjs  checks which configured feeds actually respond
+scripts/responsive-audit.mjs  the responsive geometry CI gate
+docs/RESPONSIVE.md      the layout contract that gate enforces
 scripts/sync-voice.mjs  the only place a database driver is imported
 .agents/                four skill repos as git submodules
 .claude/skills/         26 symlinks into .agents, the layout Claude Code scans

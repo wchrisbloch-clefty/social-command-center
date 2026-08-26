@@ -56,6 +56,60 @@ jobs:
       - name: Build
         run: npm run build
 
+  responsive:
+    name: responsive geometry
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Cache the browser between runs — it is ~170MB and unchanged unless the
+      # pinned Playwright version moves.
+      - name: Cache Playwright browser
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The audit measures the production build, not the dev server: dev has
+      # different hydration timing and no CSS minification.
+      - name: Build
+        run: npm run build
+
+      # Fails on horizontal overflow, an element wider than its parent, a
+      # collapsed nav/tab strip, a sub-34px tap target at a touch breakpoint,
+      # or a console error — across 3 breakpoints x 2 themes x 7 views.
+      # The contract these defend is documented in docs/RESPONSIVE.md.
+      # A crashed run must never look like a pass. The script prints exactly one
+      # PASSED/FAILED line, so its absence means it died before reporting — the
+      # same reasoning as the skipped-test guards in the job above.
+      - name: Responsive geometry audit
+        run: |
+          set -o pipefail
+          npm run audit:responsive 2>&1 | tee /tmp/responsive.log
+          if ! grep -qE '^(PASSED|FAILED)' /tmp/responsive.log; then
+            echo "::error::The responsive audit never reported a verdict — it crashed before finishing."
+            exit 1
+          fi
+
+      - name: Upload audit log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-audit-log
+          path: /tmp/responsive.log
+          if-no-files-found: ignore
+
   postgres:
     name: postgres integration
     runs-on: ubuntu-latest

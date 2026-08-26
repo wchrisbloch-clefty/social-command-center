@@ -11,6 +11,19 @@
 // post-scorer) read GOOGLE_AI_API_KEY and are upstream repos we do not
 // control. The app conforms to them rather than the reverse.
 
+// ── Degradation contract ──────────────────────────────────────────────────────
+// Matches /api/youtube and /api/social: a missing credential or a dead upstream
+// is a NORMAL state, not an error. The server logs it loudly; the client gets a
+// 200 with an explicit flag and renders a clear "add a key" state.
+//
+// Returning 500 here used to put a red "Failed to load resource" in the browser
+// console on every AI panel, at every breakpoint, on a fresh clone — which
+// trained everyone to ignore the console. A 4xx/5xx is now reserved for a
+// genuinely malformed request, which is a caller bug rather than a degradation.
+//
+//   { needsKey: true }        no provider configured
+//   { providersFailed: [..] } all configured providers failed
+
 function googleAIKey() {
   return process.env.GOOGLE_AI_API_KEY;
 }
@@ -112,6 +125,34 @@ function buildConversationPrompt({ context, title, messages }) {
   );
 }
 
+function configuredProviders() {
+  return [
+    process.env.GROQ_API_KEY && 'Groq',
+    googleAIKey() && 'Gemini',
+    process.env.ANTHROPIC_API_KEY && 'Claude',
+  ].filter(Boolean);
+}
+
+/** No credential anywhere. Loud in the log, graceful on the wire. */
+function needsKeyResponse() {
+  console.warn('[brief] no AI provider configured — set GROQ_API_KEY, GOOGLE_AI_API_KEY or ANTHROPIC_API_KEY');
+  return Response.json({
+    needsKey: true,
+    provider: null,
+    text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_API_KEY to enable AI panels.',
+  });
+}
+
+/** Keys exist but every provider refused. Also a 200 — the UI says so. */
+function providersFailedResponse(configured) {
+  console.warn(`[brief] all providers failed (tried: ${configured.join(', ')})`);
+  return Response.json({
+    providersFailed: configured,
+    provider: null,
+    text: `All AI providers failed (tried: ${configured.join(', ')}). Please retry.`,
+  });
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -128,21 +169,8 @@ export async function POST(request) {
         const result = await fn(chatPrompt, 600);
         if (result) return Response.json({ text: result, provider: name });
       }
-      const configured = [
-        process.env.GROQ_API_KEY && 'Groq',
-        googleAIKey() && 'Gemini',
-        process.env.ANTHROPIC_API_KEY && 'Claude',
-      ].filter(Boolean);
-      if (!configured.length) {
-        return Response.json(
-          { text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_API_KEY in Vercel → Settings → Environment Variables.' },
-          { status: 500 }
-        );
-      }
-      return Response.json(
-        { text: `All providers failed (tried: ${configured.join(', ')}). Please retry.` },
-        { status: 502 }
-      );
+      const configured = configuredProviders();
+      return configured.length ? providersFailedResponse(configured) : needsKeyResponse();
     }
 
     // ── Single-prompt mode (unchanged, backward compatible) ────────────────────
@@ -171,20 +199,8 @@ export async function POST(request) {
       }
     }
 
-    const configured = [
-      process.env.GROQ_API_KEY && 'Groq',
-      googleAIKey() && 'Gemini',
-      process.env.ANTHROPIC_API_KEY && 'Claude',
-    ].filter(Boolean);
-
-    if (!configured.length) {
-      return Response.json({
-        text: 'No AI provider configured. Add GROQ_API_KEY or GOOGLE_AI_API_KEY in Vercel → Settings → Environment Variables.',
-      }, { status: 500 });
-    }
-    return Response.json({
-      text: `All providers failed (tried: ${configured.join(', ')}). Please retry.`,
-    }, { status: 502 });
+    const configured = configuredProviders();
+    return configured.length ? providersFailedResponse(configured) : needsKeyResponse();
 
   } catch {
     return Response.json({ error: 'Bad request body' }, { status: 400 });

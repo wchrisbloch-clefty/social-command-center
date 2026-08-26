@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "voice:sync": "node scripts/sync-voice.mjs",
     "test:pg": "node --test packages/voice-profile/test/postgres-integration.test.ts",
-    "probe:rsshub": "node scripts/probe-rsshub.mjs"
+    "probe:rsshub": "node scripts/probe-rsshub.mjs",
+    "audit:responsive": "node scripts/responsive-audit.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
@@ -26,6 +27,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

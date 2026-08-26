@@ -597,6 +597,34 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TOUCH TARGETS — enforced at the two touch breakpoints
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Below the desktop breakpoint the app is driven by a thumb, not a pointer, so
+   every interactive control gets a real hit area. A blanket floor rather than
+   per-component sizing on purpose: the six legacy dashboard views are styled
+   inline across hundreds of controls, and a rule here cannot be forgotten by
+   the next view someone adds.
+   ASSUMPTION: 34px is the floor scripts/responsive-audit.mjs gates on. Apple
+   suggests 44px; 34 is what this dense, information-first UI can carry without
+   the legacy filter pills growing into buttons. Raise both together.
+   Desktop keeps its 30–32px controls — that is the ported MyNewsHub design and
+   a mouse has no trouble with it, so the audit only checks touch breakpoints. */
+@media (max-width: 1100px) {
+  button,
+  [role="button"],
+  select,
+  textarea,
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) {
+    min-height: 34px;
+  }
+  button,
+  [role="button"] {
+    min-width: 24px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -611,14 +639,15 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 @media (max-width: 1100px) {
   .page-grid { grid-template-columns: 1fr; gap: var(--s4); }
 
-  /* Contain the tab row's edge-to-edge bleed below. */
-  .nav-bar { overflow-x: hidden; }
-
-  .nav-bar-inner { flex-wrap: wrap; height: auto; padding: 0 var(--s4); }
+  /* No horizontal padding on the wrapper: each row insets itself, so the tab
+     strip reaches the viewport edge WITHOUT a negative margin. Nothing here is
+     wider than its parent, so nothing needs clipping to look correct — which
+     keeps the geometry audit able to see this region at all. */
+  .nav-bar-inner { flex-wrap: wrap; height: auto; padding: 0; }
 
   .logo-wrap {
     border-right: none;
-    padding: 10px 0;
+    padding: 10px 0 10px var(--s4);
     flex: 1 1 auto;
     min-width: 0;
   }
@@ -627,6 +656,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
     order: 1;
     border-left: none;
     padding-left: 0;
+    padding-right: var(--s4);
     flex: 0 0 auto;
   }
 
@@ -634,8 +664,6 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
     order: 2;
     flex: 1 0 100%;
     border-top: 1px solid var(--border2);
-    /* Bleed past the inner padding so the scroll runs edge to edge. */
-    margin: 0 calc(var(--s4) * -1);
     padding: 0 var(--s4);
   }
   .nav-tab { height: 46px; }
@@ -658,8 +686,9 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 @media (max-width: 720px) {
   .page { padding: 18px var(--s3); }
   .status-strip-inner { padding: 0 var(--s3); }
-  .nav-bar-inner { padding: 0 var(--s3); }
-  .nav-tabs { margin: 0 calc(var(--s3) * -1); padding: 0 var(--s3); }
+  .logo-wrap { padding-left: var(--s3); }
+  .nav-right { padding-right: var(--s3); }
+  .nav-tabs { padding: 0 var(--s3); }
   .logo { font-size: 17px; }
   .search-input { display: none; }
 

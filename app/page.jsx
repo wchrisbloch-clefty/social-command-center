@@ -358,26 +358,49 @@ function ProviderBadge({ provider, t }) {
   );
 }
 
+/** The counterpart to ProviderBadge: shown when no provider is configured.
+ *  /api/brief returns { needsKey: true } with a 200 — a missing key is a setup
+ *  step, not an error, so it must not read (or log) like a crash. */
+function NeedsKeyNotice({ text }) {
+  return (
+    <div style={{
+      border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
+      padding: '12px 14px', fontSize: 'var(--fs-body)', lineHeight: 1.55,
+      color: 'var(--text2)', background: 'var(--surface2)',
+    }}>
+      <strong style={{ color: 'var(--text)', display: 'block', marginBottom: 4 }}>
+        AI panels need a key
+      </strong>
+      {text || 'Add GROQ_API_KEY or GOOGLE_AI_API_KEY to enable AI panels.'}
+      <div style={{ marginTop: 6, fontSize: 'var(--fs-meta)', color: 'var(--text3)' }}>
+        Both have free tiers. See .env.example.
+      </div>
+    </div>
+  );
+}
+
 // ─── AI BRIEF ─────────────────────────────────────────────────────────────────
 function AIBriefPanel({ platform, t }) {
   const [brief,    setBrief]    = useState('');
   const [provider, setProvider] = useState(null);
+  const [needsKey, setNeedsKey] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [ts,       setTs]       = useState(null);
   const prevPlat = useRef(null);
   const cfg = PLAT[platform] || {};
 
   const generate = useCallback(async () => {
-    setLoading(true); setBrief(''); setProvider(null);
+    setLoading(true); setBrief(''); setProvider(null); setNeedsKey(false);
     const posts = MOCK_POSTS[platform] || [];
     const summary = posts.map((p,i)=>`${i+1}. @${p.author}: "${p.content.slice(0,100)}" — Signal: ${p.signal}, Velocity: ${p.velocity}`).join('\n');
     const prompt = `Social intelligence analyst. Platform: ${platform}.\n\nTop posts:\n${summary}\n\nWrite exactly 3 bullet points (use • character):\n• Dominant narrative on ${platform} right now\n• Which account to engage TODAY and exactly why\n• One concrete 24-hour action\n\nSharp, chief-of-staff tone. No fluff.`;
     try {
       const r = await fetch('/api/brief', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ prompt, type:'brief' }) });
       const d = await r.json();
+      setNeedsKey(Boolean(d.needsKey));
       setBrief(d.text || 'Unable to generate brief.');
       setProvider(d.provider || null);
-    } catch { setBrief('Connection failed. Add an API key in Settings → Environment Variables.'); }
+    } catch { setBrief('Connection failed. Check your network and try again.'); }
     setLoading(false);
     setTs(new Date().toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' }));
   }, [platform]);
@@ -401,7 +424,8 @@ function AIBriefPanel({ platform, t }) {
         </button>
       </div>
       {loading && [85,70,55].map((w,i)=><div key={i} style={{ height:7, borderRadius:4, background:t.border, width:`${w}%`, marginBottom:6, animation:'pulse 1.5s ease-in-out infinite' }}/>)}
-      {!loading && brief && (
+      {!loading && needsKey && <NeedsKeyNotice text={brief}/>}
+      {!loading && !needsKey && brief && (
         <div style={{ fontSize:11, lineHeight:1.75 }}>
           {brief.split('\n').filter(l=>l.trim()).map((line,i)=>(
             <div key={i} style={{ display:'flex', gap:7, marginBottom:5 }}>
