@@ -467,6 +467,14 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   background-size: cover; background-position: center top;
   border-radius: 6px; background-color: var(--surface2);
 }
+/* No thumbnail: the branded placeholder, never a bare grey box (tokens rule). */
+.gn-card-img.is-empty {
+  background: linear-gradient(135deg, var(--navy-light) 0%, var(--navy) 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.28);
+  font-family: var(--ah-archivo); font-size: 9px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
 .gn-card-title {
   grid-column: 2; grid-row: 1;
   font-family: var(--ah-archivo);
@@ -568,21 +576,117 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   LEGACY VIEWS — the six inline-styled dashboard views
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Studio's content grid. Mobile-first: one column by default, sidebar only
+   once there is room for it.
+
+   `minmax(0, 1fr)` rather than `1fr` is load-bearing. A bare `1fr` is
+   `minmax(auto, 1fr)`, and that `auto` minimum refuses to shrink below the
+   items' min-content width — which here was 407px inside a 358px page, so the
+   column overflowed the viewport on every phone. Setting the minimum to 0
+   lets the track shrink and the content wrap instead. */
+.studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s3);
+}
+@media (min-width: 1024px) {
+  .studio-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* The masthead is the whole layout's tightest constraint: below ~1100px a
+   single row cannot hold the logo, seven category tabs and six controls.
+   `.nav-right` is flex-shrink:0, so what actually gave was `.nav-tabs` —
+   it collapsed to 0px and the category nav disappeared entirely on mobile
+   while the controls pushed the document 62px past the viewport.
+
+   Fix: wrap to two rows. Identity + controls on the first, the category nav
+   full-width on the second, where it has the whole viewport to scroll in. */
 @media (max-width: 1100px) {
   .page-grid { grid-template-columns: 1fr; gap: var(--s4); }
+
+  /* Contain the tab row's edge-to-edge bleed below. */
+  .nav-bar { overflow-x: hidden; }
+
+  .nav-bar-inner { flex-wrap: wrap; height: auto; padding: 0 var(--s4); }
+
+  .logo-wrap {
+    border-right: none;
+    padding: 10px 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .nav-right {
+    order: 1;
+    border-left: none;
+    padding-left: 0;
+    flex: 0 0 auto;
+  }
+
+  .nav-tabs {
+    order: 2;
+    flex: 1 0 100%;
+    border-top: 1px solid var(--border2);
+    /* Bleed past the inner padding so the scroll runs edge to edge. */
+    margin: 0 calc(var(--s4) * -1);
+    padding: 0 var(--s4);
+  }
+  .nav-tab { height: 46px; }
 }
+
+/* 1101–1400px: single row, but the tab strip is within a few pixels of
+   clipping its last tab. Buy the space back from tab padding. */
+@media (min-width: 1101px) and (max-width: 1400px) {
+  .nav-tab { padding: 0 10px; }
+  .search-input { width: 104px; }
+}
+
 @media (max-width: 1024px) {
   .gn-grid { grid-template-columns: 1fr; gap: 18px; }
+  /* Once the hero spans the full column, 16/10 makes it ~480px tall on an
+     iPad and pushes every other signal below the fold. Cap it. */
+  .gn-lead-img { aspect-ratio: 16/9; max-height: 340px; }
 }
+
 @media (max-width: 720px) {
   .page { padding: 18px var(--s3); }
-  .nav-bar-inner { height: 48px; padding: 0 var(--s3); }
   .status-strip-inner { padding: 0 var(--s3); }
-  .logo-wrap { padding-right: 12px; }
+  .nav-bar-inner { padding: 0 var(--s3); }
+  .nav-tabs { margin: 0 calc(var(--s3) * -1); padding: 0 var(--s3); }
   .logo { font-size: 17px; }
   .search-input { display: none; }
+
+  /* Customize duplicates the Sources section in the nav below it — drop it
+     rather than shrink every other control to make room. */
+  .nav-btn { display: none; }
+
+  /* Touch targets: 30px controls are below a comfortable tap size. */
+  .nav-icon-btn { width: 38px; height: 38px; }
+  .nav-avatar   { width: 38px; height: 38px; font-size: 13px; }
+  .nav-btn-blue { padding: 10px 12px; }
+  .nav-right    { gap: 6px; }
+
   .gn-lead-title { font-size: var(--fs-lead); }
+
+  /* The secondary rail's 92px thumbnail leaves too little for a headline at
+     390px — drop to a text-only row and let the hero carry the imagery. */
+  .gn-card { grid-template-columns: 72px minmax(0, 1fr); column-gap: 10px; }
+  .gn-card-img { width: 72px; height: 54px; }
+
+  /* Ranked rail rows wrap their meta line already; keep the number tight. */
+  .sop-item-meta { padding-left: 22px; }
+  .sop-num { min-width: 16px; }
+}
+
+/* Very narrow phones (≤360px): the Analyze label is the first thing to go. */
+@media (max-width: 360px) {
+  .nav-btn-blue { padding: 10px; font-size: 0; gap: 0; }
+  .nav-btn-blue svg { font-size: 12px; }
 }

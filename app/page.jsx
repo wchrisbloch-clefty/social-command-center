@@ -240,13 +240,16 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
       onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg.border; e.currentTarget.style.background=t.raised; }}
       onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.glass; }}>
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      {/* flexWrap + minWidth:0 are load-bearing, not cosmetic: without them this
+          row's min-content is the sum of the author cluster and the signal
+          badge (~406px), and a grid track sized to that overflows any phone. */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, flexWrap:'wrap', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:'1 1 auto' }}>
           <div style={{ width:30, height:30, borderRadius:9, background:cfg.bg, border:`1px solid ${cfg.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:cfg.color, flexShrink:0 }}>
             {post.author[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontSize:12, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:5 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:t.text, display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
               <span style={{ color:cfg.color }}>{cfg.icon}</span>@{post.author}
               <span style={{ fontSize:9, fontWeight:600, padding:'1px 5px', borderRadius:4, background:cfg.bg, color:cfg.color }}>{platform}</span>
               {/* Every MOCK_POSTS render path funnels through PostCard, so one
@@ -977,7 +980,7 @@ function TopStories({ lead, rail }) {
             style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
             {item.thumbnail
               ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
-              : <div className="gn-card-img"/>}
+              : <div className="gn-card-img is-empty">{item.platform}</div>}
             <h3 className="gn-card-title">{item.title}</h3>
             <div className="gn-card-meta">
               <SignalBadges item={item}/>
@@ -1004,7 +1007,7 @@ function MoreStories({ items }) {
             style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
             {item.thumbnail
               ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
-              : <div className="gn-card-img"/>}
+              : <div className="gn-card-img is-empty">{item.platform}</div>}
             <h3 className="gn-card-title">{item.title}</h3>
             <div className="gn-card-meta">
               <SignalBadges item={item}/>
@@ -1296,7 +1299,12 @@ function IntelligenceView({ t }) {
 function StudioView({ t, isMobile }) {
   const [generating, setGenerating] = useState(false);
   return (
-    <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 300px', gap:16 }}>
+    // Mobile-first via CSS, not the isMobile prop: useWindowSize() starts at
+    // 1280 and only corrects after mount, so a JS ternary rendered the desktop
+    // two-column grid on a phone's first paint. The `1fr` track also had an
+    // automatic min-content minimum that blew the column out to 407px inside a
+    // 358px page — see .studio-grid in globals.css.
+    <div className="studio-grid">
       <div>
         <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
           <Flame size={14} style={{ color:'#F59E0B' }}/>Top Performing Content — All Platforms
@@ -1704,7 +1712,8 @@ export default function AetherHub() {
               {viewLabel[view]}
             </h1>
             <button onClick={() => setView('feed')}
-              style={{ background:'none', border:'none', cursor:'pointer', padding:0,
+              style={{ background:'none', border:'none', cursor:'pointer',
+                       padding:'8px 6px', margin:'-8px -6px', minHeight:34,
                        fontSize:12, fontWeight:600, color:'var(--accent)' }}>
               ← Back to feed
             </button>
