@@ -145,8 +145,8 @@ export const SOCIAL_SOURCES = [
   // No first-party video channel — she appears as a guest. X is her only feed.
   { platform: 'X', person: 'Annie Jacobsen', route: '/twitter/user/AnnieJacobsen', label: '@AnnieJacobsen', category: 'ancient', limit: 5 },
 
-  // ═══ TOPIC / KEYWORD RADAR ════════════════════════════════════════════════
-  // Seeded in Part B — see TOPIC_SOURCES below.
+  // Sports sources live in SPORTS_SOURCES below and are concatenated here at
+  // the end of this file — same array, same pipeline, just grouped for reading.
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -280,3 +280,98 @@ export function limitOf(source) {
 export function categoryLabel(id) {
   return CATEGORIES.find(c => c.id === id)?.label || id || 'General';
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SPORTS — two-level taxonomy: league → team
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Sports is the one category with a drill-down. A source carries
+// `subcategory: '<league or team id>'`, and lib/velocity.js filters on it — the
+// SAME engine Discover uses. There is no separate sports trending system.
+//
+// SOURCE STRATEGY — Reddit first, and deliberately so:
+//   • Reddit serves native RSS. No RSSHub, no token, no rate limit worth
+//     worrying about. It is the only sports source that is reliable today.
+//   • YouTube official league channels add video signal via the official API.
+//   • X handles are NOT wired for sports. The page must not depend on a
+//     platform that cannot pull on the free instance, and "trending even if I
+//     do not follow it" comes from the velocity/topic engine, not from X.
+export const SPORTS_LEAGUES = [
+  { id: 'ncaaf',   label: 'NCAAF' },
+  { id: 'ncaab',   label: 'NCAAB' },
+  { id: 'nfl',     label: 'NFL' },
+  { id: 'nba',     label: 'NBA' },
+  { id: 'mlb',     label: 'MLB' },
+  { id: 'golf',    label: 'Golf' },
+  { id: 'racing',  label: 'Horse Racing' },
+];
+
+// Your teams. `league` places each under its league in the drill-down.
+export const SPORTS_TEAMS = [
+  { id: 'clemson-fb',  label: 'Clemson Football',   league: 'ncaaf' },
+  { id: 'kentucky-fb', label: 'Kentucky Football',  league: 'ncaaf' },
+  { id: 'texans',      label: 'Houston Texans',     league: 'nfl'   },
+  { id: 'astros',      label: 'Houston Astros',     league: 'mlb'   },
+  { id: 'kentucky-bb', label: 'Kentucky Basketball', league: 'ncaab' },
+  { id: 'rockets',     label: 'Houston Rockets',    league: 'nba'   },
+];
+
+/** Every sports subcategory, flat — leagues then teams. */
+export const SPORTS_SUBCATEGORIES = [
+  ...SPORTS_LEAGUES.map(l => ({ ...l, kind: 'league', parent: null })),
+  ...SPORTS_TEAMS.map(t => ({ ...t, kind: 'team', parent: t.league })),
+];
+
+// ASSUMPTION: subreddit names below are the well-known community for each
+// league/team, and YouTube handles are the official channels. Both are my
+// resolution, not yours — flag anything wrong and it is a one-line fix.
+//
+// Kentucky is the one non-obvious mapping: football and basketball share
+// r/BigBlueNation, so wiring both to the same route would be a literal
+// duplicate feed. Basketball takes the subreddit (its dominant use) and
+// football takes a scoped search inside it.
+export const SPORTS_SOURCES = [
+  // ── Leagues (Reddit native RSS) ──────────────────────────────────────────
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/CFB/hot/.rss',                label: 'r/CFB',                category: 'sports', subcategory: 'ncaaf',  limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/CollegeBasketball/hot/.rss',  label: 'r/CollegeBasketball',  category: 'sports', subcategory: 'ncaab',  limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/nfl/hot/.rss',                label: 'r/nfl',                category: 'sports', subcategory: 'nfl',    limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/nba/hot/.rss',                label: 'r/nba',                category: 'sports', subcategory: 'nba',    limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/baseball/hot/.rss',           label: 'r/baseball',           category: 'sports', subcategory: 'mlb',    limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/golf/hot/.rss',               label: 'r/golf',               category: 'sports', subcategory: 'golf',   limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/horseracing/hot/.rss',        label: 'r/horseracing',        category: 'sports', subcategory: 'racing', limit: 4 },
+
+  // ── Teams (Reddit native RSS) ────────────────────────────────────────────
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/Clemson/hot/.rss',            label: 'r/Clemson',            category: 'sports', subcategory: 'clemson-fb',  limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/BigBlueNation/search.rss?q=football&restrict_sr=1&sort=new',
+    label: 'r/BigBlueNation · football', category: 'sports', subcategory: 'kentucky-fb', limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/BigBlueNation/hot/.rss',      label: 'r/BigBlueNation',      category: 'sports', subcategory: 'kentucky-bb', limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/Texans/hot/.rss',             label: 'r/Texans',             category: 'sports', subcategory: 'texans',      limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/Astros/hot/.rss',             label: 'r/Astros',             category: 'sports', subcategory: 'astros',      limit: 4 },
+  { platform: 'Reddit', route: 'https://www.reddit.com/r/rockets/hot/.rss',            label: 'r/rockets',            category: 'sports', subcategory: 'rockets',     limit: 4 },
+];
+
+// Official league channels — video signal with real view counts, so these are
+// the only sports sources whose velocity is scored on engagement not recency.
+// ASSUMPTION: official handles, unverified. NCAAF/NCAAB/racing have no single
+// official channel worth wiring, so they stay Reddit-only.
+export const SPORTS_YOUTUBE = [
+  { platform: 'YouTube', handle: 'NFL',      label: 'NFL',      category: 'sports', subcategory: 'nfl',  limit: 3 },
+  { platform: 'YouTube', handle: 'NBA',      label: 'NBA',      category: 'sports', subcategory: 'nba',  limit: 3 },
+  { platform: 'YouTube', handle: 'MLB',      label: 'MLB',      category: 'sports', subcategory: 'mlb',  limit: 3 },
+  { platform: 'YouTube', handle: 'PGATOUR',  label: 'PGA Tour', category: 'sports', subcategory: 'golf', limit: 3 },
+];
+
+/** Teams under a league. */
+export function teamsInLeague(leagueId) {
+  return SPORTS_TEAMS.filter(t => t.league === leagueId);
+}
+
+/** Display label for any sports subcategory id. */
+export function subcategoryLabel(id) {
+  return SPORTS_SUBCATEGORIES.find(s => s.id === id)?.label || id;
+}
+
+// Sports joins the main arrays: one list, one pipeline. Grouped above purely so
+// the taxonomy reads in one place.
+SOCIAL_SOURCES.push(...SPORTS_SOURCES);
+YOUTUBE_SOURCES.push(...SPORTS_YOUTUBE);

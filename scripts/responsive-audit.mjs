@@ -52,10 +52,22 @@ const BREAKPOINTS = [
 // the full matrix — the filter is unset there.
 const ONLY_BP = (process.env.AUDIT_BREAKPOINT || '').split(',').map(x => x.trim()).filter(Boolean);
 
-const VIEWS = ['feed', 'discover', 'recommended', 'intelligence', 'studio', 'alerts', 'sources', 'settings'];
+// Most views are reached from the section nav. Two are not: the Sports
+// drill-down lives behind a CATEGORY tab and then a league tile, so it needs its
+// own navigation recipe — otherwise the gate would report it green having never
+// rendered it.
+const VIEWS = [
+  'feed', 'discover', 'recommended', 'intelligence', 'studio', 'alerts',
+  'sources', 'settings', 'sports', 'sports-team',
+];
 const VIEW_LABEL = {
   discover: 'Discover', recommended: 'Recommended', intelligence: 'Intelligence', studio: 'Studio',
   alerts: 'Alerts', sources: 'Sources', settings: 'Settings',
+};
+// view id → how to get there when it is not a section-nav button.
+const CATEGORY_VIEWS = {
+  'sports':      { tab: 'Sports', drill: null },
+  'sports-team': { tab: 'Sports', drill: 'Houston Texans' },
 };
 
 const MIN_TAP_HEIGHT = 34;
@@ -233,6 +245,17 @@ function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
     if (zero.length) {
       violations.push({ rule: 'nav-collapsed', detail: `${zero.length} category tab(s) have zero width` });
     }
+    // A tab squeezed below its own text overlaps its neighbour and reads as
+    // corrupted, not as "scroll for more". Width > 0 was not enough to catch it:
+    // inside an overflow-x:auto row the tabs shrank and their labels collided.
+    const squashed = tabs.filter(t => t.scrollWidth > Math.ceil(t.getBoundingClientRect().width) + 1);
+    if (squashed.length) {
+      violations.push({
+        rule: 'nav-collapsed',
+        detail: `${squashed.length} tab(s) squeezed below their label width — e.g. "${squashed[0].textContent.trim()}" ` +
+                `needs ${squashed[0].scrollWidth}px, has ${Math.round(squashed[0].getBoundingClientRect().width)}px`,
+      });
+    }
     // The strip may scroll, but every tab must be reachable by scrolling it.
     const overflows = strip.scrollWidth > strip.clientWidth + 1;
     if (overflows && !['auto', 'scroll'].includes(getComputedStyle(strip).overflowX)) {
@@ -342,6 +365,23 @@ async function main() {
             // Already here on load; if we navigated away, come back.
             const back = page.locator('button:has-text("← Back to feed")');
             if (await back.count()) { await back.first().click(); await page.waitForTimeout(400); }
+            // Reset to the default category so the feed view is the feed view.
+            const general = page.locator('button.nav-tab:has-text("General")');
+            if (await general.count()) { await general.first().click(); await page.waitForTimeout(300); }
+          } else if (CATEGORY_VIEWS[view]) {
+            const { tab, drill } = CATEGORY_VIEWS[view];
+            const back = page.locator('button:has-text("← Back to feed")');
+            if (await back.count()) { await back.first().click(); await page.waitForTimeout(300); }
+            const catTab = page.locator(`button.nav-tab:has-text("${tab}")`).first();
+            await catTab.scrollIntoViewIfNeeded().catch(() => {});
+            await catTab.click({ timeout: 8000 });
+            await page.waitForTimeout(600);
+            if (drill) {
+              const tile = page.locator(`button.drill-item:has-text("${drill}")`).first();
+              await tile.scrollIntoViewIfNeeded().catch(() => {});
+              await tile.click({ timeout: 8000 });
+              await page.waitForTimeout(500);
+            }
           } else {
             const btn = page.locator(`button:has-text("${VIEW_LABEL[view]}")`).first();
             await btn.scrollIntoViewIfNeeded().catch(() => {});

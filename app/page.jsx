@@ -13,8 +13,14 @@ import {
 } from 'lucide-react';
 
 import { getFeed } from '../lib/adapters.js';
-import { CATEGORIES, DEFAULT_CATEGORY } from '../config/sources.js';
-import { groupByCategory, velocitySummary, WINDOW_OPTIONS, DEFAULT_WINDOW_HOURS, VELOCITY_WORD } from '../lib/velocity.js';
+import {
+  CATEGORIES, DEFAULT_CATEGORY,
+  SPORTS_LEAGUES, SPORTS_TEAMS, teamsInLeague,
+} from '../config/sources.js';
+import {
+  groupByCategory, velocitySummary, rankByVelocity,
+  WINDOW_OPTIONS, DEFAULT_WINDOW_HOURS, VELOCITY_WORD,
+} from '../lib/velocity.js';
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
@@ -1253,6 +1259,160 @@ function RecommendedView() {
   );
 }
 
+// ─── SPORTS DRILL-DOWN (D1) ───────────────────────────────────────────────────
+// Sports is the one category with two levels: league → team. Selecting either
+// shows that subcategory's feed AND its trending panel.
+//
+// The trending panel is rankByVelocity() filtered to the subcategory — the SAME
+// engine Discover uses. There is deliberately no second trending system: "what
+// is spiking in Energy" and "what is spiking about the Texans" are one question
+// with a different filter.
+
+function SportsBreadcrumb({ league, team, onLeague, onRoot }) {
+  return (
+    <nav className="crumbs" aria-label="Sports navigation">
+      <button className="crumb" onClick={onRoot}>Sports</button>
+      {league && <><span className="crumb-sep">/</span>
+        <button className="crumb" onClick={() => onLeague(league.id)}
+          aria-current={!team ? 'page' : undefined}>{league.label}</button></>}
+      {team && <><span className="crumb-sep">/</span>
+        <span className="crumb current" aria-current="page">{team.label}</span></>}
+    </nav>
+  );
+}
+
+/** Trending for one subcategory. Same engine, one more filter. */
+function SubcategoryTrending({ items, subcategory, windowHours }) {
+  const ranked = rankByVelocity(items, { category: 'sports', subcategory, windowHours, limit: 6 });
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">Trending · last {windowHours}h</span>
+      </div>
+      {ranked.length ? (
+        <div className="sop-list">
+          {ranked.map((item, i) => (
+            <button key={item.id} className="sop-item" data-cat="sports" onClick={() => openItem(item)}>
+              <span className="sop-num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="sop-item-title">{item.title}</span>
+              <span className="sop-item-meta">
+                <span className="sop-item-time">{item.sourceLabel} · {item.time}</span>
+                <span className={`vel vel-${item.signal}`}>{VELOCITY_WORD[item.signal]}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="view-sub">Nothing spiking here in the last {windowHours}h.</p>
+      )}
+    </section>
+  );
+}
+
+function SportsView({ items, loading, windowHours = DEFAULT_WINDOW_HOURS }) {
+  const [leagueId, setLeagueId] = useState(null);
+  const [teamId, setTeamId]     = useState(null);
+
+  const league = SPORTS_LEAGUES.find(l => l.id === leagueId) || null;
+  const team   = SPORTS_TEAMS.find(t => t.id === teamId) || null;
+  const active = teamId || leagueId;
+
+  const openLeague = id => { setLeagueId(id); setTeamId(null); };
+  const openRoot   = () => { setLeagueId(null); setTeamId(null); };
+
+  // Counts per subcategory, so a league tile can say how much is moving without
+  // the user drilling in first.
+  const countFor = sub => rankByVelocity(items, { category: 'sports', subcategory: sub, windowHours }).length;
+
+  const feed = active
+    ? rankByVelocity(items, { category: 'sports', subcategory: active, windowHours, limit: 30 })
+    : rankByVelocity(items, { category: 'sports', windowHours, limit: 30 });
+
+  return (
+    <div className="stack">
+      <div className="view-head">
+        <div className="view-head-text">
+          <h2 className="view-title">{team ? team.label : league ? league.label : 'Sports'}</h2>
+          <SportsBreadcrumb league={league} team={team} onLeague={openLeague} onRoot={openRoot}/>
+        </div>
+      </div>
+
+      {/* Level 1 — leagues. Always visible; it is the way back up. */}
+      <div className="drill" role="group" aria-label="Leagues">
+        {SPORTS_LEAGUES.map(l => (
+          <button key={l.id}
+            className={`drill-item${leagueId === l.id ? ' active' : ''}`}
+            aria-pressed={leagueId === l.id}
+            onClick={() => (leagueId === l.id ? openRoot() : openLeague(l.id))}>
+            <span className="drill-label">{l.label}</span>
+            <span className="drill-count">{countFor(l.id)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Level 2 — teams in the selected league. */}
+      {league && teamsInLeague(league.id).length > 0 && (
+        <div className="drill drill-teams" role="group" aria-label={`${league.label} teams`}>
+          {teamsInLeague(league.id).map(t => (
+            <button key={t.id}
+              className={`drill-item${teamId === t.id ? ' active' : ''}`}
+              aria-pressed={teamId === t.id}
+              onClick={() => setTeamId(teamId === t.id ? null : t.id)}>
+              <span className="drill-label">{t.label}</span>
+              <span className="drill-count">{countFor(t.id)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* My teams, reachable without drilling through their league first. */}
+      {!league && (
+        <div className="drill drill-teams" role="group" aria-label="My teams">
+          {SPORTS_TEAMS.map(t => (
+            <button key={t.id} className="drill-item"
+              onClick={() => { setLeagueId(t.league); setTeamId(t.id); }}>
+              <span className="drill-label">{t.label}</span>
+              <span className="drill-count">{countFor(t.id)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="page-grid">
+        <div className="feed-col">
+          <div className="section-head">
+            <span className="section-label">
+              {team ? team.label : league ? league.label : 'All sports'}
+            </span>
+            <span className="section-sub">
+              {loading ? 'Loading…' : `${feed.length} signal${feed.length === 1 ? '' : 's'} · last ${windowHours}h`}
+            </span>
+          </div>
+
+          {loading && <div className="empty-note">Loading sports signal…</div>}
+
+          {!loading && !feed.length && (
+            <div className="empty-note">
+              <strong>Nothing here in the last {windowHours}h.</strong>
+              <div style={{ marginTop: 8 }}>
+                Sports pulls from Reddit, which needs no credentials — so an empty
+                result here means the subreddit was quiet or unreachable, not that
+                something is unconfigured. The source list shows which.
+              </div>
+            </div>
+          )}
+
+          {!loading && feed.length > 0 && <SignalList lead={feed[0]} items={feed.slice(1)}/>}
+        </div>
+
+        <aside>
+          <SubcategoryTrending items={items} subcategory={active} windowHours={windowHours}/>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function FeedView({ t, category, search, isMobile }) {
   // "General" is the everything page, not a bucket. After the roster landed,
@@ -1275,6 +1435,12 @@ function FeedView({ t, category, search, isMobile }) {
         i.content.toLowerCase().includes(q) ||
         i.sourceLabel.toLowerCase().includes(q))
     : items;
+
+  // Sports is the one category with a drill-down. Same data, same pipeline —
+  // just a second level of navigation on top of it.
+  if (category === 'sports') {
+    return <SportsView items={visible} loading={loading}/>;
+  }
 
   const [lead, ...rest] = visible;
   const rail = rest.slice(0, 4);

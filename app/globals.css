@@ -321,6 +321,10 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-tab {
   background: transparent; border: none; color: var(--text3);
+  /* flex-shrink:0 is load-bearing: inside an overflow-x:auto flex row the tabs
+     would otherwise be squeezed below their text width and overlap each other,
+     which reads as corrupted rather than as "scroll for more". */
+  flex: 0 0 auto;
   padding: 7px 12px; cursor: pointer; border-radius: var(--radius-sm);
   font-family: var(--ah-sans); font-size: var(--fs-body);
   font-weight: var(--fw-regular); white-space: nowrap;
@@ -582,6 +586,55 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 @media (max-width: 720px) {
   .vrow { gap: var(--s2); }
   .vrow-side { flex-direction: row; align-items: center; gap: 8px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPORTS DRILL-DOWN — league → team
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.crumbs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.crumb {
+  background: none; border: none; padding: 2px 0; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-body); color: var(--text3);
+}
+.crumb:hover { color: var(--text); }
+.crumb.current { color: var(--text); cursor: default; }
+.crumb-sep { color: var(--text4); font-size: var(--fs-body); }
+
+/* Wraps at every width — a fixed row of seven leagues cannot fit a phone, and a
+   horizontally scrolling strip here would compete with the category nav above
+   it. minmax(0,1fr) so a long label cannot blow the track out. */
+.drill {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.drill-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-width: 0; padding: 10px 12px; cursor: pointer; text-align: left;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); font-family: inherit;
+  transition: background var(--ah-dur-fast), border-color var(--ah-dur-fast);
+}
+.drill-item:hover { background: var(--surface2); }
+.drill-item.active { background: var(--accent); border-color: var(--accent); }
+.drill-item.active .drill-label { color: var(--on-accent); }
+.drill-item.active .drill-count { color: var(--on-accent); opacity: 0.7; }
+.drill-label {
+  font-size: var(--fs-body); font-weight: var(--fw-regular); color: var(--text);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.drill-count {
+  font-size: var(--fs-meta); color: var(--text3); flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+/* Teams read as a level below their leagues. */
+.drill-teams .drill-item { background: transparent; }
+.drill-teams .drill-item.active { background: var(--accent); }
+
+@media (max-width: 720px) {
+  .drill { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+  .drill-item { padding: 9px 10px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

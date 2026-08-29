@@ -7,7 +7,7 @@ provenance a config line cannot — how each handle was confirmed.
 Categorization is local (`lib/categorize.js`, keyword scoring, no external
 calls). Tier is derived from platform and never hand-written.
 
-- **23** sources wired (10 RSSHub/direct, 13 YouTube)
+- **40** sources wired (23 RSSHub/direct, 17 YouTube)
 - **21** handles verified by search
 - **2** flagged `assumption` — **manual confirmation needed**
 - **12** parked (see `config/parking-lot.md`)
@@ -29,19 +29,36 @@ calls). Tier is derived from platform and never hand-written.
 | 8 | Eddie Donmez | X | `/twitter/user/eddiedonmez` | Business & Markets | street | verified |
 | 9 | Tim Grover | X | `/twitter/user/ATTACKATHLETICS` | Health | street | verified |
 | 10 | Annie Jacobsen | X | `/twitter/user/AnnieJacobsen` | Ancient Mysteries | street | verified |
-| 11 | Peter Zeihan | YouTube | `ZeihanonGeopolitics` | Business & Markets | mainstream | verified |
-| 12 | Harry Stebbings | YouTube | `20VC` | Business & Markets | mainstream | verified |
-| 13 | Daniel Pink | YouTube | `danielpinktv` | Business & Markets | mainstream | verified |
-| 14 | Christopher Voss | YouTube | `NegotiationMastery` | Business & Markets | mainstream | verified |
-| 15 | Chase Hughes | YouTube | `chasehughesofficial` | Business & Markets | mainstream | verified |
-| 16 | Jay Egg | YouTube | `EggGeothermal` | Energy | mainstream | **assumption** |
-| 17 | Chris Williamson | YouTube | `ChrisWillx` | Health | mainstream | verified |
-| 18 | David Sinclair | YouTube | `LifespanOfficial` | Health | mainstream | verified |
-| 19 | Jocko Willink | YouTube | `JockoPodcast` | Health | mainstream | verified |
-| 20 | MrBallen | YouTube | `MrBallen` | Ancient Mysteries | mainstream | verified |
-| 21 | Jesse Michels | YouTube | `JesseMichels` | Ancient Mysteries | mainstream | verified |
-| 22 | Timothy Alberino | YouTube | `TimothyAlberino` | Ancient Mysteries | mainstream | verified |
-| 23 | Michael Button | YouTube | `UCRDZ_t_-uHLsz_Otq6iOgyg` | Ancient Mysteries | mainstream | **assumption** |
+| 11 | r/CFB | Reddit | `https://www.reddit.com/r/CFB/hot/.rss` | Sports | street | **unknown** |
+| 12 | r/CollegeBasketball | Reddit | `https://www.reddit.com/r/CollegeBasketball/hot/.rss` | Sports | street | **unknown** |
+| 13 | r/nfl | Reddit | `https://www.reddit.com/r/nfl/hot/.rss` | Sports | street | **unknown** |
+| 14 | r/nba | Reddit | `https://www.reddit.com/r/nba/hot/.rss` | Sports | street | **unknown** |
+| 15 | r/baseball | Reddit | `https://www.reddit.com/r/baseball/hot/.rss` | Sports | street | **unknown** |
+| 16 | r/golf | Reddit | `https://www.reddit.com/r/golf/hot/.rss` | Sports | street | **unknown** |
+| 17 | r/horseracing | Reddit | `https://www.reddit.com/r/horseracing/hot/.rss` | Sports | street | **unknown** |
+| 18 | r/Clemson | Reddit | `https://www.reddit.com/r/Clemson/hot/.rss` | Sports | street | **unknown** |
+| 19 | r/BigBlueNation · football | Reddit | `https://www.reddit.com/r/BigBlueNation/search.rss?q=football&restrict_sr=1&sort=new` | Sports | street | **unknown** |
+| 20 | r/BigBlueNation | Reddit | `https://www.reddit.com/r/BigBlueNation/hot/.rss` | Sports | street | **unknown** |
+| 21 | r/Texans | Reddit | `https://www.reddit.com/r/Texans/hot/.rss` | Sports | street | **unknown** |
+| 22 | r/Astros | Reddit | `https://www.reddit.com/r/Astros/hot/.rss` | Sports | street | **unknown** |
+| 23 | r/rockets | Reddit | `https://www.reddit.com/r/rockets/hot/.rss` | Sports | street | **unknown** |
+| 24 | Peter Zeihan | YouTube | `ZeihanonGeopolitics` | Business & Markets | mainstream | verified |
+| 25 | Harry Stebbings | YouTube | `20VC` | Business & Markets | mainstream | verified |
+| 26 | Daniel Pink | YouTube | `danielpinktv` | Business & Markets | mainstream | verified |
+| 27 | Christopher Voss | YouTube | `NegotiationMastery` | Business & Markets | mainstream | verified |
+| 28 | Chase Hughes | YouTube | `chasehughesofficial` | Business & Markets | mainstream | verified |
+| 29 | Jay Egg | YouTube | `EggGeothermal` | Energy | mainstream | **assumption** |
+| 30 | Chris Williamson | YouTube | `ChrisWillx` | Health | mainstream | verified |
+| 31 | David Sinclair | YouTube | `LifespanOfficial` | Health | mainstream | verified |
+| 32 | Jocko Willink | YouTube | `JockoPodcast` | Health | mainstream | verified |
+| 33 | MrBallen | YouTube | `MrBallen` | Ancient Mysteries | mainstream | verified |
+| 34 | Jesse Michels | YouTube | `JesseMichels` | Ancient Mysteries | mainstream | verified |
+| 35 | Timothy Alberino | YouTube | `TimothyAlberino` | Ancient Mysteries | mainstream | verified |
+| 36 | Michael Button | YouTube | `UCRDZ_t_-uHLsz_Otq6iOgyg` | Ancient Mysteries | mainstream | **assumption** |
+| 37 | NFL | YouTube | `NFL` | Sports | mainstream | **unknown** |
+| 38 | NBA | YouTube | `NBA` | Sports | mainstream | **unknown** |
+| 39 | MLB | YouTube | `MLB` | Sports | mainstream | **unknown** |
+| 40 | PGA Tour | YouTube | `PGATOUR` | Sports | mainstream | **unknown** |
 
 ---
 
@@ -88,6 +105,45 @@ Channel confirmed ("Ancient History BA", ~200K subs) but NO @handle could be con
 **Annie Jacobsen** — `verified` · X `/twitter/user/AnnieJacobsen`
 : Area 51 / Nuclear War author. No first-party video channel — she appears as a guest — so X is the only feed. Expect low volume.
 
+**r/CFB** — `unknown` · Reddit `https://www.reddit.com/r/CFB/hot/.rss`
+: —
+
+**r/CollegeBasketball** — `unknown` · Reddit `https://www.reddit.com/r/CollegeBasketball/hot/.rss`
+: —
+
+**r/nfl** — `unknown` · Reddit `https://www.reddit.com/r/nfl/hot/.rss`
+: —
+
+**r/nba** — `unknown` · Reddit `https://www.reddit.com/r/nba/hot/.rss`
+: —
+
+**r/baseball** — `unknown` · Reddit `https://www.reddit.com/r/baseball/hot/.rss`
+: —
+
+**r/golf** — `unknown` · Reddit `https://www.reddit.com/r/golf/hot/.rss`
+: —
+
+**r/horseracing** — `unknown` · Reddit `https://www.reddit.com/r/horseracing/hot/.rss`
+: —
+
+**r/Clemson** — `unknown` · Reddit `https://www.reddit.com/r/Clemson/hot/.rss`
+: —
+
+**r/BigBlueNation · football** — `unknown` · Reddit `https://www.reddit.com/r/BigBlueNation/search.rss?q=football&restrict_sr=1&sort=new`
+: —
+
+**r/BigBlueNation** — `unknown` · Reddit `https://www.reddit.com/r/BigBlueNation/hot/.rss`
+: —
+
+**r/Texans** — `unknown` · Reddit `https://www.reddit.com/r/Texans/hot/.rss`
+: —
+
+**r/Astros** — `unknown` · Reddit `https://www.reddit.com/r/Astros/hot/.rss`
+: —
+
+**r/rockets** — `unknown` · Reddit `https://www.reddit.com/r/rockets/hot/.rss`
+: —
+
 **Peter Zeihan** — `verified` · YouTube `ZeihanonGeopolitics`
 : youtube.com/@ZeihanonGeopolitics. Near-daily uploads.
 
@@ -127,6 +183,18 @@ Channel confirmed ("Ancient History BA", ~200K subs) but NO @handle could be con
 **Michael Button** — `assumption` · YouTube `UCRDZ_t_-uHLsz_Otq6iOgyg`
 : Channel confirmed ("Ancient History BA", ~200K subs) but NO @handle could be confirmed — search surfaced two channels. Wired by channelId UCRDZ_t_-uHLsz_Otq6iOgyg. If it returns nothing, the alternates are @MichaelButtonHistory1 or X @MichaelButtonX.
 
+**NFL** — `unknown` · YouTube `NFL`
+: —
+
+**NBA** — `unknown` · YouTube `NBA`
+: —
+
+**MLB** — `unknown` · YouTube `MLB`
+: —
+
+**PGA Tour** — `unknown` · YouTube `PGATOUR`
+: —
+
 ---
 
 ## Local categorization cross-check
@@ -152,7 +220,7 @@ No duplicates across route, handle or person.
 | Business & Markets | 8 | Jeff Immelt, John Chambers, Eddie Donmez, Peter Zeihan, Harry Stebbings, Daniel Pink, Christopher Voss, Chase Hughes |
 | Energy | 6 | Daniel Yergin, Doug Sheridan, Alex Epstein, Jeff Krimmel, Rich Miller, Jay Egg |
 | AI & Tech | 0 | — |
-| Sports | 0 | — |
+| Sports | 17 | r/CFB, r/CollegeBasketball, r/nfl, r/nba, r/baseball, r/golf, r/horseracing, r/Clemson, r/BigBlueNation · football, r/BigBlueNation, r/Texans, r/Astros, r/rockets, NFL, NBA, MLB, PGA Tour |
 | Health | 4 | Tim Grover, Chris Williamson, David Sinclair, Jocko Willink |
 | Pop Culture | 0 | — |
 | Ancient Mysteries | 5 | Annie Jacobsen, MrBallen, Jesse Michels, Timothy Alberino, Michael Button |
