@@ -15,6 +15,12 @@
 // dropping the write would be the one genuinely bad outcome.
 
 import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// Config paths resolve from the PROJECT ROOT, never from import.meta.url:
+// in a production build this module is bundled into .next/server, so a
+// module-relative path points at the build output instead of the file you
+// actually edit — and the write would appear to succeed while changing nothing.
 import { SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES, CATEGORY_IDS } from '../../../config/sources.js';
 import { alreadyFollowed } from '../../../lib/categorize.js';
 import { configLineFor } from '../../../lib/recommend.js';
@@ -22,7 +28,7 @@ import { configLineFor } from '../../../lib/recommend.js';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const CONFIG_PATH = new URL('../../../config/sources.js', import.meta.url);
+const CONFIG_PATH = join(process.cwd(), 'config', 'sources.js');
 
 export async function GET() {
   return Response.json({

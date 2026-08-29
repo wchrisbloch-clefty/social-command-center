@@ -149,6 +149,7 @@ const NAV_TABS = [
   { id:'studio',       label:'Studio',       icon:<FileText size={16}/>    },
   { id:'alerts',       label:'Alerts',       icon:<Bell size={16}/>        },
   { id:'sources',      label:'Sources',      icon:<Globe size={16}/>       },
+  { id:'categories',   label:'Categories',   icon:<Layers size={16}/>      },
   { id:'settings',     label:'Settings',     icon:<Settings size={16}/>    },
 ];
 
@@ -1415,6 +1416,213 @@ function SportsView({ items, loading, windowHours = DEFAULT_WINDOW_HOURS }) {
   );
 }
 
+// ─── CATEGORY MANAGER ─────────────────────────────────────────────────────────
+// You drive: add, rename, recolor, merge, delete, reorder. Every mutation goes
+// through /api/categories, which is the one writer for config/categories.js.
+//
+// Delete and merge always REASSIGN — you pick the target, or sources fall back
+// to General. Nothing is ever orphaned, because a source pointing at a category
+// that no longer exists is silent: it just stops appearing under any tab.
+
+function ColorSwatches({ palette, value, onPick }) {
+  return (
+    <div className="swatches" role="group" aria-label="Category colour">
+      {palette.map(p => (
+        <button key={p.color} type="button"
+          className={`swatch${value === p.color ? ' active' : ''}`}
+          style={{ '--sw': p.color }}
+          aria-label={p.name} aria-pressed={value === p.color}
+          title={p.name}
+          onClick={() => onPick(p)}/>
+      ))}
+    </div>
+  );
+}
+
+function CategoryManager() {
+  const [state, setState] = useState({ categories: [], palette: [], fallbackId: 'general', loading: true });
+  const [busy, setBusy]     = useState(null);
+  const [result, setResult] = useState(null);
+  const [editing, setEditing] = useState(null);   // id being renamed
+  const [draftLabel, setDraftLabel] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [newColor, setNewColor] = useState(null);
+  const [confirming, setConfirming] = useState(null); // { kind, id, targetId }
+
+  const load = useCallback(() => {
+    fetch('/api/categories', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setState({ ...d, loading: false }))
+      .catch(e => {
+        console.warn('[categories] load failed', e?.message);
+        setState(s => ({ ...s, loading: false }));
+      });
+  }, []);
+  useEffect(load, [load]);
+
+  const mutate = async (payload, key) => {
+    setBusy(key); setResult(null);
+    try {
+      const r = await fetch('/api/categories', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      setResult(d);
+      if (d.ok) { setState(s => ({ ...s, categories: d.categories.map(c => ({ ...c, sourceCount: s.categories.find(x => x.id === c.id)?.sourceCount ?? 0 })) })); load(); }
+    } catch {
+      setResult({ ok: false, error: 'Request failed.' });
+    }
+    setBusy(null); setConfirming(null); setEditing(null);
+  };
+
+  const { categories, palette, fallbackId, loading } = state;
+  const move = (id, dir) => {
+    const ids = categories.map(c => c.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    mutate({ action: 'reorder', order: ids }, `order-${id}`);
+  };
+
+  return (
+    <div className="stack">
+      <div className="view-head">
+        <div className="view-head-text">
+          <h2 className="view-title">Categories</h2>
+          <p className="view-sub">
+            Rename, recolour and reorder freely — sources attach by a stable id,
+            never by the label, so nothing detaches. Deleting or merging always
+            reassigns; a source is never left pointing at nothing.
+          </p>
+        </div>
+      </div>
+
+      {result && (
+        <div className={`note-block${result.ok ? '' : ' note-warn'}`}>
+          <strong>{result.ok ? 'Done' : 'Not applied'}</strong>
+          <div>{result.message || result.error || result.note}</div>
+          {result.ok && result.restartRequired && (
+            <div style={{ marginTop: 6, color: 'var(--text3)' }}>
+              Written to config/categories.js. Restart the dev server to see it in the nav —
+              the config is read once at module load.
+            </div>
+          )}
+          {result.readOnly && (
+            <div style={{ marginTop: 6, color: 'var(--text3)' }}>
+              Read-only filesystem, so nothing was written. {result.sourcesNote || ''}
+            </div>
+          )}
+        </div>
+      )}
+
+      {loading && <div className="empty-note">Loading categories…</div>}
+
+      {/* ── The collection ── */}
+      <div className="cat-list">
+        {categories.map((c, i) => (
+          <div className="cat-row" key={c.id} data-cat={c.id}>
+            <span className="cat-stripe" style={{ background: c.color }}/>
+
+            <div className="cat-main">
+              {editing === c.id ? (
+                <form className="cat-edit" onSubmit={e => { e.preventDefault(); mutate({ action: 'rename', id: c.id, label: draftLabel }, `rename-${c.id}`); }}>
+                  <input className="search-input cat-input" value={draftLabel} autoFocus
+                    aria-label={`Rename ${c.label}`}
+                    onChange={e => setDraftLabel(e.target.value)}/>
+                  <button className="btn-primary" type="submit" disabled={busy === `rename-${c.id}`}>Save</button>
+                  <button className="nav-btn" type="button" onClick={() => setEditing(null)}>Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <div className="cat-name">{c.label}</div>
+                  <div className="cat-meta">
+                    <span>id <code className="cat-id">{c.id}</code></span>
+                    <span>·</span>
+                    <span>{c.sourceCount} source{c.sourceCount === 1 ? '' : 's'}</span>
+                    {c.id === fallbackId && <><span>·</span><span>fallback, cannot be deleted</span></>}
+                  </div>
+                </>
+              )}
+
+              {editing !== c.id && (
+                <ColorSwatches palette={palette} value={c.color}
+                  onPick={p => mutate({ action: 'recolor', id: c.id, color: p.color }, `color-${c.id}`)}/>
+              )}
+            </div>
+
+            <div className="cat-actions">
+              <button className="nav-icon-btn" aria-label={`Move ${c.label} up`} title="Move up"
+                disabled={i === 0 || busy} onClick={() => move(c.id, -1)}>↑</button>
+              <button className="nav-icon-btn" aria-label={`Move ${c.label} down`} title="Move down"
+                disabled={i === categories.length - 1 || busy} onClick={() => move(c.id, 1)}>↓</button>
+              <button className="nav-btn" onClick={() => { setEditing(c.id); setDraftLabel(c.label); }}>Rename</button>
+              <button className="nav-btn" onClick={() => setConfirming({ kind: 'merge', id: c.id, targetId: '' })}>Merge</button>
+              <button className="nav-btn" disabled={c.id === fallbackId}
+                onClick={() => setConfirming({ kind: 'delete', id: c.id, targetId: fallbackId })}>Delete</button>
+            </div>
+
+            {/* Confirm step — merge and delete both move sources, so neither runs
+                on a single click. */}
+            {confirming?.id === c.id && (
+              <div className="cat-confirm">
+                <div className="cat-confirm-text">
+                  {confirming.kind === 'merge'
+                    ? <>Move all <strong>{c.sourceCount}</strong> source{c.sourceCount === 1 ? '' : 's'} from <strong>{c.label}</strong> into:</>
+                    : <>Delete <strong>{c.label}</strong>. Its <strong>{c.sourceCount}</strong> source{c.sourceCount === 1 ? '' : 's'} move to:</>}
+                </div>
+                <select className="search-input cat-select" value={confirming.targetId}
+                  aria-label="Reassignment target"
+                  onChange={e => setConfirming({ ...confirming, targetId: e.target.value })}>
+                  <option value="">Choose a category…</option>
+                  {categories.filter(x => x.id !== c.id).map(x => (
+                    <option key={x.id} value={x.id}>{x.label}</option>
+                  ))}
+                </select>
+                <button className="btn-primary" disabled={!confirming.targetId || busy}
+                  onClick={() => mutate(
+                    confirming.kind === 'merge'
+                      ? { action: 'merge', fromId: c.id, toId: confirming.targetId }
+                      : { action: 'delete', id: c.id, reassignTo: confirming.targetId },
+                    `${confirming.kind}-${c.id}`)}>
+                  {confirming.kind === 'merge' ? 'Merge' : 'Delete and reassign'}
+                </button>
+                <button className="nav-btn" onClick={() => setConfirming(null)}>Cancel</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Add ── */}
+      <section className="cat-add">
+        <div className="section-head">
+          <span className="section-label">Add a category</span>
+        </div>
+        <form className="cat-add-form" onSubmit={e => {
+          e.preventDefault();
+          if (!newLabel.trim()) return;
+          mutate({ action: 'add', label: newLabel.trim(), color: newColor }, 'add');
+          setNewLabel(''); setNewColor(null);
+        }}>
+          <input className="search-input cat-input" placeholder="Category name"
+            aria-label="New category name" value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}/>
+          <ColorSwatches palette={palette} value={newColor} onPick={p => setNewColor(p.color)}/>
+          <button className="btn-primary" type="submit" disabled={!newLabel.trim() || busy === 'add'}>
+            {busy === 'add' ? 'Adding…' : 'Add category'}
+          </button>
+        </form>
+        <p className="view-sub">
+          A stable id is generated from the name once, at creation, and never
+          regenerated — so you can rename it later without detaching anything.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function FeedView({ t, category, search, isMobile }) {
   // "General" is the everything page, not a bucket. After the roster landed,
@@ -1992,7 +2200,7 @@ export default function AetherHub() {
   const viewLabel = {
     feed:'Feed', discover:'Discover', intelligence:'Intelligence',
     studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings',
-    recommended:'Recommended',
+    recommended:'Recommended', categories:'Categories',
   };
 
   return (
@@ -2033,6 +2241,7 @@ export default function AetherHub() {
         {view === 'studio'       && <StudioView       t={t} isMobile={isMobile}/>}
         {view === 'alerts'       && <AlertsView       t={t}/>}
         {view === 'sources'      && <SourcesView      t={t} circle={circle} setCircle={setCircle}/>}
+        {view === 'categories'   && <CategoryManager/>}
         {view === 'settings'     && <SettingsView     t={t} dark={dark} onDark={() => setDark(d => !d)} isMobile={isMobile}/>}
       </main>
 

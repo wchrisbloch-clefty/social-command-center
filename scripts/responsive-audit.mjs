@@ -58,11 +58,11 @@ const ONLY_BP = (process.env.AUDIT_BREAKPOINT || '').split(',').map(x => x.trim(
 // rendered it.
 const VIEWS = [
   'feed', 'discover', 'recommended', 'intelligence', 'studio', 'alerts',
-  'sources', 'settings', 'sports', 'sports-team',
+  'sources', 'settings', 'categories', 'sports', 'sports-team',
 ];
 const VIEW_LABEL = {
   discover: 'Discover', recommended: 'Recommended', intelligence: 'Intelligence', studio: 'Studio',
-  alerts: 'Alerts', sources: 'Sources', settings: 'Settings',
+  alerts: 'Alerts', sources: 'Sources', settings: 'Settings', categories: 'Categories',
 };
 // view id → how to get there when it is not a section-nav button.
 const CATEGORY_VIEWS = {
