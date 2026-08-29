@@ -81,3 +81,41 @@ to General. Nothing is ever orphaned.
 Pick from `PALETTE` in `config/categories.js`. Muted, editorial, never neon;
 every light value clears 4.5:1 on white so a category label reads as text rather
 than decoration. Twelve entries: the original eight plus four spares.
+
+---
+
+## Suggested categories (the engine assists)
+
+The manager's suggestions panel points the pipeline **inward**: Discover asks
+"which of my signals are spiking"; this asks "which themes recur across them,
+and is one big enough to deserve a category".
+
+`lib/themes.js` — keyword and bigram frequency over already-normalized signals,
+weighted by how many **distinct sources** use each term. No model, no embedding,
+no external call. A frequency table is something you can read and argue with.
+
+Three rules do most of the work:
+
+- **Breadth over volume.** A term used by four sources beats one used forty
+  times by a single source — that is one source's hobby horse, not a category.
+- **Phrases beat words.** A unigram always outranks the bigram containing it, so
+  raw frequency surfaces "Data" and "Center" and never "Data Center" — the only
+  one of the three that is actually a category. Single words are suppressed when
+  a phrase containing them has comparable support.
+- **Boilerplate is not a theme.** A term in more than half of *all* items is
+  furniture — an RSS footer, a channel's stock description. It ranks top on both
+  volume and breadth precisely because it is meaningless.
+
+A theme already 80%+ concentrated in one category is skipped: that category is
+doing its job, and a new one would fragment it rather than clarify anything.
+
+**Everything is advisory.** The panel never creates or moves anything. "Create
+category" calls the same `/api/categories` `add` that the manual form does; the
+source list it shows is a suggestion for your approval, not a pending change.
+
+### It is only as good as the text it can read
+
+The panel says so on screen rather than presenting a thin result confidently.
+Themes come from titles and descriptions, so a source that is not pulling
+contributes nothing. With `YOUTUBE_API_KEY` unset and X degraded on the free
+public instance, the readable pool is small — Reddit and any live RSS carry it.

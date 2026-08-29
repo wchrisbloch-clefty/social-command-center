@@ -1439,6 +1439,95 @@ function ColorSwatches({ palette, value, onPick }) {
   );
 }
 
+
+/** Suggested categories — advisory. Nothing is created without your tap. */
+function SuggestedCategories({ onCreate, busyKey }) {
+  const [state, setState] = useState({ suggestions: [], limits: [], mined: null, loading: true });
+  const [dismissed, setDismissed] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/suggest-categories', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { if (alive) setState({ ...d, loading: false }); })
+      .catch(e => {
+        console.warn('[suggest] fetch failed', e?.message);
+        if (alive) setState({ suggestions: [], limits: ['Could not read your feed for themes.'], mined: null, loading: false });
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const { suggestions, limits, mined, loading } = state;
+  const visible = suggestions.filter(s => !dismissed.includes(s.term));
+
+  return (
+    <section className="stack">
+      <div className="section-head">
+        <span className="section-label">Suggested categories</span>
+        {mined?.items != null && (
+          <span className="section-sub">
+            from {mined.items} items over {Math.round((mined.windowHours || 168) / 24)}d
+          </span>
+        )}
+      </div>
+
+      <p className="view-sub">
+        What your sources are actually posting about, clustered by recurring
+        theme. Suggestions only — nothing is created or moved until you tap.
+      </p>
+
+      {limits?.length > 0 && (
+        <div className="note-block">
+          <strong>How much text this could read</strong>
+          <ul>{limits.map((l, i) => <li key={i}>{l}</li>)}</ul>
+        </div>
+      )}
+
+      {loading && <div className="empty-note">Reading your feed for recurring themes…</div>}
+
+      {!loading && !visible.length && (
+        <div className="empty-note">
+          <strong>No themes stand out yet.</strong>
+          <div style={{ marginTop: 8 }}>
+            A theme needs to appear across at least two of your sources before it
+            is worth a category — one source talking about something is that
+            source&apos;s interest, not a category.
+          </div>
+        </div>
+      )}
+
+      <div className="rec-list">
+        {visible.map(s => (
+          <div className="rec" key={s.term}>
+            <div className="rec-main">
+              <div className="rec-name">{s.label}</div>
+              <div className="rec-meta"><span>{s.reason}</span></div>
+              <div className="rec-why">
+                {s.candidateSources.slice(0, 4).join(', ')}
+                {s.candidateSources.length > 4 ? ` +${s.candidateSources.length - 4} more` : ''}
+              </div>
+              {s.spanningCategories?.length > 1 && (
+                <div className="rec-why">
+                  Currently split across{' '}
+                  {s.spanningCategories.map(c => categoryLabelOf(c.id)).join(', ')} —
+                  which is why it may deserve its own.
+                </div>
+              )}
+            </div>
+            <div className="rec-action">
+              <button className="btn-primary" disabled={busyKey === `add-${s.term}`}
+                onClick={() => onCreate(s)}>
+                {busyKey === `add-${s.term}` ? 'Creating…' : 'Create category'}
+              </button>
+              <button className="nav-btn" onClick={() => setDismissed(d => [...d, s.term])}>Dismiss</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CategoryManager() {
   const [state, setState] = useState({ categories: [], palette: [], fallbackId: 'general', loading: true });
   const [busy, setBusy]     = useState(null);
@@ -1594,6 +1683,10 @@ function CategoryManager() {
           </div>
         ))}
       </div>
+
+      {/* ── Engine assists ── */}
+      <SuggestedCategories busyKey={busy}
+        onCreate={sug => mutate({ action: 'add', label: sug.label }, `add-${sug.term}`)}/>
 
       {/* ── Add ── */}
       <section className="cat-add">
