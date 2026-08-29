@@ -46,20 +46,10 @@
   --ah-dur-fast: 0.12s; --ah-dur-card: 0.12s;
   --ah-dur-input: 0.12s; --ah-dur-toggle: 0.2s;
 
-  /* ══ CATEGORY COLOUR MAP ════════════════════════════════════════════════
-     One muted, editorial colour per category, used in exactly two places: the
-     3px left stripe on its cards and its small text label. Grown-up tones —
-     nothing bright, nothing neon. Every value clears 4.5:1 on white so the
-     label is readable as text, not just decoration.
-     Documented in docs/DESIGN.md; keep the two in step. */
-  --cat-general:    #5b6470;  /* slate        */
-  --cat-business:   #8a6a2f;  /* soft brass   */
-  --cat-energy:     #2f6b6b;  /* slate-teal   */
-  --cat-tech:       #6b5b8a;  /* dusty violet */
-  --cat-sports:     #9c5a3c;  /* muted clay   */
-  --cat-health:     #4a7355;  /* sage         */
-  --cat-popculture: #96536b;  /* dusty rose   */
-  --cat-ancient:    #6b5a44;  /* bronze       */
+  /* Category colours are DATA now — see config/categories.js. The
+     [data-cat] → --cat rules are generated from the collection and injected by
+     <CategoryStyles/>, so adding a category no longer means editing a
+     stylesheet. Only the fallback lives here. */
 
   /* ── Velocity — the only other colour on screen ──────────────────────── */
   --ah-signal-high:     #15803d;  /* green  */
@@ -134,16 +124,6 @@
 
   --shadow-sm: none; --shadow-md: none; --shadow-lg: none;
 
-  /* Same hues, lifted for a dark ground. Still muted, still editorial. */
-  --cat-general:    #9aa4b0;
-  --cat-business:   #d1a758;
-  --cat-energy:     #5fb0b0;
-  --cat-tech:       #a897c9;
-  --cat-sports:     #d18a6a;
-  --cat-health:     #82b894;
-  --cat-popculture: #d18aa5;
-  --cat-ancient:    #b39c7d;
-
   --ah-signal-high:     #4ade80;
   --ah-signal-rising:   #fbbf24;
   --ah-signal-moderate: #7d7d7d;
@@ -167,16 +147,8 @@
   --ah-ring-focus: 0 0 0 2px var(--border);
 }
 
-/* Category colour resolution. `data-cat` on any element picks up its hue via
-   --cat, so the stripe and the label never disagree. */
-[data-cat="general"]    { --cat: var(--cat-general); }
-[data-cat="business"]   { --cat: var(--cat-business); }
-[data-cat="energy"]     { --cat: var(--cat-energy); }
-[data-cat="tech"]       { --cat: var(--cat-tech); }
-[data-cat="sports"]     { --cat: var(--cat-sports); }
-[data-cat="health"]     { --cat: var(--cat-health); }
-[data-cat="popculture"] { --cat: var(--cat-popculture); }
-[data-cat="ancient"]    { --cat: var(--cat-ancient); }
+/* `data-cat` on any element picks up its hue via --cat. The mapping itself is
+   generated from config/categories.js — see categoryStyleSheet(). */
 
 .cat-label {
   color: var(--cat, var(--text3));

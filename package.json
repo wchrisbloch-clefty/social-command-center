@@ -13,7 +13,8 @@
     "test:pg": "node --test packages/voice-profile/test/postgres-integration.test.ts",
     "probe:rsshub": "node scripts/probe-rsshub.mjs",
     "audit:responsive": "node scripts/responsive-audit.mjs",
-    "sources:map": "node scripts/build-source-map.mjs"
+    "sources:map": "node scripts/build-source-map.mjs",
+    "categories:verify": "node scripts/verify-categories.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

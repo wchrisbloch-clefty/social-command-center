@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { categoryStyleSheet } from "../config/categories.js";
 
 // One typeface, two weights. The serif (Playfair), the display face (Archivo)
 // and the meta face (Public Sans) are retired with the editorial theme — the
@@ -33,6 +34,15 @@ export default function RootLayout({
       data-theme="light"
       className={inter.variable}
     >
+      <head>
+        {/* Category colours are data, not stylesheet. Generated from
+            config/categories.js so a category added in the manager is styled
+            the moment it exists — nothing to edit in CSS. */}
+        <style
+          id="category-colors"
+          dangerouslySetInnerHTML={{ __html: categoryStyleSheet() }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

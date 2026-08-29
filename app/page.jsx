@@ -14,7 +14,7 @@ import {
 
 import { getFeed } from '../lib/adapters.js';
 import {
-  CATEGORIES, DEFAULT_CATEGORY,
+  CATEGORIES, DEFAULT_CATEGORY, sortedCategories, categoryLabel,
   SPORTS_LEAGUES, SPORTS_TEAMS, teamsInLeague,
 } from '../config/sources.js';
 import {
@@ -914,7 +914,9 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
 }
 
 const TIER_WORD = { mainstream: 'Verified', street: 'Alt. perspective' };
-const categoryLabelOf = id => CATEGORIES.find(c => c.id === id)?.label || id;
+const categoryLabelOf = id => categoryLabel(id);
+// Nav order comes from the collection's `order`, not import order.
+const NAV_CATEGORIES = () => sortedCategories(CATEGORIES);
 
 // ─── LIVE FEED PLUMBING ───────────────────────────────────────────────────────
 // Everything below renders from getFeed() → normalizeSignal(). No signal reaches
@@ -1903,7 +1905,7 @@ function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefres
           </div>
 
           <nav className="nav-tabs" aria-label="Categories">
-            {CATEGORIES.map(c => (
+            {NAV_CATEGORIES().map(c => (
               <button key={c.id}
                 className={`nav-tab${category === c.id ? ' active' : ''}`}
                 aria-current={category === c.id ? 'page' : undefined}

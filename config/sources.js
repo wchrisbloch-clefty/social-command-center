@@ -71,22 +71,16 @@
 //  Swapping to a self-hosted RSSHub later: set RSSHUB_BASE_URL and change
 //  nothing here. Every relative route re-points automatically. See README.
 
-// ─── Categories — mirrors MyNewsHub's nav, in nav order ──────────────────────
-export const CATEGORIES = [
-  { id: 'general',    label: 'General'            },
-  { id: 'business',   label: 'Business & Markets' },
-  { id: 'energy',     label: 'Energy'             },
-  { id: 'tech',       label: 'AI & Tech'          },
-  { id: 'sports',     label: 'Sports'             },
-  { id: 'health',     label: 'Health'             },
-  { id: 'popculture', label: 'Pop Culture'        },
-  // ASSUMPTION: 'Ancient Mysteries' covers lost civilisations, archaeology,
-  // anomalous history, UAP/fringe science and unexplained-story creators — the
-  // cluster that has no home in the other seven.
-  { id: 'ancient',    label: 'Ancient Mysteries'   },
-];
+// ─── Categories ──────────────────────────────────────────────────────────────
+// Categories are a first-class, editable collection now — see
+// config/categories.js. Re-exported here so every existing importer keeps
+// working; there is still exactly one definition.
+export {
+  CATEGORIES, CATEGORY_IDS, PALETTE, DEFAULT_CATEGORIES, FALLBACK_CATEGORY_ID,
+  sortedCategories, categoryById, categoryLabel, makeCategoryId,
+  normalizeOrder, categoryStyleSheet,
+} from './categories.js';
 
-export const CATEGORY_IDS = CATEGORIES.map(c => c.id);
 export const DEFAULT_CATEGORY = 'general';
 
 // ─── Tier — derived from platform, never set per source ──────────────────────
@@ -276,10 +270,6 @@ export function limitOf(source) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_LIMIT;
 }
 
-/** Display label for a category id. Falls back to the id so nothing renders blank. */
-export function categoryLabel(id) {
-  return CATEGORIES.find(c => c.id === id)?.label || id || 'General';
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SPORTS — two-level taxonomy: league → team
