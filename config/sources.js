@@ -115,29 +115,44 @@ export const DEFAULT_LIMIT = 5;
 // high-volume account so the feed shows something on first run. Replace the
 // whole list with your own — the shape is all that matters.
 export const SOCIAL_SOURCES = [
-  // ── Instagram (mainstream) ── /instagram/2/user/:username
-  { platform: 'Instagram', route: '/instagram/2/user/nasa',       label: '@nasa',       category: 'tech',       limit: 4 },
-  { platform: 'Instagram', route: '/instagram/2/user/espn',       label: '@espn',       category: 'sports',     limit: 4 },
-  { platform: 'Instagram', route: '/instagram/2/user/natgeo',     label: '@natgeo',     category: 'general',    limit: 4 },
+  // ═══ ENERGY ═══════════════════════════════════════════════════════════════
+  // X handles below are VERIFIED but will NOT pull on the free public RSSHub
+  // instance — /twitter/* needs TWITTER_AUTH_TOKEN configured on the instance
+  // itself. They are wired and correct, and start working the moment you point
+  // RSSHUB_BASE_URL at a self-hosted instance with a token. Until then they
+  // show as degraded in the source rail with their real HTTP status.
+  { platform: 'X', person: 'Daniel Yergin', route: '/twitter/user/DanielYergin', label: '@DanielYergin', category: 'energy', limit: 5 },
+  { platform: 'X', person: 'Doug Sheridan', route: '/twitter/user/DougSheridan', label: '@DougSheridan', category: 'energy', limit: 5 },
+  { platform: 'X', person: 'Alex Epstein',  route: '/twitter/user/AlexEpstein',  label: '@AlexEpstein',  category: 'energy', limit: 5 },
+  { platform: 'X', person: 'Jeff Krimmel',  route: '/twitter/user/JeffKrimmel',  label: '@JeffKrimmel',  category: 'energy', limit: 5 },
+  // Rich Miller = Data Center Frontier founder (per your call), not the Bloomberg reporter.
+  { platform: 'X', person: 'Rich Miller',   route: '/twitter/user/Tech_Journalism', label: '@Tech_Journalism', category: 'energy', limit: 5 },
 
-  // ── LinkedIn (mainstream) ── /linkedin/company/:company_id/posts
-  { platform: 'LinkedIn',  route: '/linkedin/company/openai/posts',      label: 'OpenAI',       category: 'tech',     limit: 5 },
-  { platform: 'LinkedIn',  route: '/linkedin/company/bloomenergy/posts', label: 'Bloom Energy', category: 'energy',   limit: 5 },
-  { platform: 'LinkedIn',  route: '/linkedin/company/goldman-sachs/posts', label: 'Goldman Sachs', category: 'business', limit: 5 },
+  // ═══ BUSINESS & MARKETS ═══════════════════════════════════════════════════
+  { platform: 'X', person: 'Jeff Immelt',   route: '/twitter/user/JeffImmelt',   label: '@JeffImmelt',   category: 'business', limit: 5 },
+  { platform: 'X', person: 'John Chambers', route: '/twitter/user/JohnTChambers', label: '@JohnTChambers', category: 'business', limit: 5 },
+  { platform: 'X', person: 'Eddie Donmez',  route: '/twitter/user/eddiedonmez',  label: '@eddiedonmez',  category: 'business', limit: 5 },
 
-  // ── X (street) ── /twitter/user/:id — expect these to need a self-hosted token
-  { platform: 'X',         route: '/twitter/user/sama',        label: '@sama',      category: 'tech',     limit: 5 },
-  { platform: 'X',         route: '/twitter/user/business',    label: '@business',  category: 'business', limit: 5 },
-  { platform: 'X',         route: '/twitter/user/espn',        label: '@espn',      category: 'sports',   limit: 5 },
+  // ═══ HEALTH ═══════════════════════════════════════════════════════════════
+  // ASSUMPTION: @ATTACKATHLETICS is Grover's verified handle on X/Instagram. He
+  // has a YouTube presence but no handle I could confirm, and a confirmed
+  // handle on a degrading platform beats a guessed one on a working platform —
+  // it becomes correct the day you self-host, rather than being a dead feed now
+  // AND later.
+  { platform: 'X', person: 'Tim Grover',    route: '/twitter/user/ATTACKATHLETICS', label: '@ATTACKATHLETICS', category: 'health', limit: 5 },
 
-  // ── Reddit (street) ── native RSS, absolute URL, does NOT touch RSSHub
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/energy/hot/.rss',            label: 'r/energy',        category: 'energy',     limit: 4 },
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/artificial/hot/.rss',        label: 'r/artificial',    category: 'tech',       limit: 4 },
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/nba/hot/.rss',               label: 'r/nba',           category: 'sports',     limit: 4 },
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/Health/hot/.rss',            label: 'r/Health',        category: 'health',     limit: 4 },
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/popculturechat/hot/.rss',    label: 'r/popculturechat', category: 'popculture', limit: 4 },
-  { platform: 'Reddit', route: 'https://www.reddit.com/r/news/hot/.rss',              label: 'r/news',          category: 'general',    limit: 4 },
+  // ═══ ANCIENT MYSTERIES ════════════════════════════════════════════════════
+  // No first-party video channel — she appears as a guest. X is her only feed.
+  { platform: 'X', person: 'Annie Jacobsen', route: '/twitter/user/AnnieJacobsen', label: '@AnnieJacobsen', category: 'ancient', limit: 5 },
+
+  // ═══ TOPIC / KEYWORD RADAR ════════════════════════════════════════════════
+  // Seeded in Part B — see TOPIC_SOURCES below.
 ];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TOPIC SOURCES — keyword/hashtag radar. Seeded in Part B.
+// ═══════════════════════════════════════════════════════════════════════════
+export const TOPIC_SOURCES = [];
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  YOUTUBE — official Data API v3, NOT RSSHub. Left on its own path on purpose.
@@ -145,10 +160,37 @@ export const SOCIAL_SOURCES = [
 // Handles are the @name from the channel URL, without the '@'.
 // Needs YOUTUBE_API_KEY. Without it the route reports needsKey and returns [].
 export const YOUTUBE_SOURCES = [
-  // ASSUMPTION: placeholders again — swap for the channels you actually track.
-  { platform: 'YouTube', handle: 'lexfridman',     label: 'Lex Fridman',      category: 'tech',   limit: 3 },
-  { platform: 'YouTube', handle: 'AndrewHubermanLab', label: 'Huberman Lab',  category: 'health', limit: 3 },
-  { platform: 'YouTube', handle: 'Bloomberg',      label: 'Bloomberg',        category: 'business', limit: 3 },
+  // Every handle below was verified by search except where marked ASSUMPTION.
+  // YouTube is the backbone: it is live, free, and returns real view counts, so
+  // these are the only sources whose velocity is scored on actual engagement
+  // rather than recency.
+
+  // ═══ BUSINESS & MARKETS ═══════════════════════════════════════════════════
+  { platform: 'YouTube', person: 'Peter Zeihan',      handle: 'ZeihanonGeopolitics', label: 'Zeihan on Geopolitics', category: 'business', limit: 4 },
+  { platform: 'YouTube', person: 'Harry Stebbings',   handle: '20VC',                label: '20VC',                  category: 'business', limit: 4 },
+  { platform: 'YouTube', person: 'Daniel Pink',       handle: 'danielpinktv',        label: 'Daniel Pink',           category: 'business', limit: 3 },
+  { platform: 'YouTube', person: 'Christopher Voss',  handle: 'NegotiationMastery',  label: 'Chris Voss',            category: 'business', limit: 3 },
+  { platform: 'YouTube', person: 'Chase Hughes',      handle: 'chasehughesofficial', label: 'Chase Hughes',          category: 'business', limit: 3 },
+
+  // ═══ ENERGY ═══════════════════════════════════════════════════════════════
+  // ASSUMPTION: "EggGeothermal" is a legacy YouTube username (youtube.com/user/
+  // EggGeothermal), not a confirmed @handle. YouTube usually mints a matching
+  // handle from a legacy username, but if this 404s the fallback is X @GeoJayegg.
+  { platform: 'YouTube', person: 'Jay Egg',           handle: 'EggGeothermal',       label: 'Egg Geo',               category: 'energy',   limit: 3 },
+
+  // ═══ HEALTH ═══════════════════════════════════════════════════════════════
+  { platform: 'YouTube', person: 'Chris Williamson',  handle: 'ChrisWillx',          label: 'Modern Wisdom',         category: 'health',   limit: 4 },
+  { platform: 'YouTube', person: 'David Sinclair',    handle: 'LifespanOfficial',    label: 'Lifespan',              category: 'health',   limit: 3 },
+  { platform: 'YouTube', person: 'Jocko Willink',     handle: 'JockoPodcast',        label: 'Jocko Podcast',         category: 'health',   limit: 3 },
+
+  // ═══ ANCIENT MYSTERIES ════════════════════════════════════════════════════
+  { platform: 'YouTube', person: 'MrBallen',          handle: 'MrBallen',            label: 'MrBallen',              category: 'ancient',  limit: 4 },
+  { platform: 'YouTube', person: 'Jesse Michels',     handle: 'JesseMichels',        label: 'American Alchemy',      category: 'ancient',  limit: 4 },
+  { platform: 'YouTube', person: 'Timothy Alberino',  handle: 'TimothyAlberino',     label: 'Timothy Alberino',      category: 'ancient',  limit: 3 },
+  // ASSUMPTION: Button's channel ("Ancient History BA", ~200K subs) resolves to
+  // channel id UCRDZ_t_-uHLsz_Otq6iOgyg; I could not confirm an @handle for it.
+  // channelId is supported alongside handle precisely for this case.
+  { platform: 'YouTube', person: 'Michael Button',    channelId: 'UCRDZ_t_-uHLsz_Otq6iOgyg', label: 'Michael Button', category: 'ancient', limit: 3 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════

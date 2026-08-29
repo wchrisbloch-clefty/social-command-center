@@ -26,6 +26,27 @@ export const revalidate = 0;
 // "prove it free before self-hosting" phase. One env var moves it.
 const DEFAULT_BASE = 'https://rsshub.app';
 
+// ── X is the self-host trigger ──────────────────────────────────────────────
+// /twitter/* requires TWITTER_AUTH_TOKEN configured ON THE RSSHUB INSTANCE —
+// not in AetherHub, which never sees it. A shared public instance will not hold
+// your token, so X routes fail there no matter how correct the handle is.
+//
+// The distinction matters to anyone reading the source rail: "HTTP 403" looks
+// like a wrong handle, when in fact the handle is fine and the INSTANCE is the
+// limitation. So a failure on a platform we know cannot work on the free tier
+// is reported with that reason instead of a bare status code.
+const PLATFORM_LIMITS = {
+  X: {
+    needs: 'TWITTER_AUTH_TOKEN',
+    reason: 'X needs TWITTER_AUTH_TOKEN on your RSSHub instance — the public one cannot serve it',
+  },
+};
+
+/** True when this base URL is the shared public instance. */
+function isPublicInstance() {
+  return baseUrl().includes('rsshub.app');
+}
+
 function baseUrl() {
   const raw = (process.env.RSSHUB_BASE_URL || DEFAULT_BASE).trim();
   return raw.replace(/\/+$/, ''); // tolerate a trailing slash in the env var
@@ -202,8 +223,19 @@ async function loadSource(source) {
 
   if (!res.ok) {
     // FAIL LOUD: the server log names the source, the status and the reason.
-    console.warn(`[social] ${tagStr} FAIL status=${res.status} (${res.err}) via=${viaRsshub ? 'rsshub' : 'direct'} url=${url}`);
-    return { items: [], report: { label: source.label, platform: source.platform, category: source.category, ok: false, status: res.status, error: res.err, count: 0 } };
+    const limit = viaRsshub && isPublicInstance() ? PLATFORM_LIMITS[source.platform] : null;
+    const reason = limit ? limit.reason : res.err;
+    console.warn(`[social] ${tagStr} FAIL status=${res.status} (${reason}) via=${viaRsshub ? 'rsshub' : 'direct'} url=${url}`);
+    return {
+      items: [],
+      report: {
+        label: source.label, platform: source.platform, category: source.category,
+        ok: false, status: res.status, error: reason, count: 0,
+        // Distinguishes "this cannot work here" from "this broke". The UI shows
+        // the first as a known limitation, not as a fault to go chase.
+        ...(limit ? { limitation: true, needs: limit.needs } : {}),
+      },
+    };
   }
 
   let parsed = [];

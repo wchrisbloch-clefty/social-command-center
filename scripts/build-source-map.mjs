@@ -1,291 +1,196 @@
 #!/usr/bin/env node
-// scripts/build-source-map.mjs — resolve the roster, categorize it locally,
-// scan for duplicates, and write config/source-map.md for human review.
+// scripts/build-source-map.mjs — regenerate config/source-map.md.
 //
 //   npm run sources:map
 //
-// The ROSTER below is the proposed name → platform → handle resolution. It is
-// the reviewable artifact: every entry carries a status and a confidence, and
-// anything I could not resolve says so rather than shipping a plausible-looking
-// handle that silently produces a dead feed.
-//
-// Categorization runs through lib/categorize.js — local keyword scoring, no
-// external calls, so AetherHub stays decoupled.
+// The map is DERIVED from config/sources.js, never parallel to it. Add a source
+// there and it appears here; there is no second list to forget to update.
+// VERIFICATION below holds only the provenance a source line cannot carry:
+// how the handle was confirmed, and what is still a guess.
 
 import { writeFileSync } from 'node:fs';
 import { categorize, findDuplicates } from '../lib/categorize.js';
-import { CATEGORIES, PLATFORM_TIER } from '../config/sources.js';
+import {
+  CATEGORIES, PLATFORM_TIER, SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES,
+} from '../config/sources.js';
 
-// status:
-//   resolved      person and handle both confident — wire it
-//   verify        person confident, handle is my best guess — check before trusting
-//   unresolved    could not identify the person from the name alone
-//   unsupported   identified, but the platform route does not exist for them
-const ROSTER = [
-  // ── Energy ────────────────────────────────────────────────────────────────
-  { person: 'Daniel Yergin', platform: 'X', handle: 'danielyergin', status: 'verify',
-    cat: 'energy', why: 'Energy historian (The Prize, The New Map), S&P Global vice chairman. No personal video channel; X is his only first-party feed.',
-    bio: 'energy history oil gas geopolitics CERAWeek petroleum energy transition' },
+// person → how its handle was established.
+//   verified   confirmed against the person's own channel/profile via search
+//   assumption best available, explicitly uncertain — see the note
+const VERIFICATION = {
+  'Daniel Yergin':     { state: 'verified',   note: 'X profile confirms author of The Prize/The New Map, S&P Global vice chairman.' },
+  'Doug Sheridan':     { state: 'verified',   note: 'EnergyPoint Research; X-native, posts daily oil & gas commentary.' },
+  'Alex Epstein':      { state: 'verified',   note: 'Fossil Future author; X is his primary channel.' },
+  'Jeff Krimmel':      { state: 'verified',   note: 'Confirmed @JeffKrimmel. CORRECTION: firm is Krimmel Strategy Group, not "Krimmel Capital".' },
+  'Rich Miller':       { state: 'verified',   note: 'Data Center Frontier founder/editor-at-large — the data-centre Rich Miller, per your call, not the Bloomberg economics reporter.' },
+  'Jeff Immelt':       { state: 'verified',   note: 'Former GE CEO, now NEA venture partner. ~53K followers, low posting volume.' },
+  'John Chambers':     { state: 'verified',   note: 'Founder JC2 Ventures, Chairman Emeritus Cisco.' },
+  'Eddie Donmez':      { state: 'verified',   note: 'Founder of Creative Capital; handle is lowercase @eddiedonmez.' },
+  'Tim Grover':        { state: 'verified',   note: 'ATTACK Athletics CEO. @ATTACKATHLETICS is consistent across X and Instagram. No confirmable YouTube handle, so the verified X handle was preferred over a guessed YouTube one.' },
+  'Annie Jacobsen':    { state: 'verified',   note: 'Area 51 / Nuclear War author. No first-party video channel — she appears as a guest — so X is the only feed. Expect low volume.' },
+  'Peter Zeihan':      { state: 'verified',   note: 'youtube.com/@ZeihanonGeopolitics. Near-daily uploads.' },
+  'Harry Stebbings':   { state: 'verified',   note: '20VC; full episodes go to YouTube.' },
+  'Daniel Pink':       { state: 'verified',   note: 'CORRECTED from my guess @DanielPink → @danielpinktv ("Daniel Pink TV"), home of the Pinkcast.' },
+  'Christopher Voss':  { state: 'verified',   note: 'youtube.com/@NegotiationMastery — "Chris Voss & The Black Swan Group".' },
+  'Chase Hughes':      { state: 'verified',   note: '@chasehughesofficial. He also co-hosts The Behavior Panel; the solo channel was chosen as the first-party feed.' },
+  'Chris Williamson':  { state: 'verified',   note: 'Modern Wisdom, @ChrisWillx.' },
+  'David Sinclair':    { state: 'verified',   note: 'CORRECTED from my guess @davidsinclairpodcast (a legacy custom URL) → @LifespanOfficial.' },
+  'Jocko Willink':     { state: 'verified',   note: 'Jocko Podcast.' },
+  'MrBallen':          { state: 'verified',   note: 'Unambiguous handle.' },
+  'Jesse Michels':     { state: 'verified',   note: 'CORRECTED TWICE: your list said "Jesse Michaels" (spelling), and my guess @AmericanAlchemy was wrong — the channel handle is @JesseMichels. His X is @AlchemyAmerican.' },
+  'Timothy Alberino':  { state: 'verified',   note: 'youtube.com/@TimothyAlberino.' },
+  'Michael Button':    { state: 'assumption', note: 'Channel confirmed ("Ancient History BA", ~200K subs) but NO @handle could be confirmed — search surfaced two channels. Wired by channelId UCRDZ_t_-uHLsz_Otq6iOgyg. If it returns nothing, the alternates are @MichaelButtonHistory1 or X @MichaelButtonX.' },
+  'Jay Egg':           { state: 'assumption', note: 'Only a LEGACY username was found (youtube.com/user/EggGeothermal), not a modern @handle. YouTube usually mints a matching handle, but this is unconfirmed. Fallback: X @GeoJayegg.' },
+};
 
-  { person: 'Doug Sheridan', platform: 'X', handle: 'DougSheridan', status: 'resolved',
-    cat: 'energy', why: 'EnergyPoint Research. Genuinely X-native — posts daily oil & gas charts and commentary there and essentially nowhere else.',
-    bio: 'oil and gas energy upstream shale petroleum markets commentary' },
-
-  { person: 'Alex Epstein', platform: 'X', handle: 'AlexEpstein', status: 'resolved',
-    cat: 'energy', why: 'Fossil Future / Moral Case for Fossil Fuels. X is where he actually argues; the YouTube channel is a repost archive.',
-    bio: 'fossil fuels energy policy decarbonization debate energy humanism' },
-
-  { person: 'Jeff Krimmel', platform: 'X', handle: 'jeffkrimmel', status: 'verify',
-    cat: 'energy', why: 'Krimmel Capital, energy/commodities analysis. Handle is a best guess from the name pattern.',
-    bio: 'energy commodities oil gas analysis capital markets' },
-
-  { person: 'Mark Lewis', platform: 'X', handle: null, status: 'unresolved',
-    cat: 'energy', why: 'Almost certainly the energy/carbon strategist (Andurand Capital, ex-Kepler Cheuvreux, ex-BNP) — but "Mark Lewis" is common enough that I will not guess a handle.',
-    bio: 'carbon energy transition strategist commodities' },
-
-  { person: 'Jay Egg', platform: 'YouTube', handle: 'EggGeo', status: 'verify',
-    cat: 'energy', why: 'Geothermal HVAC educator (Egg Geo). Publishes explainer video, so YouTube is right; handle is a best guess.',
-    bio: 'geothermal heating cooling hvac energy efficiency ground source heat pump' },
-
-  { person: 'Susanna Kass', platform: 'LinkedIn', handle: null, status: 'unsupported',
-    cat: 'energy', why: 'Data-centre sustainability / UN SDG advisor. Publishes on a LinkedIn PERSONAL profile, and RSSHub only exposes LinkedIn COMPANY pages. No pullable first-party feed.',
-    bio: 'data center sustainability energy infrastructure renewable compute' },
-
-  { person: 'Matt Vincent', platform: 'X', handle: null, status: 'unresolved',
-    cat: 'energy', why: 'Likely the Data Center Frontier editor, which fits the data-centre cluster in this list — but I cannot confirm the handle, and the name is common.',
-    bio: 'data center infrastructure editor energy cooling power' },
-
-  { person: 'Rich Miller', platform: 'X', handle: null, status: 'unresolved',
-    cat: 'energy', why: 'AMBIGUOUS. Data Center Frontier founder (fits Kass/Vincent) or the Bloomberg economics reporter. Different people, different categories. Needs your call.',
-    bio: 'data center frontier infrastructure power cooling' },
-
-  // ── Business & Markets ────────────────────────────────────────────────────
-  { person: 'Peter Zeihan', platform: 'YouTube', handle: 'ZeihanonGeopolitics', status: 'resolved',
-    cat: 'business', why: 'Posts near-daily to YouTube; it is unambiguously his primary channel. Heavy energy/demographics overlap — could equally sit in Energy.',
-    bio: 'geopolitics demographics supply chain energy trade macro markets' },
-
-  { person: 'Harry Stebbings', platform: 'YouTube', handle: '20VC', status: 'resolved',
-    cat: 'business', why: '20VC. Full episodes go to YouTube; it is the highest-signal free pull.',
-    bio: 'venture capital startup founder investing portfolio valuation' },
-
-  { person: 'Jeff Immelt', platform: 'X', handle: 'JeffImmelt', status: 'verify',
-    cat: 'business', why: 'Former GE CEO, now NEA. Low volume but X is his only first-party feed.',
-    bio: 'leadership ceo industrial strategy business' },
-
-  { person: 'Daniel Pink', platform: 'YouTube', handle: 'DanielPink', status: 'verify',
-    cat: 'business', why: 'Author (Drive, To Sell Is Human). Runs "Pinkcast" video shorts; handle is a best guess.',
-    bio: 'motivation sales behavioral science business books timing' },
-
-  { person: 'Christopher Voss', platform: 'YouTube', handle: 'NegotiationMastery', status: 'verify',
-    cat: 'business', why: 'Never Split the Difference / Black Swan Group. The group channel is the active one; handle is my best guess between that and @BlackSwanGroup.',
-    bio: 'negotiation tactical empathy hostage sales persuasion' },
-
-  { person: 'John Chambers', platform: 'X', handle: 'JohnTChambers', status: 'verify',
-    cat: 'business', why: 'Former Cisco CEO, JC2 Ventures. X is his only regular first-party output.',
-    bio: 'leadership ceo cisco venture startup technology strategy' },
-
-  { person: 'Eddie Donmez', platform: 'X', handle: 'EddieDonmez', status: 'verify',
-    cat: 'business', why: 'Markets/trading commentator (ex-Amplify Trading). X-native. Handle is a best guess.',
-    bio: 'markets trading macro equities commentary earnings' },
-
-  { person: 'Chase Hughes', platform: 'YouTube', handle: 'ChaseHughes', status: 'verify',
-    cat: 'business', why: 'Behavioural profiling / influence. Sits naturally beside Voss. Handle is a best guess.',
-    bio: 'behavior profiling influence persuasion psychology negotiation' },
-
-  // ── Health ────────────────────────────────────────────────────────────────
-  { person: 'Chris Williamson', platform: 'YouTube', handle: 'ChrisWillx', status: 'resolved',
-    cat: 'health', why: 'Modern Wisdom. YouTube is the primary distribution and the handle is well established.',
-    bio: 'modern wisdom psychology health mindset performance stoic philosophy' },
-
-  { person: 'David Sinclair', platform: 'YouTube', handle: 'davidsinclairpodcast', status: 'verify',
-    cat: 'health', why: 'Harvard longevity researcher, Lifespan podcast. Handle is a best guess; @davidasinclair on X is the fallback.',
-    bio: 'longevity healthspan epigenetic nad aging research lifespan' },
-
-  { person: 'Jocko Willink', platform: 'YouTube', handle: 'JockoPodcast', status: 'resolved',
-    cat: 'health', why: 'Jocko Podcast. Discipline/leadership/stoicism — straddles Health and Business; filed under Health for the mindset cluster.',
-    bio: 'discipline leadership extreme ownership stoic training mindset' },
-
-  { person: 'Tim Grover', platform: 'YouTube', handle: 'TimGrover', status: 'verify',
-    cat: 'health', why: 'Relentless; trained Jordan and Bryant. Mental-performance content. Handle is a best guess (@AttackAthletics is the alternative).',
-    bio: 'mental performance training athlete mindset relentless winning' },
-
-  // ── Ancient Mysteries ─────────────────────────────────────────────────────
-  { person: 'MrBallen', platform: 'YouTube', handle: 'MrBallen', status: 'resolved',
-    cat: 'ancient', why: 'Strange/dark/unexplained stories. Handle is unambiguous.',
-    bio: 'strange mysterious unexplained dark stories mystery paranormal' },
-
-  { person: 'Jesse Michels', platform: 'YouTube', handle: 'AmericanAlchemy', status: 'verify',
-    cat: 'ancient', why: 'TYPO CORRECTED: you wrote "Jesse Michaels"; the American Alchemy host is Jesse MICHELS. UAP/fringe-science long-form interviews.',
-    bio: 'uap ufo fringe science anomalous history declassified interviews' },
-
-  { person: 'Timothy Alberino', platform: 'YouTube', handle: 'TimothyAlberino', status: 'verify',
-    cat: 'ancient', why: 'Antediluvian history, giants, lost civilisations. Handle follows his name; worth a check.',
-    bio: 'antediluvian ancient giants lost civilization archaeology esoteric' },
-
-  { person: 'Michael Button', platform: 'YouTube', handle: 'MichaelButton', status: 'verify',
-    cat: 'ancient', why: 'Human-origins / lost-civilisations essayist. YouTube-native. Handle is a best guess.',
-    bio: 'human origins lost civilization ancient prehistory archaeology ice age' },
-
-  { person: 'Annie Jacobsen', platform: 'X', handle: 'anniejacobsen', status: 'verify',
-    cat: 'ancient', why: 'Author (Area 51, Nuclear War, Phenomena). No own channel — she appears on others — so X is the only first-party feed. Expect low volume.',
-    bio: 'area 51 declassified pentagon nuclear investigative history anomalous' },
-
-  { person: 'Michelle Thaller', platform: 'YouTube', handle: null, status: 'unresolved',
-    cat: 'ancient', why: 'NASA astrophysicist. Prolific GUEST, but I could not identify a first-party channel of her own. Following her may not be possible without a third-party aggregator.',
-    bio: 'astronomy astrophysics nasa cosmology space science' },
-
-  { person: 'Cassie Coppersmith', platform: 'YouTube', handle: null, status: 'unresolved',
-    cat: 'ancient', why: 'Could not identify with confidence. Plausibly an ancient-mysteries creator given the company she keeps in this list, but I will not invent a handle.',
-    bio: 'ancient mysteries archaeology' },
-
-  // ── Could not identify from the name alone ────────────────────────────────
-  { person: 'Giacomo Prandelli', platform: 'LinkedIn', handle: null, status: 'unresolved',
-    cat: 'energy', why: 'Could not identify. If he is the LNG/energy analyst who publishes on a LinkedIn personal profile, that is also UNSUPPORTED — RSSHub exposes company pages only.',
-    bio: 'energy lng analyst' },
-
-  { person: 'Saidul Islam', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify — the name is very common and nothing in the surrounding list disambiguates it.', bio: '' },
-
-  { person: 'Alex Lanin', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify.', bio: '' },
-
-  { person: 'Linhua G.', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify — the surname is truncated to an initial, so there is nothing to resolve against.', bio: '' },
-
-  { person: 'Guy Massey', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify.', bio: '' },
-
-  { person: 'Andy Davis', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify — very common name.', bio: '' },
-
-  { person: 'Paul Hammer', platform: null, handle: null, status: 'unresolved',
-    cat: 'general', why: 'Could not identify.', bio: '' },
+const PARKED = [
+  ['Susanna Kass', 'Energy', 'LinkedIn personal profile — RSSHub exposes company pages only. Structurally unfollowable, deliberately not wired.'],
+  ['Mark Lewis', 'Energy', 'Person confident (Andurand carbon strategist); name too common to attribute a handle.'],
+  ['Matt Vincent', 'Energy', 'Likely Data Center Frontier editor; no personal handle confirmed.'],
+  ['Giacomo Prandelli', 'Energy', 'No confident identification.'],
+  ['Michelle Thaller', 'Ancient Mysteries', 'NASA astrophysicist — a guest, not a host. No first-party channel.'],
+  ['Cassie Coppersmith', 'Ancient Mysteries', 'No confident identification.'],
+  ['Saidul Islam', '—', 'Very common name.'],
+  ['Alex Lanin', '—', 'No confident identification.'],
+  ['Linhua G.', '—', 'Surname truncated to an initial.'],
+  ['Guy Massey', '—', 'No confident identification.'],
+  ['Andy Davis', '—', 'Very common name.'],
+  ['Paul Hammer', '—', 'No confident identification.'],
 ];
 
-// ── Route construction, per the verified RSSHub patterns ────────────────────
-export function routeFor({ platform, handle }) {
-  if (!handle) return null;
-  switch (platform) {
-    case 'YouTube':   return { kind: 'youtube', handle };              // official Data API
-    case 'X':         return { kind: 'rsshub',  route: `/twitter/user/${handle}` };
-    case 'Instagram': return { kind: 'rsshub',  route: `/instagram/2/user/${handle}` };
-    case 'LinkedIn':  return { kind: 'rsshub',  route: `/linkedin/company/${handle}/posts` };
-    case 'Reddit':    return { kind: 'direct',  route: `https://www.reddit.com/r/${handle}/hot/.rss` };
-    default:          return null;
-  }
-}
-
 const label = id => CATEGORIES.find(c => c.id === id)?.label || id;
+const all = [...SOCIAL_SOURCES, ...YOUTUBE_SOURCES];
 
-// ── Build ───────────────────────────────────────────────────────────────────
-const rows = ROSTER.map(r => {
-  const auto = categorize(`${r.person} ${r.handle || ''} ${r.bio}`, r.cat);
-  const route = routeFor(r);
+const rows = all.map(src => {
+  const v = VERIFICATION[src.person] || { state: 'unknown', note: '—' };
+  const ref = src.handle || src.channelId || src.route;
+  const auto = categorize(`${src.person || ''} ${src.label} ${ref}`, src.category);
   return {
-    ...r,
-    tier: r.platform ? (PLATFORM_TIER[r.platform] || 'street') : '—',
+    person: src.person || src.label,
+    platform: src.platform,
+    ref,
+    category: src.category,
+    tier: PLATFORM_TIER[src.platform] || 'street',
+    state: v.state,
+    note: v.note,
     autoCat: auto.category,
     autoConfidence: auto.confidence,
-    matched: auto.matched,
-    agrees: auto.category === r.cat,
-    route,
+    agrees: auto.category === src.category,
   };
 });
 
-const dupes = findDuplicates(rows.filter(r => r.handle).map(r => ({
-  platform: r.platform, handle: r.handle, label: r.person, person: r.person,
-  route: r.route?.route || r.route?.handle,
+const dupes = findDuplicates(all.map(s => ({
+  platform: s.platform, handle: s.handle || s.channelId, label: s.label,
+  person: s.person, route: s.route,
 })));
 
-const byStatus = s => rows.filter(r => r.status === s);
-const counts = {
-  resolved: byStatus('resolved').length,
-  verify: byStatus('verify').length,
-  unresolved: byStatus('unresolved').length,
-  unsupported: byStatus('unsupported').length,
-};
+const assumptions = rows.filter(r => r.state === 'assumption');
+const xSources = rows.filter(r => r.platform === 'X');
 
 const md = `# Source map — name → platform → handle → category
 
-Generated by \`npm run sources:map\`. **Review artifact, not the live config.**
-Sources only become live once written into \`config/sources.js\`.
+**Derived from \`config/sources.js\`** by \`npm run sources:map\`. Not a parallel
+list: add a source there and it shows up here. This file carries only the
+provenance a config line cannot — how each handle was confirmed.
 
 Categorization is local (\`lib/categorize.js\`, keyword scoring, no external
-calls). Tier is derived from platform and never set by hand.
+calls). Tier is derived from platform and never hand-written.
 
-| Status | Count | Meaning |
-|---|---|---|
-| \`resolved\` | ${counts.resolved} | Person and handle both confident — safe to wire |
-| \`verify\` | ${counts.verify} | Person confident, **handle is a best guess** — check before trusting |
-| \`unresolved\` | ${counts.unresolved} | Could not identify the person from the name alone |
-| \`unsupported\` | ${counts.unsupported} | Identified, but no pullable route exists for them |
-
-**${counts.resolved + counts.verify} of ${rows.length}** names produced a usable feed candidate.
+- **${rows.length}** sources wired (${SOCIAL_SOURCES.length} RSSHub/direct, ${YOUTUBE_SOURCES.length} YouTube)
+- **${rows.filter(r => r.state === 'verified').length}** handles verified by search
+- **${assumptions.length}** flagged \`assumption\` — **manual confirmation needed**
+- **${PARKED.length}** parked (see \`config/parking-lot.md\`)
+- **${xSources.length}** on X — wired and correct, but degraded on the free instance
 
 ---
 
-## Full mapping
+## Wired sources
 
-| # | Name | Platform | Handle | Category | Tier | Status | Local check |
-|---|---|---|---|---|---|---|---|
+| # | Name | Platform | Handle / route | Category | Tier | Handle |
+|---|---|---|---|---|---|---|
 ${rows.map((r, i) =>
-  `| ${i + 1} | ${r.person} | ${r.platform || '—'} | ${r.handle ? '`' + r.handle + '`' : '—'} | ${label(r.cat)} | ${r.tier} | \`${r.status}\` | ${r.agrees ? `agrees (${r.autoConfidence})` : `**differs** → ${label(r.autoCat)} (${r.autoConfidence})`} |`
+  `| ${i + 1} | ${r.person} | ${r.platform} | \`${r.ref}\` | ${label(r.category)} | ${r.tier} | ${r.state === 'verified' ? 'verified' : '**' + r.state + '**'} |`
 ).join('\n')}
 
 ---
 
-## Why each resolution
+## ⚠ Unverified — manual confirmation needed (${assumptions.length})
 
-${rows.map((r, i) => `**${i + 1}. ${r.person}** — \`${r.status}\`${r.platform ? ` · ${r.platform}${r.handle ? ` @${r.handle}` : ''}` : ''}
-: ${r.why}`).join('\n\n')}
+${assumptions.length ? assumptions.map(r =>
+  `### ${r.person} — ${r.platform} \`${r.ref}\`\n${r.note}\n`).join('\n') : 'None.'}
 
 ---
 
-## Needs your decision (${counts.verify + counts.unresolved + counts.unsupported})
+## How each handle was established
 
-### Handle is a best guess — a wrong one becomes a silently dead feed
-${byStatus('verify').map(r => `- **${r.person}** → ${r.platform} \`@${r.handle}\``).join('\n')}
+${rows.map(r => `**${r.person}** — \`${r.state}\` · ${r.platform} \`${r.ref}\`
+: ${r.note}`).join('\n\n')}
 
-### Could not identify
-${byStatus('unresolved').map(r => `- **${r.person}** — ${r.why}`).join('\n')}
+---
 
-### No pullable route exists
-${byStatus('unsupported').map(r => `- **${r.person}** — ${r.why}`).join('\n')}
+## Local categorization cross-check
+
+The keyword classifier runs independently of the category written in config.
+Disagreements are worth a look; agreement is a weak positive signal.
+
+${rows.filter(r => !r.agrees).length
+  ? rows.filter(r => !r.agrees).map(r => `- **${r.person}**: config says ${label(r.category)}, classifier says ${label(r.autoCat)} (${r.autoConfidence})`).join('\n')
+  : 'The classifier agrees with every wired category.'}
 
 ---
 
 ## Duplicate scan
 
-${dupes.length ? dupes.map(d => `- \`${d.kind}\` — ${d.a.person} / ${d.b.person} (${d.detail})`).join('\n') : 'No duplicates or overlaps detected across the roster.'}
+${dupes.length ? dupes.map(d => `- \`${d.kind}\` — ${d.a.person} / ${d.b.person} (${d.detail})`).join('\n') : 'No duplicates across route, handle or person.'}
 
 ---
 
 ## Category distribution
 
-| Category | Count | Names |
+| Category | Sources | Names |
 |---|---|---|
 ${CATEGORIES.map(c => {
-  const inCat = rows.filter(r => r.cat === c.id);
+  const inCat = rows.filter(r => r.category === c.id);
   return `| ${c.label} | ${inCat.length} | ${inCat.map(r => r.person).join(', ') || '—'} |`;
 }).join('\n')}
 
+${TOPIC_SOURCES?.length ? `
+## Topic sources (keyword radar)
+
+| Query | Platform | Category | Route |
+|---|---|---|---|
+${TOPIC_SOURCES.map(t => `| ${t.label} | ${t.platform} | ${label(t.category)} | \`${t.route}\` |`).join('\n')}
+` : ''}
+
 ---
 
-## Platform distribution
+## Parked — not wired (${PARKED.length})
 
-| Platform | Count | Pulls on the free public instance? |
+| Name | Category | Why |
 |---|---|---|
-| YouTube | ${rows.filter(r => r.platform === 'YouTube').length} | Yes — official Data API, needs \`YOUTUBE_API_KEY\` |
-| X | ${rows.filter(r => r.platform === 'X').length} | **No** — needs \`TWITTER_AUTH_TOKEN\` on the RSSHub instance. Degrades honestly. |
-| LinkedIn | ${rows.filter(r => r.platform === 'LinkedIn').length} | Company pages only; personal profiles are unsupported |
-| Instagram | ${rows.filter(r => r.platform === 'Instagram').length} | Rate-limited (\`antiCrawler\`) |
-| unresolved | ${rows.filter(r => !r.platform).length} | — |
+${PARKED.map(([n, c, w]) => `| ${n} | ${c} | ${w} |`).join('\n')}
+
+Full detail in \`config/parking-lot.md\`.
+
+---
+
+## X is the self-host trigger
+
+${xSources.length} sources are on X. Every handle is verified and every route is
+correct — they simply cannot pull on the free public RSSHub instance, because
+\`/twitter/*\` requires \`TWITTER_AUTH_TOKEN\` configured **on the RSSHub instance
+itself**, not in AetherHub. A shared public instance will not hold your token.
+
+They show as degraded in the source rail with their real HTTP status, and they
+start working the moment \`RSSHUB_BASE_URL\` points at a self-hosted instance
+with a token set. Nothing in the app needs to change.
+
+${xSources.map(r => `- ${r.person} — \`${r.ref}\` (${label(r.category)})`).join('\n')}
 `;
 
 writeFileSync(new URL('../config/source-map.md', import.meta.url), md);
 process.stdout.write(
-  `config/source-map.md written — ${rows.length} names: ` +
-  `${counts.resolved} resolved, ${counts.verify} to verify, ` +
-  `${counts.unresolved} unresolved, ${counts.unsupported} unsupported\n` +
-  `duplicates: ${dupes.length}\n`
+  `config/source-map.md — ${rows.length} wired ` +
+  `(${rows.filter(r => r.state === 'verified').length} verified, ${assumptions.length} assumption), ` +
+  `${PARKED.length} parked, ${dupes.length} duplicates, ${xSources.length} on X\n`
 );

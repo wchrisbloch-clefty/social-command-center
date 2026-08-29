@@ -64,24 +64,38 @@ function toSignal(video, source) {
   );
 }
 
-/** Latest uploads for one channel handle. Never throws — logs and returns []. */
+/**
+ * Latest uploads for one channel. Never throws — logs and returns [].
+ *
+ * Accepts EITHER `handle` (the @name, preferred and readable) or `channelId`
+ * (the raw UC… id). channelId exists because a channel's handle is not always
+ * discoverable: Michael Button's channel is confirmed but its @handle is not,
+ * and a guessed handle is a silently dead feed. An id that resolves beats a
+ * handle that reads nicely.
+ */
 async function channelVideos(source, key) {
   const limit = limitOf(source);
+  const ref = source.handle ? `@${source.handle}` : source.channelId;
   try {
+    if (!source.handle && !source.channelId) {
+      console.warn(`[youtube] ${source.label} has neither handle nor channelId`);
+      return { items: [], report: { label: source.label, platform: 'YouTube', category: source.category, ok: false, status: 0, error: 'no handle or channelId', count: 0 } };
+    }
+
     const chan = await ytGet('channels', {
       part: 'contentDetails,snippet',
-      forHandle: source.handle,
+      ...(source.handle ? { forHandle: source.handle } : { id: source.channelId }),
     }, key);
 
     const channel = chan.items?.[0];
     if (!channel) {
-      console.warn(`[youtube] @${source.handle} NOT FOUND`);
+      console.warn(`[youtube] ${ref} NOT FOUND — handle or id is wrong`);
       return { items: [], report: { label: source.label, platform: 'YouTube', category: source.category, ok: false, status: 404, error: 'channel not found', count: 0 } };
     }
 
     const uploadsId = channel.contentDetails?.relatedPlaylists?.uploads;
     if (!uploadsId) {
-      console.warn(`[youtube] @${source.handle} NO UPLOADS PLAYLIST`);
+      console.warn(`[youtube] ${ref} NO UPLOADS PLAYLIST`);
       return { items: [], report: { label: source.label, platform: 'YouTube', category: source.category, ok: false, status: 200, error: 'no uploads playlist', count: 0 } };
     }
 
@@ -96,7 +110,7 @@ async function channelVideos(source, key) {
       .filter(Boolean);
 
     if (!ids.length) {
-      console.warn(`[youtube] @${source.handle} EMPTY (0 uploads)`);
+      console.warn(`[youtube] ${ref} EMPTY (0 uploads)`);
       return { items: [], report: { label: source.label, platform: 'YouTube', category: source.category, ok: false, status: 200, error: 'empty', count: 0 } };
     }
 
@@ -106,7 +120,7 @@ async function channelVideos(source, key) {
 
     return { items, report: { label: source.label, platform: 'YouTube', category: source.category, ok: true, status: 200, count: items.length } };
   } catch (e) {
-    console.warn(`[youtube] @${source.handle} FAIL ${e?.message || e}`);
+    console.warn(`[youtube] ${ref} FAIL ${e?.message || e}`);
     return { items: [], report: { label: source.label, platform: 'YouTube', category: source.category, ok: false, status: 0, error: e?.message || 'error', count: 0 } };
   }
 }

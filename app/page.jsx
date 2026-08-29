@@ -1093,7 +1093,11 @@ function SourceHealth({ sources, youtubeNeedsKey }) {
           <div className="src-row" key={`${s.platform}-${s.label}-${i}`}>
             <span className={`src-dot ${s.ok ? 'ok' : 'fail'}`}/>
             <span className="src-name">{s.label}</span>
-            <span className="src-note">{s.ok ? `${s.count} items` : (s.error || `HTTP ${s.status}`)}</span>
+            <span className="src-note" title={s.limitation ? `Needs ${s.needs} on your RSSHub instance` : undefined}>
+              {s.ok ? `${s.count} items`
+                    : s.limitation ? `needs ${s.needs}`
+                    : (s.error || `HTTP ${s.status}`)}
+            </span>
           </div>
         ))}
       </div>
