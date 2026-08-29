@@ -278,7 +278,9 @@ async function loadSource(source) {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function GET(request) {
-  const category = request.nextUrl.searchParams.get('category');
+  // `general` is the everything view, not a bucket — see FeedView.
+  const raw = request.nextUrl.searchParams.get('category');
+  const category = raw === 'general' ? null : raw;
 
   // Topic sources are ordinary sources with a query instead of an account, so
   // they join the same fetch set rather than getting their own endpoint.

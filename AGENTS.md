@@ -43,3 +43,11 @@ render a clear state. Reserve 4xx/5xx for genuinely malformed requests.
 `/api/social`, `/api/youtube` and `/api/brief` all follow this. A console error
 fails the responsive audit, so a route that 500s on a fresh clone breaks the
 build.
+
+# Visual system
+
+**[`docs/DESIGN.md`](docs/DESIGN.md) governs surface, type and colour** — read it
+before styling anything. Hard rules: velocity and tier are WORDS never icons, no
+platform logos, no monospace, no glow/shadow/pulse, one typeface at two weights,
+and the only colours on screen are the eight muted category hues plus three
+velocity colours.

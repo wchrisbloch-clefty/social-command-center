@@ -1,36 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Archivo, Playfair_Display, Public_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-// Editorial type system, ported from MyNewsHub:
-//   Playfair Display — masthead only
-//   Archivo          — headlines, ranked numbers (heavy + tight)
-//   Inter            — body
-//   Public Sans      — meta: source, timestamp, ticker
+// One typeface, two weights. The serif (Playfair), the display face (Archivo)
+// and the meta face (Public Sans) are retired with the editorial theme — the
+// Signal Desk system is a single clean sans across the whole app.
 const inter = Inter({
   subsets: ["latin"],
+  weight: ["400", "500"],
   variable: "--font-inter",
-  display: "swap",
-});
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  weight: ["600", "700", "800", "900"],
-  variable: "--font-archivo",
-  display: "swap",
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["700", "900"],
-  variable: "--font-playfair",
-  display: "swap",
-});
-
-const publicSans = Public_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-public-sans",
   display: "swap",
 });
 
@@ -40,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#12558c",
+  themeColor: "#171717",
 };
 
 export default function RootLayout({
@@ -53,7 +31,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
-      className={`${inter.variable} ${archivo.variable} ${playfair.variable} ${publicSans.variable}`}
+      className={inter.variable}
     >
       <body>{children}</body>
     </html>

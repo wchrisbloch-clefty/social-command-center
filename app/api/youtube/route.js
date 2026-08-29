@@ -147,7 +147,9 @@ async function searchQuery(query, category, key) {
 
 export async function GET(request) {
   const key = process.env.YOUTUBE_API_KEY;
-  const category = request.nextUrl.searchParams.get('category');
+  // `general` is the everything view, not a bucket — see FeedView.
+  const raw = request.nextUrl.searchParams.get('category');
+  const category = raw === 'general' ? null : raw;
 
   // Graceful fallback: no key is a normal state, not an error. The app renders.
   if (!key) {

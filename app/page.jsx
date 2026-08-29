@@ -914,16 +914,6 @@ const categoryLabelOf = id => CATEGORIES.find(c => c.id === id)?.label || id;
 // Everything below renders from getFeed() → normalizeSignal(). No signal reaches
 // a card without a tier, because normalizeSignal is the only way in.
 
-const PLAT_VAR = {
-  LinkedIn:  'var(--ah-plat-linkedin)',
-  X:         'var(--ah-plat-x)',
-  Instagram: 'var(--ah-plat-instagram)',
-  YouTube:   'var(--ah-plat-youtube)',
-  Reddit:    'var(--ah-plat-reddit)',
-  TikTok:    'var(--ah-plat-tiktok)',
-};
-const platVar = p => PLAT_VAR[p] || 'var(--text3)';
-
 /** Fetches the feed for a category. Never throws — an error is a render state. */
 function useLiveFeed(category) {
   const [state, setState] = useState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, loading: true });
@@ -948,105 +938,46 @@ function useLiveFeed(category) {
   return { ...state, refresh: () => setNonce(n => n + 1) };
 }
 
-/** Tier + LIVE/MANUAL, on every card. Both are unconditional by construction. */
-function SignalBadges({ item, showSignal = false }) {
+/**
+ * One signal. Metadata line, headline, then velocity + tier as WORDS.
+ *
+ * No platform logo (platform is plain text), no thumbnail, no arrow, gauge or
+ * dot. Tier and velocity are unconditional — normalizeSignal guarantees both
+ * exist, so nothing here has to defend against a missing one.
+ */
+function SignalCard({ item, lead = false }) {
   return (
-    <span className="badge-row">
-      <span className={`badge badge-tier badge-${item.tier}`}>{item.tier}</span>
-      <span className={`badge ${item.live ? 'badge-live' : 'badge-manual'}`}>
-        {item.live ? 'Live' : 'Manual'}
-      </span>
-      <span className="badge badge-plat" style={{ '--plat': platVar(item.platform) }}>
-        {item.platform}
-      </span>
-      {showSignal && (
-        <span className={`badge badge-signal-${item.signal}`} style={{ border: '1px solid currentColor' }}>
-          {item.signal}
+    <button className={`signal${lead ? ' lead' : ''}`} data-cat={item.category}
+      onClick={() => openItem(item)}>
+      <span className="signal-main">
+        <span className="signal-meta">
+          <span className="cat-label" data-cat={item.category}>{categoryLabelOf(item.category)}</span>
+          <span>·</span><span>{item.sourceLabel}</span>
+          <span>·</span><span>{item.platform}</span>
+          <span>·</span><time dateTime={item.publishedAt}>{item.time}</time>
+          {item.topic && <><span>·</span><span>topic</span></>}
+          {!item.live && <><span>·</span><span>Manual</span></>}
         </span>
-      )}
-    </span>
-  );
-}
-
-function CardMeta({ item }) {
-  return (
-    <div className="gn-card-meta">
-      <span className="gn-card-source">{item.sourceLabel}</span>
-      <span>·</span>
-      <time dateTime={item.publishedAt}>{item.time}</time>
-      {item.engagement && <><span>·</span><span>{item.engagement}</span></>}
-    </div>
+        <span className="signal-head">{item.title}</span>
+        {lead && item.content && <span className="signal-desc">{item.content}</span>}
+      </span>
+      <span className="signal-side">
+        <span className={`vel vel-${item.signal}`}>{VELOCITY_WORD[item.signal]}</span>
+        <span className="tier">{TIER_WORD[item.tier]}</span>
+      </span>
+    </button>
   );
 }
 
 const openItem = item => { if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer'); };
 
-/** Top Stories — one row: hero (~53%) + a vertical rail of compact secondaries. */
-function TopStories({ lead, rail }) {
-  if (!lead) return null;
+/** The signal list. One component for the lead and the rest — same card. */
+function SignalList({ lead, items }) {
   return (
-    <div className="gn-grid">
-      <article className="gn-lead" onClick={() => openItem(lead)}>
-        {lead.thumbnail
-          ? <div className="gn-lead-img" style={{ backgroundImage:`url(${lead.thumbnail})` }}/>
-          : <div className="media-img-ph" style={{ aspectRatio:'16/10' }}>{lead.platform}</div>}
-        <div className="gn-lead-text">
-          <SignalBadges item={lead} showSignal/>
-          <h2 className="gn-lead-title" style={{ marginTop:8 }}>{lead.title}</h2>
-          {lead.content && <p className="gn-lead-desc">{lead.content}</p>}
-          <div className="gn-lead-meta">
-            <span className="gn-lead-source">{lead.sourceLabel}</span>
-            <span>·</span>
-            <time dateTime={lead.publishedAt}>{lead.time}</time>
-            {lead.engagement && <><span>·</span><span>{lead.engagement}</span></>}
-          </div>
-        </div>
-      </article>
-
-      <div className="gn-row">
-        {rail.map(item => (
-          <article key={item.id} className="gn-card" data-platform={item.platform}
-            style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
-            {item.thumbnail
-              ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
-              : <div className="gn-card-img is-empty">{item.platform}</div>}
-            <h3 className="gn-card-title">{item.title}</h3>
-            <div className="gn-card-meta">
-              <SignalBadges item={item}/>
-            </div>
-          </article>
-        ))}
-      </div>
+    <div className="signal-list">
+      {lead && <SignalCard item={lead} lead/>}
+      {items.map(i => <SignalCard key={i.id} item={i}/>)}
     </div>
-  );
-}
-
-/** Everything past the lead row, as a stacked card list. */
-function MoreStories({ items }) {
-  if (!items.length) return null;
-  return (
-    <>
-      <div className="section-head">
-        <span className="section-label">More Signal</span>
-        <span className="section-sub">{items.length} more</span>
-      </div>
-      <div className="gn-row" style={{ gap:18, marginBottom:28 }}>
-        {items.map(item => (
-          <article key={item.id} className="gn-card" data-platform={item.platform}
-            style={{ '--plat': platVar(item.platform) }} onClick={() => openItem(item)}>
-            {item.thumbnail
-              ? <div className="gn-card-img" style={{ backgroundImage:`url(${item.thumbnail})` }}/>
-              : <div className="gn-card-img is-empty">{item.platform}</div>}
-            <h3 className="gn-card-title">{item.title}</h3>
-            <div className="gn-card-meta">
-              <SignalBadges item={item}/>
-              <span>·</span>
-              <time dateTime={item.publishedAt}>{item.time}</time>
-            </div>
-          </article>
-        ))}
-      </div>
-    </>
   );
 }
 
@@ -1056,18 +987,17 @@ function LiveSignalRail({ items }) {
   if (!top.length) return null;
   return (
     <section className="sop-strip">
-      <div className="sop-head">
-        <span className="sop-label">Live Signal</span>
-      </div>
+      <div className="sop-head"><span className="sop-label">Live signal</span></div>
       <div className="sop-list">
         {top.map((item, i) => (
-          <button key={item.id} className="sop-item" onClick={() => openItem(item)}>
+          <button key={item.id} className="sop-item" data-cat={item.category}
+            onClick={() => openItem(item)}>
             <span className="sop-num">{String(i + 1).padStart(2, '0')}</span>
             <span className="sop-item-title">{item.title}</span>
             <span className="sop-item-meta">
-              <span className={`badge badge-tier badge-${item.tier}`}>{item.tier}</span>
-              <span className={`badge ${item.live ? 'badge-live' : 'badge-manual'}`}>{item.live ? 'Live' : 'Manual'}</span>
+              <span className="cat-label" data-cat={item.category}>{categoryLabelOf(item.category)}</span>
               <span className="sop-item-time">{item.sourceLabel} · {item.time}</span>
+              <span className={`vel vel-${item.signal}`}>{VELOCITY_WORD[item.signal]}</span>
             </span>
           </button>
         ))}
@@ -1325,7 +1255,11 @@ function RecommendedView() {
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function FeedView({ t, category, search, isMobile }) {
-  const { items, sources, degraded, youtubeNeedsKey, loading, refresh } = useLiveFeed(category);
+  // "General" is the everything page, not a bucket. After the roster landed,
+  // no source is filed under `general`, so treating it as a filter opened the
+  // app on an empty feed. Every other tab filters; General shows the lot.
+  const { items, sources, degraded, youtubeNeedsKey, loading, refresh } =
+    useLiveFeed(category === 'general' ? null : category);
 
   // Expose refresh to the masthead's refresh icon without threading it through
   // every view — the feed owns its own fetch, the nav just pokes it.
@@ -1350,7 +1284,7 @@ function FeedView({ t, category, search, isMobile }) {
     <div className="page-grid">
       <div className="feed-col">
         <div className="section-head">
-          <span className="section-label">Top Signal</span>
+          <span className="section-label">{category === 'general' ? 'All signal' : categoryLabelOf(category)}</span>
           <span className="section-sub">
             {loading ? 'Loading…' : `${visible.length} signal${visible.length === 1 ? '' : 's'}`}
             {degraded > 0 && ` · ${degraded} source${degraded === 1 ? '' : 's'} degraded`}
@@ -1378,8 +1312,7 @@ function FeedView({ t, category, search, isMobile }) {
           </div>
         )}
 
-        {!loading && lead && <TopStories lead={lead} rail={rail}/>}
-        {!loading && <MoreStories items={more}/>}
+        {!loading && lead && <SignalList lead={lead} items={[...rail, ...more]}/>}
       </div>
 
       <aside>
@@ -1912,8 +1845,8 @@ export default function AetherHub() {
       <main className="page">
         {view !== 'feed' && (
           <div style={{ display:'flex', alignItems:'baseline', gap:12, marginBottom:18 }}>
-            <h1 style={{ fontFamily:'var(--ah-archivo)', fontSize:22, fontWeight:800,
-                         color:'var(--text)', margin:0, letterSpacing:'-0.02em' }}>
+            <h1 style={{ fontSize:'var(--fs-title)', fontWeight:500,
+                         color:'var(--text)', margin:0, letterSpacing:'-0.01em' }}>
               {viewLabel[view]}
             </h1>
             <button onClick={() => setView('feed')}
