@@ -52,9 +52,9 @@ const BREAKPOINTS = [
 // the full matrix — the filter is unset there.
 const ONLY_BP = (process.env.AUDIT_BREAKPOINT || '').split(',').map(x => x.trim()).filter(Boolean);
 
-const VIEWS = ['feed', 'discover', 'intelligence', 'studio', 'alerts', 'sources', 'settings'];
+const VIEWS = ['feed', 'discover', 'recommended', 'intelligence', 'studio', 'alerts', 'sources', 'settings'];
 const VIEW_LABEL = {
-  discover: 'Discover', intelligence: 'Intelligence', studio: 'Studio',
+  discover: 'Discover', recommended: 'Recommended', intelligence: 'Intelligence', studio: 'Studio',
   alerts: 'Alerts', sources: 'Sources', settings: 'Settings',
 };
 

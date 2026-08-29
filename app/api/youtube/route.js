@@ -57,10 +57,11 @@ function toSignal(video, source) {
       thumbnail,
       bw:          (snippet?.tags || []).slice(0, 4),
       category:    source?.category,
+      subcategory: source?.subcategory || null,
       sourceLabel: source?.label || snippet?.channelTitle,
       live:        true,
     },
-    { platform: 'YouTube', category: source?.category, label: source?.label }
+    { platform: 'YouTube', category: source?.category, label: source?.label, subcategory: source?.subcategory || null }
   );
 }
 

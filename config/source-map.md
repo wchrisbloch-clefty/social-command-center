@@ -158,6 +158,17 @@ No duplicates across route, handle or person.
 | Ancient Mysteries | 5 | Annie Jacobsen, MrBallen, Jesse Michels, Timothy Alberino, Michael Button |
 
 
+## Topic sources (keyword radar)
+
+| Query | Platform | Category | Route |
+|---|---|---|---|
+| ERCOT | Reddit | Energy | `https://www.reddit.com/search.rss?q=ERCOT&sort=new&t=week` |
+| ERCOT on X | X | Energy | `/twitter/keyword/ERCOT` |
+| Multifamily RE | Reddit | Business & Markets | `https://www.reddit.com/search.rss?q=multifamily&sort=new&t=week` |
+| Covered calls | Reddit | Business & Markets | `https://www.reddit.com/r/thetagang/search.rss?q=covered+call&restrict_sr=1&sort=new` |
+| r/longevity | Reddit | Health | `https://www.reddit.com/r/longevity/hot/.rss` |
+| AI for BD | Reddit | AI & Tech | `https://www.reddit.com/search.rss?q=AI+sales+prospecting&sort=new&t=week` |
+
 
 ---
 

@@ -14,7 +14,7 @@
 // routes (Reddit) are unaffected — they never touch RSSHub.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { SOCIAL_SOURCES, limitOf } from '../../../config/sources.js';
+import { SOCIAL_SOURCES, TOPIC_SOURCES, limitOf } from '../../../config/sources.js';
 import { normalizeSignal } from '../../../lib/adapters.js';
 
 // GET handlers are dynamic by default since Next 15, but a live feed should say
@@ -230,7 +230,7 @@ async function loadSource(source) {
       items: [],
       report: {
         label: source.label, platform: source.platform, category: source.category,
-        ok: false, status: res.status, error: reason, count: 0,
+        ok: false, status: res.status, error: reason, count: 0, topic: Boolean(source.topic),
         // Distinguishes "this cannot work here" from "this broke". The UI shows
         // the first as a known limitation, not as a fault to go chase.
         ...(limit ? { limitation: true, needs: limit.needs } : {}),
@@ -263,14 +263,16 @@ async function loadSource(source) {
       thumbnail:   it.img,
       platform:    source.platform,
       category:    source.category,
+      subcategory: source.subcategory || null,
       sourceLabel: source.label,
+      topic:       Boolean(source.topic),
       live:        true, // it came off the wire this request
       // RSS carries no engagement numbers — normalizeSignal scores on recency.
     },
-    { platform: source.platform, category: source.category, label: source.label }
+    { platform: source.platform, category: source.category, label: source.label, subcategory: source.subcategory || null }
   ));
 
-  return { items, report: { label: source.label, platform: source.platform, category: source.category, ok: true, status: 200, count: items.length } };
+  return { items, report: { label: source.label, platform: source.platform, category: source.category, ok: true, status: 200, count: items.length, topic: Boolean(source.topic) } };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -278,9 +280,10 @@ async function loadSource(source) {
 export async function GET(request) {
   const category = request.nextUrl.searchParams.get('category');
 
-  const selected = category
-    ? SOCIAL_SOURCES.filter(s => s.category === category)
-    : SOCIAL_SOURCES;
+  // Topic sources are ordinary sources with a query instead of an account, so
+  // they join the same fetch set rather than getting their own endpoint.
+  const pool = [...SOCIAL_SOURCES, ...TOPIC_SOURCES];
+  const selected = category ? pool.filter(s => s.category === category) : pool;
 
   if (!selected.length) {
     return Response.json({ items: [], sources: [], base: baseUrl() });

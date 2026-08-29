@@ -152,7 +152,59 @@ export const SOCIAL_SOURCES = [
 // ═══════════════════════════════════════════════════════════════════════════
 //  TOPIC SOURCES — keyword/hashtag radar. Seeded in Part B.
 // ═══════════════════════════════════════════════════════════════════════════
-export const TOPIC_SOURCES = [];
+// A topic source pulls from a SEARCH or HASHTAG rather than an account. Same
+// shape as any other source plus `topic: true`, so it flows through the exact
+// same fetch → normalizeSignal → tier pipeline and needs no special-casing
+// anywhere downstream.
+//
+// ── ROUTE PATTERNS PER PLATFORM ──────────────────────────────────────────────
+//
+//  Reddit search — NATIVE RSS, no RSSHub, works free. The backbone here.
+//    https://www.reddit.com/search.rss?q=<query>&sort=new&t=week
+//    https://www.reddit.com/r/<sub>/search.rss?q=<q>&restrict_sr=1&sort=new
+//
+//  Instagram hashtag — RSSHub, no login, but antiCrawler: rate-limits hard.
+//    /instagram/2/tags/<hashtag>
+//
+//  X keyword — RSSHub, needs TWITTER_AUTH_TOKEN on the instance. Degrades on
+//  the free tier exactly like the X account sources.
+//    /twitter/keyword/<query>
+//
+//  YouTube search — official Data API, via TRACKED_QUERIES below rather than
+//  here, because it uses the API path instead of a feed URL.
+//
+// ASSUMPTION: every entry below is a seed for one of your money domains, chosen
+// to be a query that actually returns signal rather than noise. Tune the query
+// strings; the shape is what matters.
+export const TOPIC_SOURCES = [
+  // ── ERCOT / grid ──────────────────────────────────────────────────────────
+  { platform: 'Reddit', topic: true, query: 'ERCOT grid',
+    route: 'https://www.reddit.com/search.rss?q=ERCOT&sort=new&t=week',
+    label: 'ERCOT', category: 'energy', limit: 5 },
+  { platform: 'X', topic: true, query: 'ERCOT',
+    route: '/twitter/keyword/ERCOT',
+    label: 'ERCOT on X', category: 'energy', limit: 5 },
+
+  // ── Multifamily real estate ───────────────────────────────────────────────
+  { platform: 'Reddit', topic: true, query: 'multifamily real estate',
+    route: 'https://www.reddit.com/search.rss?q=multifamily&sort=new&t=week',
+    label: 'Multifamily RE', category: 'business', limit: 5 },
+
+  // ── Dividends / covered calls ─────────────────────────────────────────────
+  { platform: 'Reddit', topic: true, query: 'covered calls',
+    route: 'https://www.reddit.com/r/thetagang/search.rss?q=covered+call&restrict_sr=1&sort=new',
+    label: 'Covered calls', category: 'business', limit: 5 },
+
+  // ── Longevity ─────────────────────────────────────────────────────────────
+  { platform: 'Reddit', topic: true, query: 'longevity',
+    route: 'https://www.reddit.com/r/longevity/hot/.rss',
+    label: 'r/longevity', category: 'health', limit: 5 },
+
+  // ── AI for business development ───────────────────────────────────────────
+  { platform: 'Reddit', topic: true, query: 'AI sales prospecting',
+    route: 'https://www.reddit.com/search.rss?q=AI+sales+prospecting&sort=new&t=week',
+    label: 'AI for BD', category: 'tech', limit: 5 },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  YOUTUBE — official Data API v3, NOT RSSHub. Left on its own path on purpose.

@@ -14,6 +14,7 @@ import {
 
 import { getFeed } from '../lib/adapters.js';
 import { CATEGORIES, DEFAULT_CATEGORY } from '../config/sources.js';
+import { groupByCategory, velocitySummary, WINDOW_OPTIONS, DEFAULT_WINDOW_HOURS, VELOCITY_WORD } from '../lib/velocity.js';
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
@@ -137,6 +138,7 @@ const DEFAULT_CIRCLE = {
 const NAV_TABS = [
   { id:'feed',         label:'Feed',         icon:<Zap size={16}/>         },
   { id:'discover',     label:'Discover',     icon:<Compass size={16}/>     },
+  { id:'recommended',  label:'Recommended',  icon:<Users size={16}/>       },
   { id:'intelligence', label:'Intelligence', icon:<Brain size={16}/>       },
   { id:'studio',       label:'Studio',       icon:<FileText size={16}/>    },
   { id:'alerts',       label:'Alerts',       icon:<Bell size={16}/>        },
@@ -905,6 +907,9 @@ function RightPanel({ t, activeFilter, setActiveFilter }) {
   );
 }
 
+const TIER_WORD = { mainstream: 'Verified', street: 'Alt. perspective' };
+const categoryLabelOf = id => CATEGORIES.find(c => c.id === id)?.label || id;
+
 // ─── LIVE FEED PLUMBING ───────────────────────────────────────────────────────
 // Everything below renders from getFeed() → normalizeSignal(). No signal reaches
 // a card without a tier, because normalizeSignal is the only way in.
@@ -1105,6 +1110,219 @@ function SourceHealth({ sources, youtubeNeedsKey }) {
   );
 }
 
+// ─── DISCOVER (B1) ────────────────────────────────────────────────────────────
+// "What's spiking in MY world" — every source, ranked by the velocity the
+// pipeline already assigned, grouped by category. Ranking lives in
+// lib/velocity.js and is shared with the Sports drill-down; there is deliberately
+// no second velocity implementation.
+
+/** The whole feed, unfiltered by category — Discover ranks across everything. */
+function useAllSignals() {
+  const [state, setState] = useState({ items: [], sources: [], loading: true, youtubeNeedsKey: false });
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    const ac = new AbortController();
+    let alive = true;
+    setState(s => ({ ...s, loading: true }));
+    getFeed({ signal: ac.signal })
+      .then(r => { if (alive) setState({ ...r, loading: false }); })
+      .catch(e => {
+        console.warn('[discover] getFeed failed', e?.message);
+        if (alive) setState({ items: [], sources: [], loading: false, youtubeNeedsKey: false });
+      });
+    return () => { alive = false; ac.abort(); };
+  }, [nonce]);
+  return { ...state, refresh: () => setNonce(n => n + 1) };
+}
+
+function VelocityRow({ item }) {
+  return (
+    <button className="vrow" onClick={() => openItem(item)}>
+      <span className="vrow-main">
+        <span className="vrow-meta">
+          <span className="cat-label" data-cat={item.category}>{categoryLabelOf(item.category)}</span>
+          <span>·</span><span>{item.sourceLabel}</span>
+          <span>·</span><span>{item.platform}</span>
+          <span>·</span><time dateTime={item.publishedAt}>{item.time}</time>
+          {item.topic && <><span>·</span><span>topic</span></>}
+        </span>
+        <span className="vrow-title">{item.title}</span>
+      </span>
+      <span className="vrow-side">
+        <span className={`vel vel-${item.signal}`}>{VELOCITY_WORD[item.signal]}</span>
+        <span className="tier">{TIER_WORD[item.tier]}</span>
+      </span>
+    </button>
+  );
+}
+
+function DiscoverView() {
+  const { items, loading, refresh } = useAllSignals();
+  const [windowHours, setWindowHours] = useState(DEFAULT_WINDOW_HOURS);
+
+  const groups = groupByCategory(items, { windowHours, perCategory: 6 });
+  const summary = velocitySummary(items, windowHours);
+
+  useEffect(() => {
+    window.__aetherRefreshFeed = refresh;
+    return () => { delete window.__aetherRefreshFeed; };
+  }, [refresh]);
+
+  return (
+    <div className="stack">
+      <div className="view-head">
+        <div className="view-head-text">
+          <h2 className="view-title">Discover</h2>
+          <p className="view-sub">
+            {loading
+              ? 'Ranking your sources…'
+              : `${summary.total} signals in the last ${windowHours}h · ${summary.high} High · ${summary.rising} Rising`}
+          </p>
+        </div>
+        <div className="seg" role="group" aria-label="Time window">
+          {WINDOW_OPTIONS.map(w => (
+            <button key={w.hours}
+              className={`seg-btn${windowHours === w.hours ? ' active' : ''}`}
+              aria-pressed={windowHours === w.hours}
+              onClick={() => setWindowHours(w.hours)}>{w.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <div className="empty-note">Ranking your sources…</div>}
+
+      {!loading && !groups.length && (
+        <div className="empty-note">
+          <strong>Nothing in the last {windowHours}h.</strong>
+          <div style={{ marginTop: 8 }}>
+            Widen the window, or check the source list — every source may be degraded.
+          </div>
+        </div>
+      )}
+
+      {groups.map(g => (
+        <section key={g.id} className="vgroup">
+          <div className="section-head">
+            <span className="cat-label" data-cat={g.id}>{g.label}</span>
+            <span className="section-sub">
+              {g.total} signal{g.total === 1 ? '' : 's'}
+              {g.high ? ` · ${g.high} High` : ''}{g.rising ? ` · ${g.rising} Rising` : ''}
+            </span>
+          </div>
+          <div className="vlist">
+            {g.items.map(i => <VelocityRow key={i.id} item={i}/>)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+// ─── RECOMMENDED TO FOLLOW (B3) ───────────────────────────────────────────────
+function RecommendedView() {
+  const [state, setState] = useState({ recommendations: [], limits: [], mined: null, loading: true });
+  const [added, setAdded] = useState({});
+  const [busy, setBusy] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/recommend', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { if (alive) setState({ ...d, loading: false }); })
+      .catch(e => {
+        console.warn('[recommend] fetch failed', e?.message);
+        if (alive) setState({ recommendations: [], limits: ['Could not mine recommendations.'], mined: null, loading: false });
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const add = async rec => {
+    setBusy(rec.key);
+    try {
+      const r = await fetch('/api/sources', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: rec.platform, handle: rec.handle, label: rec.display,
+          category: rec.category, person: rec.display.replace(/^@/, ''), reason: rec.reason,
+        }),
+      });
+      const result = await r.json();
+      setAdded(a => ({ ...a, [rec.key]: result }));
+    } catch {
+      setAdded(a => ({ ...a, [rec.key]: { added: false, message: 'Request failed.' } }));
+    }
+    setBusy(null);
+  };
+
+  const { recommendations, limits, loading } = state;
+
+  return (
+    <div className="stack">
+      <div className="view-head">
+        <div className="view-head-text">
+          <h2 className="view-title">Recommended to follow</h2>
+          <p className="view-sub">
+            Accounts your sources keep pointing at that you do not follow yet,
+            ranked by how many of your sources reference each.
+          </p>
+        </div>
+      </div>
+
+      {limits?.length > 0 && (
+        <div className="note-block">
+          <strong>What this could see</strong>
+          <ul>{limits.map((l, i) => <li key={i}>{l}</li>)}</ul>
+        </div>
+      )}
+
+      {loading && <div className="empty-note">Mining your feed for referenced accounts…</div>}
+
+      {!loading && !recommendations.length && (
+        <div className="empty-note">
+          <strong>No candidates yet.</strong>
+          <div style={{ marginTop: 8 }}>
+            This mines co-mentions out of the feed your own sources produced, so it
+            needs a populated feed to work from. With YouTube unconfigured and X
+            degraded on the free instance, there is very little text to read.
+          </div>
+        </div>
+      )}
+
+      <div className="rec-list">
+        {recommendations.map(rec => {
+          const res = added[rec.key];
+          return (
+            <div className="rec" key={rec.key}>
+              <div className="rec-main">
+                <div className="rec-name">{rec.display}</div>
+                <div className="rec-meta">
+                  <span className="cat-label" data-cat={rec.category}>{categoryLabelOf(rec.category)}</span>
+                  <span>·</span><span>{rec.platform}</span>
+                  <span>·</span><span>{rec.pointingCount} of your sources referenced this</span>
+                </div>
+                <div className="rec-why">
+                  {rec.pointingSources.slice(0, 3).join(', ')}
+                  {rec.pointingSources.length > 3 ? ` +${rec.pointingSources.length - 3} more` : ''}
+                </div>
+              </div>
+              <div className="rec-action">
+                {res?.added ? <span className="rec-ok">Added</span>
+                  : res?.duplicate ? <span className="rec-note">Already following</span>
+                  : res?.readOnly ? <span className="rec-note">Read-only — copy the line</span>
+                  : !rec.handle ? <span className="rec-note">No handle</span>
+                  : <button className="btn-primary" disabled={busy === rec.key} onClick={() => add(rec)}>
+                      {busy === rec.key ? 'Adding…' : 'Add to Follow'}
+                    </button>}
+              </div>
+              {res?.readOnly && <pre className="rec-line">{res.line}</pre>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function FeedView({ t, category, search, isMobile }) {
   const { items, sources, degraded, youtubeNeedsKey, loading, refresh } = useLiveFeed(category);
@@ -1172,7 +1390,7 @@ function FeedView({ t, category, search, isMobile }) {
   );
 }
 
-function DiscoverView({ t, setActiveFilter, onNav }) {
+function LegacyDiscoverView({ t, setActiveFilter, onNav }) {
   const [query,      setQuery]      = useState('');
   const [results,    setResults]    = useState(null);
   const [searching,  setSearching]  = useState(false);
@@ -1673,6 +1891,7 @@ export default function AetherHub() {
   const viewLabel = {
     feed:'Feed', discover:'Discover', intelligence:'Intelligence',
     studio:'Content Studio', alerts:'Alerts', sources:'Sources', settings:'Settings',
+    recommended:'Recommended',
   };
 
   return (
@@ -1707,7 +1926,8 @@ export default function AetherHub() {
         )}
 
         {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}/>}
-        {view === 'discover'     && <DiscoverView     t={t} setActiveFilter={setActiveFilter} onNav={setView}/>}
+        {view === 'discover'     && <DiscoverView/>}
+        {view === 'recommended'  && <RecommendedView/>}
         {view === 'intelligence' && <IntelligenceView t={t}/>}
         {view === 'studio'       && <StudioView       t={t} isMobile={isMobile}/>}
         {view === 'alerts'       && <AlertsView       t={t}/>}
