@@ -28,8 +28,8 @@ device slightly wider than the target still gets the right layout.
 
 ### mobile — 390px
 
-- **Masthead wraps to two rows.** Row 1: logo + controls. Row 2: the category
-  nav, full width, scrolling edge to edge.
+- **Masthead is two rows.** Row 1: logo + controls. Row 2: the category nav,
+  full width, scrolling edge to edge.
 - **Category nav is full-width and horizontally scrollable.** All seven tabs
   render; the strip scrolls to reach the ones past the fold.
 - **Feed is one column.** `.page-grid` collapses; the Live Signal rail moves
@@ -42,8 +42,7 @@ device slightly wider than the target still gets the right layout.
 
 ### iPad — 820px
 
-- **Masthead still two rows** — seven tabs plus six controls do not fit one row
-  until ~1100px. All seven tabs are visible without scrolling.
+- **Masthead two rows**, all categories visible without scrolling.
 - **Search reappears** (hidden only below 720px).
 - **Feed is still one column**; the rail is still below.
 - **Hero image is capped.** 16/10 across a 772px column is ~480px tall and
@@ -52,9 +51,8 @@ device slightly wider than the target still gets the right layout.
 
 ### desktop — 1280px+
 
-- **Masthead is one row**: logo · seven tabs · controls.
-- **Between 1101–1400px tab padding tightens** to 10px. At exactly 1280 the
-  seventh tab ("Pop Culture") clips otherwise.
+- **Masthead is two rows**, same as every other breakpoint: identity +
+  controls, then the category nav full-width. All categories visible, no scroll.
 - **Feed is two columns**: `.page-grid` at `2.1fr 1fr` — story column ~68%,
   Live Signal rail ~32%.
 - **Top Stories is hero + rail**: `.gn-grid` at `53% 1fr` — a large lead card
@@ -84,8 +82,16 @@ inside an ancestor with `overflow-x: auto | scroll | hidden` — a tab strip is
 > cards. This exact bug blew Studio's column out to 407px inside a 358px page.
 
 ### 3. No collapsed nav or tab strip
-`.nav-tabs` must be ≥240px wide, must render all seven category tabs, no tab may
-have zero width, and if the strip overflows it must scroll.
+`.nav-tabs` must be ≥240px wide, must render every category tab (count comes
+from `CATEGORIES`), no tab may have zero width, and if the strip overflows it
+must scroll. **At desktop it must not overflow at all** — every category has to
+be visible without scrolling under a pointer.
+
+> The masthead is therefore **two rows at every width**: identity + controls,
+> then the category nav across the full container. It was briefly one row on
+> desktop; adding an eighth category clipped the last tab by 127px at 1280px
+> while the strip still technically scrolled, so nothing failed and the category
+> simply looked absent.
 
 > This rule exists because it already happened. `.nav-tabs` is `flex: 1` between
 > two `flex-shrink: 0` siblings, so when the masthead ran out of room the tab

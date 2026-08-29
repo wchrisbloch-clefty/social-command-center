@@ -80,6 +80,10 @@ export const CATEGORIES = [
   { id: 'sports',     label: 'Sports'             },
   { id: 'health',     label: 'Health'             },
   { id: 'popculture', label: 'Pop Culture'        },
+  // ASSUMPTION: 'Ancient Mysteries' covers lost civilisations, archaeology,
+  // anomalous history, UAP/fringe science and unexplained-story creators — the
+  // cluster that has no home in the other seven.
+  { id: 'ancient',    label: 'Ancient Mysteries'   },
 ];
 
 export const CATEGORY_IDS = CATEGORIES.map(c => c.id);
@@ -160,6 +164,7 @@ export const TRACKED_QUERIES = {
   sports:     [],
   health:     ['longevity research'],
   popculture: [],
+  ancient:    [],
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -234,8 +234,21 @@ function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
       violations.push({ rule: 'nav-collapsed', detail: `${zero.length} category tab(s) have zero width` });
     }
     // The strip may scroll, but every tab must be reachable by scrolling it.
-    if (strip.scrollWidth > strip.clientWidth + 1 && !['auto', 'scroll'].includes(getComputedStyle(strip).overflowX)) {
+    const overflows = strip.scrollWidth > strip.clientWidth + 1;
+    if (overflows && !['auto', 'scroll'].includes(getComputedStyle(strip).overflowX)) {
       violations.push({ rule: 'nav-collapsed', detail: '.nav-tabs overflows but does not scroll — tabs are unreachable' });
+    }
+    // On a pointer breakpoint every category must be visible without scrolling.
+    // Adding an eighth category ("Ancient Mysteries") clipped the last tab by
+    // 127px at 1280px while the strip still technically scrolled, so nothing
+    // failed and the category looked absent. A hidden tab is a broken nav.
+    if (!touch && overflows) {
+      const last = tabs[tabs.length - 1];
+      violations.push({
+        rule: 'nav-collapsed',
+        detail: `.nav-tabs needs ${strip.scrollWidth}px but has ${strip.clientWidth}px at a pointer breakpoint — ` +
+                `"${last ? last.textContent.trim() : '?'}" is cut off`,
+      });
     }
   }
 

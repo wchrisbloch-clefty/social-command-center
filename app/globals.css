@@ -278,69 +278,37 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STATUS STRIP — one slim row: live flag · market ticker · weather chip
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-.topbar-wrap { position: sticky; top: 0; z-index: 300; }
-
-.status-strip {
-  height: 38px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border2);
-  font-family: var(--ah-publicsans);
-}
-.status-strip-inner {
-  max-width: 1400px; margin: 0 auto; height: 100%;
-  display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s4);
-}
-.ss-flag {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  font-size: 10px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: 0.09em; border: none; background: none;
-  font-family: inherit; padding: 0;
-}
-.ss-flag-markets { color: var(--text3); cursor: default; }
-.ss-flag-live    { color: var(--red); cursor: default; }
-.ss-pulse {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--red);
-  animation: ss-pulse 1.8s ease-out infinite;
-}
-@keyframes ss-pulse {
-  0%   { box-shadow: 0 0 0 0   rgba(200,16,46,0.5); }
-  70%  { box-shadow: 0 0 0 6px rgba(200,16,46,0); }
-  100% { box-shadow: 0 0 0 0   rgba(200,16,46,0); }
-}
-.ss-ticker {
-  flex: 1; min-width: 0; overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
-}
-.ss-ticker-inner { display: flex; align-items: center; gap: var(--s4); overflow-x: auto; scrollbar-width: none; }
-.ss-ticker-inner::-webkit-scrollbar { display: none; }
-.ss-tk { display: inline-flex; align-items: baseline; gap: 6px; flex-shrink: 0; white-space: nowrap; }
-.ss-tk-sym { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: var(--text3); text-transform: uppercase; }
-.ss-tk-val { font-size: 12px; font-weight: 600; color: var(--text); }
-.ss-tk-chg { font-size: var(--fs-meta); font-weight: 700; }
-.ss-tk-chg.up   { color: var(--pos); }
-.ss-tk-chg.down { color: var(--neg); }
-.ss-wx { flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--text2); }
-.ss-wx-temp { font-weight: 700; color: var(--text); }
-
-/* ═══════════════════════════════════════════════════════════════════════════
    MASTHEAD + CATEGORY NAV — editorial rule, serif logo, BBC-clean tabs
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Sticky wrapper. Previously declared alongside the market/weather ticker; that
+   strip was demo data with no adapter behind it and has been deleted, but the
+   masthead still has to stay pinned. */
+.topbar-wrap { position: sticky; top: 0; z-index: 300; }
 
 .nav-bar {
   background: var(--surface);
   border-top: 3px solid var(--accent);
   border-bottom: 1px solid var(--border);
 }
+/* Two rows at EVERY width: identity + controls, then the category nav across
+   the full container.
+
+   This used to be mobile-only, with desktop cramming everything into one row.
+   That did not survive an eighth category: at 1280px the strip got 676px for
+   803px of tabs and clipped "Ancient Mysteries" by 127px — reachable only by
+   scrolling a strip that does not look scrollable. Giving the nav its own row
+   means the tabs get the whole 1400px, every breakpoint behaves identically,
+   and a ninth category will not break it either. */
 .nav-bar-inner {
   max-width: 1400px; margin: 0 auto;
-  display: flex; align-items: center; gap: 0;
-  height: 54px; padding: 0 var(--s4);
+  display: flex; align-items: center; flex-wrap: wrap;
+  padding: 0;
 }
-.logo-wrap { flex-shrink: 0; line-height: 1; padding-right: 20px; border-right: 1px solid var(--border); }
+.logo-wrap {
+  flex: 1 1 auto; min-width: 0; line-height: 1;
+  padding: 10px 0 10px var(--s4);
+}
 .logo {
   font-family: var(--ah-serif); font-size: 20px; font-weight: 900;
   color: var(--text); letter-spacing: -0.5px; line-height: 1;
@@ -351,8 +319,14 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; margin-top: 2px;
 }
 
-/* Section tabs: no box, strong underline on active */
-.nav-tabs { display: flex; gap: 0; flex: 1; overflow-x: auto; scrollbar-width: none; }
+/* Section tabs: no box, strong underline on active. Own row, full width. */
+.nav-tabs {
+  display: flex; gap: 0;
+  order: 2; flex: 1 0 100%;
+  overflow-x: auto; scrollbar-width: none;
+  border-top: 1px solid var(--border2);
+  padding: 0 var(--s4);
+}
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-tab {
   background: transparent; border: none; color: var(--text3);
@@ -366,8 +340,9 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 .nav-tab:hover:not(.active) { color: var(--text2); }
 
 .nav-right {
-  display: flex; gap: 8px; align-items: center; flex-shrink: 0;
-  padding-left: var(--s3); border-left: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center;
+  order: 1; flex: 0 0 auto;
+  padding-right: var(--s4);
 }
 .search-input {
   background: var(--surface2); border: 1px solid var(--border); color: var(--text);
@@ -628,52 +603,12 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* The masthead is the whole layout's tightest constraint: below ~1100px a
-   single row cannot hold the logo, seven category tabs and six controls.
-   `.nav-right` is flex-shrink:0, so what actually gave was `.nav-tabs` —
-   it collapsed to 0px and the category nav disappeared entirely on mobile
-   while the controls pushed the document 62px past the viewport.
-
-   Fix: wrap to two rows. Identity + controls on the first, the category nav
-   full-width on the second, where it has the whole viewport to scroll in. */
+/* Layout collapses below the desktop breakpoint. The masthead is already
+   two-row at every width (see .nav-bar-inner above), so only the page grid and
+   the taller touch tabs are breakpoint-specific here. */
 @media (max-width: 1100px) {
   .page-grid { grid-template-columns: 1fr; gap: var(--s4); }
-
-  /* No horizontal padding on the wrapper: each row insets itself, so the tab
-     strip reaches the viewport edge WITHOUT a negative margin. Nothing here is
-     wider than its parent, so nothing needs clipping to look correct — which
-     keeps the geometry audit able to see this region at all. */
-  .nav-bar-inner { flex-wrap: wrap; height: auto; padding: 0; }
-
-  .logo-wrap {
-    border-right: none;
-    padding: 10px 0 10px var(--s4);
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .nav-right {
-    order: 1;
-    border-left: none;
-    padding-left: 0;
-    padding-right: var(--s4);
-    flex: 0 0 auto;
-  }
-
-  .nav-tabs {
-    order: 2;
-    flex: 1 0 100%;
-    border-top: 1px solid var(--border2);
-    padding: 0 var(--s4);
-  }
   .nav-tab { height: 46px; }
-}
-
-/* 1101–1400px: single row, but the tab strip is within a few pixels of
-   clipping its last tab. Buy the space back from tab padding. */
-@media (min-width: 1101px) and (max-width: 1400px) {
-  .nav-tab { padding: 0 10px; }
-  .search-input { width: 104px; }
 }
 
 @media (max-width: 1024px) {
@@ -685,7 +620,6 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 
 @media (max-width: 720px) {
   .page { padding: 18px var(--s3); }
-  .status-strip-inner { padding: 0 var(--s3); }
   .logo-wrap { padding-left: var(--s3); }
   .nav-right { padding-right: var(--s3); }
   .nav-tabs { padding: 0 var(--s3); }

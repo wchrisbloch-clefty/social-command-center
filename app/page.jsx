@@ -1571,50 +1571,9 @@ function SettingsView({ t, dark, onDark, isMobile }) {
 //   1. status strip  — live flag · market ticker · weather chip
 //   2. nav bar       — serif logo · category tabs w/ active underline · controls
 
-// ASSUMPTION: the ticker and weather are still placeholders. AetherHub has no
-// markets or weather adapter, and inventing numbers would contradict the
-// "label all fabricated data" rule — so the strip is badged DEMO and carries
-// the same values the old dashboard showed.
-const TICKER_DEMO = [
-  { sym:'S&P 500', val:'5,842.91', chg:'+0.42%', up:true  },
-  { sym:'NASDAQ',  val:'19,218.17', chg:'+0.68%', up:true  },
-  { sym:'DOW',     val:'43,870.35', chg:'-0.11%', up:false },
-  { sym:'BTC',     val:'97,412',    chg:'+1.84%', up:true  },
-  { sym:'10Y',     val:'4.28%',     chg:'-0.03',  up:false },
-];
-
-function StatusStrip({ liveCount }) {
-  return (
-    <div className="status-strip">
-      <div className="status-strip-inner">
-        {liveCount > 0
-          ? <span className="ss-flag ss-flag-live"><span className="ss-pulse"/>Live</span>
-          : <span className="ss-flag ss-flag-markets">Markets</span>}
-        <div className="ss-ticker">
-          <div className="ss-ticker-inner">
-            {TICKER_DEMO.map(tk => (
-              <span className="ss-tk" key={tk.sym}>
-                <span className="ss-tk-sym">{tk.sym}</span>
-                <span className="ss-tk-val tnum">{tk.val}</span>
-                <span className={`ss-tk-chg tnum ${tk.up ? 'up' : 'down'}`}>{tk.chg}</span>
-              </span>
-            ))}
-            <span className="ss-tk"><span className="ss-tk-sym">demo data</span></span>
-          </div>
-        </div>
-        <span className="ss-wx">
-          <span className="ss-wx-temp tnum">72°</span>
-          <span>Houston</span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav, liveCount }) {
+function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav }) {
   return (
     <div className="topbar-wrap">
-      <StatusStrip liveCount={liveCount}/>
       <div className="nav-bar">
         <div className="nav-bar-inner">
           <div className="logo-wrap">
@@ -1723,7 +1682,6 @@ export default function AetherHub() {
         onSearch={setSearch}
         onRefresh={() => window.__aetherRefreshFeed?.()}
         onNav={setView}
-        liveCount={view === 'feed' ? 1 : 0}
       />
 
       {view !== 'feed' && <SectionNav view={view} onNav={setView} alertCount={unreadAlerts}/>}

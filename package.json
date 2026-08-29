@@ -12,7 +12,8 @@
     "voice:sync": "node scripts/sync-voice.mjs",
     "test:pg": "node --test packages/voice-profile/test/postgres-integration.test.ts",
     "probe:rsshub": "node scripts/probe-rsshub.mjs",
-    "audit:responsive": "node scripts/responsive-audit.mjs"
+    "audit:responsive": "node scripts/responsive-audit.mjs",
+    "sources:map": "node scripts/build-source-map.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
