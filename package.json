@@ -15,7 +15,8 @@
     "audit:responsive": "node scripts/responsive-audit.mjs",
     "sources:map": "node scripts/build-source-map.mjs",
     "categories:verify": "node scripts/verify-categories.mjs",
-    "verify:pacing": "node scripts/verify-reddit-pacing.mjs"
+    "verify:pacing": "node scripts/verify-reddit-pacing.mjs",
+    "sources:resolve": "node scripts/resolve-sources.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

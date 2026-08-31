@@ -124,7 +124,10 @@ export const SOCIAL_SOURCES = [
 
   // ═══ BUSINESS & MARKETS ═══════════════════════════════════════════════════
   { platform: 'X', person: 'Jeff Immelt',   route: '/twitter/user/JeffImmelt',   label: '@JeffImmelt',   category: 'business', limit: 5 },
-  { platform: 'X', person: 'John Chambers', route: '/twitter/user/JohnTChambers', label: '@JohnTChambers', category: 'business', limit: 5 },
+  // Re-sorted business → tech: Chambers is a technology-industry figure
+  // (Cisco chairman emeritus, JC2 Ventures backing tech companies), not a
+  // generalist markets commentator.
+  { platform: 'X', person: 'John Chambers', route: '/twitter/user/JohnTChambers', label: '@JohnTChambers', category: 'tech', limit: 5 },
   { platform: 'X', person: 'Eddie Donmez',  route: '/twitter/user/eddiedonmez',  label: '@eddiedonmez',  category: 'business', limit: 5 },
 
   // ═══ HEALTH ═══════════════════════════════════════════════════════════════
@@ -233,10 +236,11 @@ export const YOUTUBE_SOURCES = [
   { platform: 'YouTube', person: 'MrBallen',          handle: 'MrBallen',            label: 'MrBallen',              category: 'ancient',  limit: 4 },
   { platform: 'YouTube', person: 'Jesse Michels',     handle: 'JesseMichels',        label: 'American Alchemy',      category: 'ancient',  limit: 4 },
   { platform: 'YouTube', person: 'Timothy Alberino',  handle: 'TimothyAlberino',     label: 'Timothy Alberino',      category: 'ancient',  limit: 3 },
-  // ASSUMPTION: Button's channel ("Ancient History BA", ~200K subs) resolves to
-  // channel id UCRDZ_t_-uHLsz_Otq6iOgyg; I could not confirm an @handle for it.
-  // channelId is supported alongside handle precisely for this case.
-  { platform: 'YouTube', person: 'Michael Button',    channelId: 'UCRDZ_t_-uHLsz_Otq6iOgyg', label: 'Michael Button', category: 'ancient', limit: 3 },
+  // Resolved by search: youtube.com/@MichaelButton1 ("Ancient History BA",
+  // ~250K subs). This REPLACES an earlier channelId guess that was never
+  // confirmed. Identity is now solid; content-verification runs via
+  // `npm run sources:resolve` once YOUTUBE_API_KEY is available.
+  { platform: 'YouTube', person: 'Michael Button',    handle: 'MichaelButton1',      label: 'Michael Button',        category: 'ancient',  limit: 3 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
