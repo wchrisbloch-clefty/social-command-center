@@ -8,9 +8,15 @@
 
 import { SOCIAL_SOURCES, YOUTUBE_SOURCES } from '../../../config/sources.js';
 import { mineRecommendations } from '../../../lib/recommend.js';
+import { ttlCache, wantsFresh } from '../../../lib/ttl-cache.js';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Co-mention mining reads the whole feed, so a cold call pays /api/social's
+// ~20s pacing bill. Who your sources reference does not change in five minutes.
+// `?fresh=1` bypasses it.
+const cache = ttlCache('recommend', 5 * 60 * 1000);
 
 async function localJson(request, path) {
   // Reuse our own routes rather than duplicating fetch logic, so a change to
@@ -27,6 +33,11 @@ async function localJson(request, path) {
 }
 
 export async function GET(request) {
+  if (!wantsFresh(request)) {
+    const hit = cache.get('all');
+    if (hit) return Response.json({ ...hit.value, cachedAt: hit.cachedAt, ageSeconds: hit.ageSeconds });
+  }
+
   try {
     const [social, youtube] = await Promise.all([
       localJson(request, '/api/social'),
@@ -54,11 +65,12 @@ export async function GET(request) {
 
     if (!recommendations.length) console.warn('[recommend] mined 0 candidates from', items.length, 'items');
 
-    return Response.json({
-      recommendations,
-      mined: { items: items.length, sources: sources.length },
-      limits,
-    });
+    const payload = { recommendations, mined: { items: items.length, sources: sources.length }, limits };
+    // Only cache an answer that actually saw the feed. Caching a degraded empty
+    // result would keep showing "nothing to recommend" for five minutes after
+    // the upstream recovered.
+    if (items.length) cache.set('all', payload);
+    return Response.json({ ...payload, cachedAt: null, ageSeconds: 0 });
   } catch (err) {
     console.warn(`[recommend] EXCEPTION ${err?.message}`);
     return Response.json({ recommendations: [], mined: { items: 0, sources: 0 }, limits: ['Recommendation mining failed.'] });

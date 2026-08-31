@@ -25,7 +25,7 @@ import {
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
 // `T` reads those tokens rather than carrying hex literals, so the whole app —
-// all seven views, not just the feed — retheme from one file and the dark-mode
+// all eleven views, not just the feed — retheme from one file and the dark-mode
 // toggle is a single data-theme swap on <html> instead of a JS branch.
 //
 // Both entries are identical because the CSS vars already resolve per theme.
@@ -78,14 +78,6 @@ const MOCK_POSTS = {
   ],
 };
 
-const TRENDING = {
-  LinkedIn:  [{ tag:'#AIProductivity',   v:'12.4K', d:'+31%' },{ tag:'#FutureOfWork',    v:'9.1K',  d:'+18%' },{ tag:'#LeadershipMindset',v:'7.8K', d:'+9%'  },{ tag:'#B2BGrowth',      v:'5.3K', d:'+14%' }],
-  X:         [{ tag:'#BuildInPublic',    v:'31.2K', d:'+44%' },{ tag:'#AIStrategy',       v:'22.8K', d:'+61%' },{ tag:'#CreatorEconomy',   v:'18.4K',d:'+27%' },{ tag:'#IndieHacker',    v:'9.7K', d:'+13%' }],
-  Instagram: [{ tag:'#ContentCreator',  v:'28.1K', d:'+22%' },{ tag:'#BrandIdentity',    v:'14.7K', d:'+11%' },{ tag:'#AestheticFeed',    v:'11.2K',d:'+6%'  },{ tag:'#ReelTrends',     v:'8.4K', d:'+19%' }],
-  YouTube:   [{ tag:'#LongFormContent', v:'19.3K', d:'+16%' },{ tag:'#PodcastClips',      v:'14.1K', d:'+29%' },{ tag:'#ScienceExplained', v:'11.8K',d:'+12%' },{ tag:'#TechReview',     v:'8.6K', d:'+7%'  }],
-  TikTok:    [{ tag:'#ForYouPage',      v:'89.2K', d:'+72%' },{ tag:'#TikTokMadeMeDoIt', v:'41K',   d:'+35%' },{ tag:'#FYP',              v:'64.1K',d:'+18%' },{ tag:'#ViralVideo',     v:'29K',  d:'+41%' }],
-};
-
 const ALERTS = [
   { id:'a1', sev:'critical', msg:'@lexfridman post gaining +890% velocity on YouTube — viral opportunity window open now', time:'2m ago',  plat:'YouTube',  read:false },
   { id:'a2', sev:'high',     msg:'Keyword "AI strategy" spiking +61% on X — 22.8K mentions in last hour',                time:'8m ago',  plat:'X',        read:false },
@@ -101,36 +93,6 @@ const CONTENT_IDEAS = [
   { id:'ci3', hook:'POV: Day 1 vs Day 365 of building in public — what changed',       plat:'Instagram', trend:'#BuildInPublic',  score:88 },
   { id:'ci4', hook:"I analyzed 100 viral creator posts. Here's the single pattern",    plat:'YouTube',   trend:'#CreatorEconomy', score:85 },
   { id:'ci5', hook:'Uncomfortable truth about personal brand that nobody talks about', plat:'TikTok',    trend:'#ForYouPage',     score:82 },
-];
-
-// ─── NEW DATA ─────────────────────────────────────────────────────────────────
-const TOPIC_AREAS = [
-  { id:'ai',      label:'AI & Technology',    icon:'🤖', color:'#6366F1', mentions:847,  delta:'+31%', pos:true,  keywords:['AI','AGI','OpenAI','productivity','technology','machine'] },
-  { id:'biz',     label:'Business & Strategy', icon:'💼', color:'#22D3EE', mentions:423,  delta:'+18%', pos:true,  keywords:['founders','startups','growth','SaaS','revenue','strategy'] },
-  { id:'creator', label:'Creator Economy',    icon:'🎨', color:'#F0609E', mentions:612,  delta:'+44%', pos:true,  keywords:['creator','content','viral','brand','reel','audience'] },
-  { id:'finance', label:'Finance & Markets',  icon:'📈', color:'#10B981', mentions:289,  delta:'+9%',  pos:true,  keywords:['investing','market','crypto','money','stocks','finance'] },
-  { id:'sports',  label:'Sports & Culture',   icon:'🏆', color:'#F59E0B', mentions:156,  delta:'+7%',  pos:true,  keywords:['sports','NFL','NBA','football','basketball','culture'] },
-];
-
-const KEYWORD_TRENDS = {
-  football: [{ tag:'#CollegeFootball',v:'89.2K',d:'+44%',plat:'X' },{ tag:'#NFLDraft',v:'41.3K',d:'+28%',plat:'X' },{ tag:'#SEC',v:'23.1K',d:'+19%',plat:'X' },{ tag:'#CFB',v:'18.7K',d:'+33%',plat:'YouTube' }],
-  kentucky: [{ tag:'#BigBlueNation',v:'12.4K',d:'+67%',plat:'X' },{ tag:'#Wildcats',v:'8.9K',d:'+42%',plat:'Instagram' },{ tag:'#SEC',v:'23.1K',d:'+19%',plat:'X' },{ tag:'#KentuckyFootball',v:'5.2K',d:'+89%',plat:'X' }],
-  ai:       [{ tag:'#AIStrategy',v:'22.8K',d:'+61%',plat:'LinkedIn' },{ tag:'#ChatGPT',v:'45.1K',d:'+18%',plat:'X' },{ tag:'#MachineLearning',v:'31.2K',d:'+24%',plat:'YouTube' },{ tag:'#BuildWithAI',v:'9.8K',d:'+52%',plat:'X' }],
-  crypto:   [{ tag:'#Bitcoin',v:'112.4K',d:'+18%',plat:'X' },{ tag:'#Ethereum',v:'67.2K',d:'+12%',plat:'X' },{ tag:'#DeFi',v:'23.1K',d:'+29%',plat:'X' },{ tag:'#Web3',v:'18.9K',d:'+14%',plat:'LinkedIn' }],
-  startup:  [{ tag:'#BuildInPublic',v:'31.2K',d:'+44%',plat:'X' },{ tag:'#IndieHacker',v:'9.7K',d:'+13%',plat:'X' },{ tag:'#SaaS',v:'14.1K',d:'+22%',plat:'LinkedIn' },{ tag:'#Founder',v:'19.3K',d:'+16%',plat:'LinkedIn' }],
-  nba:      [{ tag:'#NBA',v:'67.2K',d:'+22%',plat:'X' },{ tag:'#NBAPlayoffs',v:'41.3K',d:'+38%',plat:'X' },{ tag:'#Basketball',v:'28.1K',d:'+14%',plat:'Instagram' }],
-  nfl:      [{ tag:'#NFL',v:'89.2K',d:'+18%',plat:'X' },{ tag:'#NFLDraft',v:'41.3K',d:'+28%',plat:'X' },{ tag:'#SuperBowl',v:'23.1K',d:'+12%',plat:'Instagram' }],
-  creator:  [{ tag:'#CreatorEconomy',v:'18.4K',d:'+27%',plat:'X' },{ tag:'#ContentCreator',v:'28.1K',d:'+22%',plat:'Instagram' },{ tag:'#ForYouPage',v:'89.2K',d:'+72%',plat:'TikTok' },{ tag:'#BuildInPublic',v:'31.2K',d:'+44%',plat:'X' }],
-  sports:   [{ tag:'#Sports',v:'44.1K',d:'+12%',plat:'X' },{ tag:'#NFL',v:'89.2K',d:'+18%',plat:'X' },{ tag:'#NBA',v:'67.2K',d:'+22%',plat:'X' },{ tag:'#CollegeFootball',v:'89.2K',d:'+44%',plat:'X' }],
-  tech:     [{ tag:'#TechNews',v:'31.2K',d:'+19%',plat:'X' },{ tag:'#AIStrategy',v:'22.8K',d:'+61%',plat:'LinkedIn' },{ tag:'#TechReview',v:'8.6K',d:'+7%',plat:'YouTube' },{ tag:'#BuildWithAI',v:'9.8K',d:'+52%',plat:'X' }],
-};
-
-const RECOMMENDED = [
-  { id:'r1', title:"Sam Altman on AGI timelines — 4hr conversation",  platform:'YouTube',  author:'lexfridman',     stat:'312K views',     signal:'high'  },
-  { id:'r2', title:"$2.1M ARR with no employees — full breakdown",     platform:'X',        author:'levelsio',       stat:'987 reposts',    signal:'high'  },
-  { id:'r3', title:"The Science of Deep Focus — neurochemistry guide", platform:'YouTube',  author:'andrewhuberman', stat:'48K views',      signal:'rising'},
-  { id:'r4', title:"Microsoft AI workflow — what's actually changing", platform:'LinkedIn', author:'satyanadella',   stat:'4.2K reactions', signal:'high'  },
-  { id:'r5', title:"Founder to $1M ARR — the uncomfortable truth",    platform:'LinkedIn', author:'reidhoffman',    stat:'2.8K reactions', signal:'rising'},
 ];
 
 const DEFAULT_CIRCLE = {
@@ -165,39 +127,10 @@ function useWindowSize() {
   return w;
 }
 
-function fmt(n) {
-  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
-  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
-  return String(n);
-}
-
 function sigColor(sig) {
   if (sig==='high')   return { c:'#10B981', bg:'rgba(16,185,129,0.12)',  label:'HIGH'    };
   if (sig==='rising') return { c:'#F59E0B', bg:'rgba(245,158,11,0.12)',  label:'RISING'  };
   return                     { c:'#52525B', bg:'rgba(82,82,91,0.1)',     label:'MODERATE'};
-}
-
-function searchTrending(query) {
-  if (!query.trim()) return null;
-  const q = query.toLowerCase();
-  const matchKey = Object.keys(KEYWORD_TRENDS).find(k => q.includes(k) || k.includes(q.split(' ')[0]));
-  if (matchKey) return KEYWORD_TRENDS[matchKey];
-  const tagMatches = Object.values(TRENDING).flat().filter(t => t.tag.toLowerCase().includes(q));
-  if (tagMatches.length) return tagMatches;
-  const bwMatches = Object.entries(MOCK_POSTS).flatMap(([plat, posts]) =>
-    posts.filter(p => p.content.toLowerCase().includes(q) || p.bw?.some(w => w.toLowerCase().includes(q)))
-      .flatMap(p => (p.bw||[]).map(w => ({ tag:`#${w}`, v:'—', d:'trending', plat })))
-  );
-  return bwMatches.length ? [...new Map(bwMatches.map(x=>[x.tag,x])).values()] : [];
-}
-
-function postsForFilter(filter) {
-  if (!filter) return Object.entries(MOCK_POSTS).flatMap(([plat,ps])=>ps.map(p=>({...p,platform:plat})));
-  const f = filter.replace('#','').toLowerCase();
-  return Object.entries(MOCK_POSTS).flatMap(([plat,ps]) =>
-    ps.filter(p => p.content.toLowerCase().includes(f) || p.bw?.some(w=>w.toLowerCase().includes(f)) || p.author.toLowerCase().includes(f))
-      .map(p=>({...p,platform:plat}))
-  );
 }
 
 // ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
@@ -310,27 +243,6 @@ function PostCard({ post, platform, t, bookmarks, onBookmark, compact }) {
             {copied?<Check size={9}/>:<Copy size={9}/>}{copied?'Copied!':'Copy post'}
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function TopicCard({ topic, t, active, onClick }) {
-  return (
-    <div onClick={onClick} style={{ borderRadius:16, padding:'15px 16px', background:active?`${topic.color}14`:t.card, border:`1px solid ${active?topic.color+'55':t.border}`, cursor:'pointer', transition:'all 0.18s', position:'relative', overflow:'hidden' }}
-      onMouseEnter={e=>{ if (!active) e.currentTarget.style.borderColor=topic.color+'40'; }}
-      onMouseLeave={e=>{ if (!active) e.currentTarget.style.borderColor=t.border; }}>
-      <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg, ${topic.color}, transparent)`, opacity:active?1:0.5 }}/>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
-        <span style={{ fontSize:18 }}>{topic.icon}</span>
-        <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:'rgba(16,185,129,0.12)', color:'#10B981', display:'flex', alignItems:'center', gap:2 }}>
-          <ArrowUpRight size={9}/>{topic.delta}
-        </span>
-      </div>
-      <div style={{ fontSize:20, fontWeight:800, color:t.text, letterSpacing:'-0.02em', marginBottom:2 }}>{fmt(topic.mentions)}</div>
-      <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
-        <span style={{ fontSize:11, color:t.textSub, fontWeight:600 }}>{topic.label}</span>
-        <DemoChip compact/>
       </div>
     </div>
   );
@@ -822,94 +734,6 @@ function MorningDigest({ t }) {
         );
       })}
       {!loading && !bullets.length && <p style={{ fontSize:11, color:t.textSub }}>Loading intelligence…</p>}
-    </div>
-  );
-}
-
-// ─── RIGHT PANEL ──────────────────────────────────────────────────────────────
-function RightPanel({ t, activeFilter, setActiveFilter }) {
-  const allBuzz = [...new Set(Object.values(MOCK_POSTS).flatMap(p=>p.flatMap(x=>x.bw||[])))];
-  const topTrending = Object.entries(TRENDING).flatMap(([plat,items])=>items.map(item=>({...item,plat}))).sort((a,b)=>parseFloat(b.d)-parseFloat(a.d)).slice(0,8);
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      {/* Trending Now */}
-      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-          <Flame size={13} style={{ color:'#EF4444' }}/>
-          <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Trending Now</span>
-          <DemoChip compact style={{ marginLeft:'auto' }}/>
-        </div>
-        {topTrending.map((item,i)=>{
-          const cfg = PLAT[item.plat];
-          const isActive = activeFilter===item.tag;
-          return (
-            <div key={i} onClick={()=>setActiveFilter(isActive?null:item.tag)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 0', borderBottom:`1px solid ${t.border}`, cursor:'pointer', transition:'opacity 0.15s' }}
-              onMouseEnter={e=>e.currentTarget.style.opacity='0.75'}
-              onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-              <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                <span style={{ fontSize:10, color:t.textMuted, width:18, textAlign:'center', fontWeight:700 }}>#{i+1}</span>
-                <div>
-                  <div style={{ fontSize:11, fontWeight:700, color:isActive?'#818CF8':cfg?.color||t.text }}>{item.tag}</div>
-                  <div style={{ fontSize:9, color:t.textSub, display:'flex', alignItems:'center', gap:3 }}>
-                    <span style={{ color:cfg?.color }}>{cfg?.icon}</span>{item.v}
-                  </div>
-                </div>
-              </div>
-              <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{item.d}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Buzzwords */}
-      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <Hash size={13} style={{ color:'#6366F1' }}/>
-            <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Buzzwords</span>
-            <DemoChip compact/>
-          </div>
-          {activeFilter && <button onClick={()=>setActiveFilter(null)} style={{ fontSize:9, padding:'2px 7px', borderRadius:5, background:'rgba(99,102,241,0.15)', color:'#818CF8', border:'none', cursor:'pointer' }}>Clear ×</button>}
-        </div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-          {allBuzz.slice(0,18).map((w,i)=>{
-            const active = activeFilter===w || activeFilter===`#${w}`;
-            return (
-              <button key={i} onClick={()=>setActiveFilter(active?null:w)}
-                style={{ fontSize:10, padding:'3px 9px', borderRadius:20, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'#6366F1':'rgba(99,102,241,0.2)'}`, background:active?'rgba(99,102,241,0.18)':'rgba(99,102,241,0.05)', color:active?'#A5B4FC':'#818CF8', transition:'all 0.15s' }}>
-                {w}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Recommended Viewings */}
-      <div style={{ background:t.card, border:`1px solid ${t.border}`, borderRadius:16, padding:16 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:12 }}>
-          <Star size={13} style={{ color:'#F59E0B' }}/>
-          <span style={{ fontSize:11, fontWeight:700, color:t.text, textTransform:'uppercase', letterSpacing:'0.05em' }}>Recommended</span>
-          <DemoChip compact style={{ marginLeft:'auto' }}/>
-        </div>
-        {RECOMMENDED.map(item=>{
-          const cfg = PLAT[item.platform];
-          const sig = sigColor(item.signal);
-          return (
-            <div key={item.id} style={{ marginBottom:9, padding:'10px 11px', borderRadius:12, background:t.glass, border:`1px solid ${t.border}`, cursor:'pointer', transition:'all 0.18s' }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg?.border||t.borderMid; e.currentTarget.style.background=t.raised; }}
-              onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.glass; }}>
-              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
-                <span style={{ color:cfg?.color }}>{cfg?.icon}</span>
-                <span style={{ fontSize:9, fontWeight:700, color:cfg?.color }}>{item.platform}</span>
-                <span style={{ fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4, background:sig.bg, color:sig.c, marginLeft:'auto' }}>{sig.label}</span>
-              </div>
-              <p style={{ fontSize:11, fontWeight:600, color:t.text, lineHeight:1.4, marginBottom:4 }}>{item.title}</p>
-              <div style={{ fontSize:10, color:t.textSub }}>@{item.author} · {item.stat}</div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -1792,133 +1616,6 @@ function FeedView({ t, category, search, isMobile }) {
   );
 }
 
-function LegacyDiscoverView({ t, setActiveFilter, onNav }) {
-  const [query,      setQuery]      = useState('');
-  const [results,    setResults]    = useState(null);
-  const [searching,  setSearching]  = useState(false);
-  const [activePlat, setActivePlat] = useState('all');
-  const inputRef = useRef(null);
-
-  useEffect(()=>{
-    if (!query.trim()) { setResults(null); setSearching(false); return; }
-    setSearching(true);
-    const id = setTimeout(()=>{ setResults(searchTrending(query)); setSearching(false); }, 350);
-    return ()=>clearTimeout(id);
-  }, [query]);
-
-  const allTrending = Object.entries(TRENDING).flatMap(([plat,items])=>items.map(item=>({...item,plat}))).sort((a,b)=>parseFloat(b.d)-parseFloat(a.d));
-  const displayed   = activePlat==='all' ? allTrending : allTrending.filter(x=>x.plat===activePlat);
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
-      <div style={{ position:'relative' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 18px', borderRadius:14, border:`1px solid ${query?'#6366F1':t.borderMid}`, background:t.card, transition:'all 0.2s', boxShadow:query?'0 0 0 3px rgba(99,102,241,0.1)':'none' }}>
-          <Search size={18} style={{ color:query?'#6366F1':t.textSub, flexShrink:0 }}/>
-          <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)}
-            placeholder="Search topics, hashtags — e.g. 'kentucky football', 'AI strategy', 'crypto', 'creator'…"
-            style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:14, color:t.text, fontFamily:'inherit' }}/>
-          {searching && <RefreshCw size={14} style={{ color:t.textSub, animation:'spin 1s linear infinite', flexShrink:0 }}/>}
-          {query && !searching && <button onClick={()=>{setQuery('');setResults(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:t.textSub, display:'flex' }}><X size={14}/></button>}
-        </div>
-        {results !== null && query && (
-          <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, right:0, borderRadius:14, background:t.surface, border:`1px solid ${t.borderMid}`, boxShadow:'0 20px 60px rgba(0,0,0,0.45)', zIndex:50, padding:18 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:t.textSub, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:12 }}>
-              Top trending for &ldquo;{query}&rdquo;
-            </div>
-            {results.length > 0 ? (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
-                {results.slice(0,10).map((item,i)=>{
-                  const cfg = PLAT[item.plat];
-                  return (
-                    <button key={i} onClick={()=>{ setActiveFilter(item.tag); setQuery(''); setResults(null); onNav('feed'); }}
-                      style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, padding:'7px 13px', borderRadius:20, border:`1px solid ${cfg?.border||t.border}`, background:cfg?.bg||t.glass, color:cfg?.color||t.text, cursor:'pointer', transition:'all 0.15s' }}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
-                      onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      {cfg?.icon}{item.tag}
-                      <span style={{ fontSize:10, color:'#10B981', fontWeight:700 }}>{item.d}</span>
-                      {item.v!=='—' && <span style={{ fontSize:10, color:t.textSub }}>{item.v}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p style={{ fontSize:12, color:t.textSub }}>No trending topics found for &ldquo;{query}&rdquo;. Try: football, ai, crypto, startup, creator, nba, nfl</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
-        <button onClick={()=>setActivePlat('all')} style={{ fontSize:11, fontWeight:700, padding:'6px 14px', borderRadius:20, cursor:'pointer', border:`1px solid ${activePlat==='all'?'#6366F1':t.border}`, background:activePlat==='all'?'rgba(99,102,241,0.12)':t.glass, color:activePlat==='all'?'#818CF8':t.textSub }}>
-          All Platforms
-        </button>
-        {Object.entries(PLAT).map(([plat,cfg])=>(
-          <button key={plat} onClick={()=>setActivePlat(plat)} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700, padding:'6px 12px', borderRadius:20, cursor:'pointer', border:`1px solid ${activePlat===plat?cfg.color:t.border}`, background:activePlat===plat?cfg.bg:t.glass, color:activePlat===plat?cfg.color:t.textSub }}>
-            <span style={{ color:cfg.color }}>{cfg.icon}</span>{plat}
-          </button>
-        ))}
-      </div>
-
-      <div>
-        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-          <TrendingUp size={14} style={{ color:'#EF4444' }}/>
-          Trending {activePlat==='all'?'Everywhere':`on ${activePlat}`} — click any topic to filter your feed
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:10 }}>
-          {displayed.map((item,i)=>{
-            const cfg = PLAT[item.plat];
-            return (
-              <div key={i} onClick={()=>{ setActiveFilter(item.tag); onNav('feed'); }}
-                style={{ borderRadius:14, padding:'13px 16px', background:t.card, border:`1px solid ${t.border}`, display:'flex', alignItems:'center', gap:12, cursor:'pointer', transition:'all 0.18s' }}
-                onMouseEnter={e=>{ e.currentTarget.style.borderColor=cfg?.border||t.borderMid; e.currentTarget.style.transform='translateY(-1px)'; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.transform='none'; }}>
-                <div style={{ fontSize:18, fontWeight:800, color:t.textMuted, width:28, flexShrink:0, textAlign:'center' }}>#{i+1}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
-                    <span style={{ color:cfg?.color }}>{cfg?.icon}</span>
-                    <span style={{ fontSize:12, fontWeight:700, color:cfg?.color||t.text }}>{item.tag}</span>
-                  </div>
-                  <div style={{ fontSize:10, color:t.textSub }}>{item.v} mentions · <span style={{ fontWeight:700, color:'#10B981' }}>{item.d}</span></div>
-                </div>
-                <ChevronRight size={13} style={{ color:t.textMuted }}/>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ fontSize:12, fontWeight:700, color:t.text, marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-          <Layers size={14} style={{ color:'#6366F1' }}/>Explore by Topic Area
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:10 }}>
-          {TOPIC_AREAS.map(topic=>(
-            <div key={topic.id} onClick={()=>{ setActiveFilter(topic.keywords[0]); onNav('feed'); }}
-              style={{ borderRadius:14, padding:'14px 15px', background:t.card, border:`1px solid ${t.border}`, cursor:'pointer', transition:'all 0.18s', position:'relative', overflow:'hidden' }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor=topic.color+'55'; e.currentTarget.style.background=`${topic.color}08`; }}
-              onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=t.card; }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:`linear-gradient(90deg,${topic.color},transparent)` }}/>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <span style={{ fontSize:20 }}>{topic.icon}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <DemoChip compact/>
-                  <span style={{ fontSize:10, fontWeight:700, color:'#10B981' }}>{topic.delta}</span>
-                </div>
-              </div>
-              <div style={{ fontSize:13, fontWeight:700, color:t.text, marginBottom:6 }}>{topic.label}</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                {topic.keywords.slice(0,3).map((kw,i)=>(
-                  <span key={i} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:`${topic.color}12`, color:topic.color, border:`1px solid ${topic.color}30`, fontWeight:600 }}>{kw}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function IntelligenceView({ t }) {
   const [activePlat, setActivePlat] = useState('LinkedIn');
   return (
@@ -2192,8 +1889,17 @@ function SettingsView({ t, dark, onDark, isMobile }) {
 
 // ─── TOP BAR ──────────────────────────────────────────────────────────────────
 // Two stacked rows, MyNewsHub's masthead:
-//   1. status strip  — live flag · market ticker · weather chip
-//   2. nav bar       — serif logo · category tabs w/ active underline · controls
+//   1. nav bar     — logo · category tabs with an active underline · controls
+//   2. section nav — the view switcher
+//
+// It is two rows AT EVERY WIDTH, not only on mobile. One row was tried and the
+// category strip clipped the eighth category by 127px at 1280px while still
+// scrolling, so nothing failed and nothing was visibly wrong. See
+// docs/RESPONSIVE.md.
+//
+// There is no status strip. An earlier design had one carrying a market ticker
+// and a weather chip; both were fabricated, so the row was deleted rather than
+// kept behind a DEMO DATA badge.
 
 function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav }) {
   return (

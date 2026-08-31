@@ -8,9 +8,14 @@
 
 import { suggestCategories } from '../../../lib/themes.js';
 import { CATEGORIES } from '../../../config/categories.js';
+import { ttlCache, wantsFresh } from '../../../lib/ttl-cache.js';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// A week-long theme window is the slowest question the app asks, and answering
+// it re-reads the entire feed. Ten minutes. `?fresh=1` bypasses it.
+const cache = ttlCache('suggest-categories', 10 * 60 * 1000);
 
 async function localJson(request, path) {
   try {
@@ -27,6 +32,13 @@ async function localJson(request, path) {
 export async function GET(request) {
   const windowHours = Number(request.nextUrl.searchParams.get('window')) || 168;
   const dismissed = (request.nextUrl.searchParams.get('dismissed') || '').split(',').filter(Boolean);
+
+  // Both inputs change the answer, so both are part of the key.
+  const key = `${windowHours}|${dismissed.slice().sort().join(',')}`;
+  if (!wantsFresh(request)) {
+    const hit = cache.get(key);
+    if (hit) return Response.json({ ...hit.value, cachedAt: hit.cachedAt, ageSeconds: hit.ageSeconds });
+  }
 
   try {
     const [social, youtube] = await Promise.all([
@@ -57,11 +69,14 @@ export async function GET(request) {
 
     console.warn(`[suggest] mined ${suggestions.length} suggestions from ${items.length} items over ${windowHours}h`);
 
-    return Response.json({
+    const payload = {
       suggestions,
       mined: { items: items.length, windowHours, sourcesOk: okSources, sourcesDegraded: degraded },
       limits,
-    });
+    };
+    // As in /api/recommend: never cache an answer mined from nothing.
+    if (items.length) cache.set(key, payload);
+    return Response.json({ ...payload, cachedAt: null, ageSeconds: 0 });
   } catch (err) {
     console.warn(`[suggest] EXCEPTION ${err?.message}`);
     return Response.json({ suggestions: [], mined: { items: 0 }, limits: ['Theme extraction failed.'] });

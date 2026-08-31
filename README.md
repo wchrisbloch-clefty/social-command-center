@@ -13,25 +13,29 @@ Next 16.2.6 · React 19.2.4 · Tailwind 4 · deployed on Vercel.
 
 ## Current state — read this first
 
-**The Feed is live. The other six views are still fabricated.**
+**Seven of eleven views are live. Four still render mock data.**
 
-The Feed pulls real posts from Instagram, LinkedIn, X and Reddit through
-RSSHub, plus YouTube through its official Data API — see *Social ingestion*
-below. Every signal on it carries a tier badge (`mainstream` / `street`) and a
-`LIVE` badge, and the right rail names any source that failed and why.
+Live, reading the real feed: **Feed, Discover, Recommended, Categories, Sports,
+Sports (team drill-down)**, and the source-health rail. They pull real posts
+from Instagram, LinkedIn, X and Reddit through RSSHub, plus YouTube through its
+official Data API — see *Social ingestion* below. Every signal carries a tier
+badge (`mainstream` / `street`), and any source that failed is named with its
+reason rather than hidden.
 
-Discover, Intelligence, Studio, Alerts, Sources and Settings still render mock
-data checked into `app/page.jsx`. That is a deliberate stage, not an oversight,
-and the UI says so: fabricated numbers carry a visible amber `DEMO DATA` marker.
-The market ticker in the status strip is fabricated too and is labelled as such.
-The rule is written down in BRAND.md §7.8 so it holds for components that do not
-exist yet.
+Still fabricated: **Intelligence, Studio, Alerts, Sources**. That is a
+deliberate stage, not an oversight, and the UI says so — fabricated numbers
+carry a visible amber `DEMO DATA` marker. The rule is written down in BRAND.md
+§7.8 so it holds for components that do not exist yet.
+
+The status strip that carried a market ticker and a weather chip is **gone**.
+Both were fabricated, and a row whose entire content is invented is better
+deleted than badged.
 
 What is real:
 
 | Area | State |
 |---|---|
-| UI shell, navigation, all seven views | Working, responsive, deployed |
+| UI shell, navigation, all eleven views | Working, responsive, deployed |
 | **Feed — live social signal** | **Working.** RSSHub + YouTube Data API, category-filtered |
 | `/api/social` — Instagram, LinkedIn, X, Reddit | Working. Fails soft per source |
 | `/api/youtube` — official Data API v3 | Working. Needs `YOUTUBE_API_KEY`, degrades without it |
@@ -39,7 +43,11 @@ What is real:
 | `/api/extract` — URL/article/YouTube ingest | Working |
 | Design tokens (editorial palette, Tailwind `@theme`) | Landed. Drives every view via `data-theme` |
 | `packages/voice-profile` | Built and tested. **Not wired into the app** |
-| Trend / alert / ticker data | Fabricated, labeled |
+| Discover / Recommended / Sports — velocity ranking | Working. Real feed, `lib/velocity.js` |
+| Categories — add, rename, recolor, merge, delete, reorder | Working. `/api/categories` is the one writer |
+| `/api/recommend`, `/api/suggest-categories` | Working. Advisory only; both cached in-process |
+| `lib/source-resolver.js` + `npm run sources:resolve` | Working. Verify-then-wire; needs `YOUTUBE_API_KEY` |
+| Intelligence / Studio / Alerts / Sources data | Fabricated, labeled |
 | Voice UI (Settings → Voice) | Not built. Step 3 |
 | Auth | None. Single-tenant by design |
 
@@ -115,7 +123,7 @@ a crash that prints nothing would otherwise look like success.
 **[`docs/RESPONSIVE.md`](docs/RESPONSIVE.md) is the layout contract — read it
 before touching a view.** Mobile-first is a hard requirement and it is enforced,
 not advisory: `npm run audit:responsive` drives a real Chromium across
-**3 breakpoints × 2 themes × 7 views = 42 cases** and fails CI on horizontal
+**3 breakpoints × 2 themes × 11 views = 66 cases** and fails CI on horizontal
 overflow, an element wider than its parent, a collapsed nav/tab strip, a
 sub-34px tap target at a touch breakpoint, or a console error.
 

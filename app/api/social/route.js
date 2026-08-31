@@ -22,6 +22,14 @@ import { normalizeSignal } from '../../../lib/adapters.js';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// Pacing Reddit at ~1.1s means a cold full feed takes ~20s for 18 subreddits.
+// That is fine, but it must be ALLOWED to take that long: Vercel's default
+// function timeout is shorter, and a killed function returns nothing and caches
+// nothing, so the next load starts cold and dies the same way.
+// Hobby caps at 10s regardless of this value — see DEADLINE_MS below, which is
+// what actually keeps the response honest on a short-timeout host.
+export const maxDuration = 60;
+
 // ASSUMPTION: the free public instance is the starting point, per the
 // "prove it free before self-hosting" phase. One env var moves it.
 const DEFAULT_BASE = 'https://rsshub.app';
@@ -52,17 +60,110 @@ function baseUrl() {
   return raw.replace(/\/+$/, ''); // tolerate a trailing slash in the env var
 }
 
-// A real browser UA. Default/bot agents get 403'd by Reddit and by Cloudflare in
-// front of rsshub.app — this is the same lesson the news feed proxy already learned.
+// A real browser UA. Default/bot agents get 403'd by Cloudflare in front of
+// rsshub.app — the same lesson the news feed proxy already learned.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
            '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-const FEED_HEADERS = {
-  'User-Agent': UA,
-  'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, application/json, */*',
-  'Accept-Language': 'en-US,en;q=0.9',
-};
+
+// Reddit is the exception, and it wants the OPPOSITE of a browser UA.
+// Reddit's API rules ask for a descriptive, uniquely identifying agent and
+// throttle generic/browser strings from cloud IPs much harder — a datacenter
+// claiming to be Chrome is exactly the pattern they penalise.
+// ASSUMPTION: the repo URL is the closest thing to a contact address this
+// project has. Swap it if you'd rather they could reach you another way.
+const REDDIT_UA =
+  'AetherHub/1.0 (personal social-intelligence dashboard; ' +
+  '+https://github.com/wchrisbloch-clefty/social-command-center)';
+
+const isReddit = url => /(^|\.)reddit\.com/i.test(hostOf(url));
+
+function headersFor(url) {
+  return {
+    'User-Agent': isReddit(url) ? REDDIT_UA : UA,
+    'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, application/json, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+}
 
 const FETCH_TIMEOUT_MS = 9000;
+
+function hostOf(url) {
+  try { return new URL(url).host; } catch { return ''; }
+}
+
+// ── Per-host request pacing ─────────────────────────────────────────────────
+// The bug this fixes: every source was fetched with Promise.allSettled, so all
+// 18 Reddit routes left at once. Live, exactly one returned 200 and seventeen
+// came back 429. That is throttling, not blocking — Reddit serves this content
+// happily, just not eighteen times in the same instant.
+//
+// So requests to the same host now queue behind one another with a minimum gap.
+// Different hosts still run fully in parallel: rsshub.app and reddit.com do not
+// wait on each other, only reddit-on-reddit does.
+//
+// ASSUMPTION: 1100ms between Reddit requests. Reddit's published guidance is
+// ~60 requests/minute for unauthenticated clients; one per second sits just
+// inside that with headroom for a retry.
+const HOST_MIN_GAP_MS = { 'www.reddit.com': 1100, 'reddit.com': 1100 };
+const DEFAULT_GAP_MS = 0;   // everything else is unthrottled
+
+// Extra hosts to pace, as "host:ms" pairs. Two real uses: throttling a
+// self-hosted RSSHub that you would rather not hammer, and pointing the
+// rate-limit test at a fixture so it exercises this exact code path instead of
+// a copy of it.
+//   SOCIAL_THROTTLE_HOSTS=127.0.0.1:4321=300,rsshub.internal=500
+for (const pair of (process.env.SOCIAL_THROTTLE_HOSTS || '').split(',').filter(Boolean)) {
+  const at = pair.lastIndexOf('=');
+  if (at < 1) continue;
+  const host = pair.slice(0, at).trim();
+  const ms = Number(pair.slice(at + 1));
+  if (host && Number.isFinite(ms) && ms >= 0) HOST_MIN_GAP_MS[host] = ms;
+}
+
+const hostQueues = new Map();   // host → promise chain tail
+
+function paced(url, task) {
+  const host = hostOf(url);
+  const gap = HOST_MIN_GAP_MS[host] ?? DEFAULT_GAP_MS;
+  if (!gap) return task();
+
+  const prev = hostQueues.get(host) || Promise.resolve();
+  // Chain, and swallow the predecessor's rejection so one failure cannot break
+  // the queue for everything behind it.
+  const next = prev.catch(() => {}).then(async () => {
+    const result = await task();
+    await sleep(gap);          // hold the slot open so the NEXT caller waits
+    return result;
+  });
+  hostQueues.set(host, next.catch(() => {}));
+  return next;
+}
+
+// ── Response cache ──────────────────────────────────────────────────────────
+// A page load fans out to every source. Without this, opening the feed twice in
+// a minute re-hammers Reddit and earns another 429 — the cache is part of the
+// rate-limit fix, not just a speed-up.
+//
+// ASSUMPTION: 5 minutes. These are hot/new subreddit listings; a few minutes
+// stale is invisible, and it collapses a burst of page loads into one fetch.
+// Per-instance only: serverless gives each lambda its own memory, so this
+// reduces load rather than guaranteeing a single fetch fleet-wide.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const responseCache = new Map();   // url → { at, ok, text, status, err }
+
+function cacheGet(url) {
+  const hit = responseCache.get(url);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) { responseCache.delete(url); return null; }
+  return hit;
+}
+
+function cacheSet(url, value) {
+  // Only cache SUCCESS. Caching a 429 would extend an outage well past the
+  // moment the rate limit lifted.
+  if (!value.ok) return;
+  responseCache.set(url, { ...value, at: Date.now() });
+}
 
 // ─── XML / JSON feed parsing ─────────────────────────────────────────────────
 // Native fetch + regex, no new dependencies — same constraint the extract route
@@ -179,22 +280,52 @@ function parseFeed(body) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/** Retry transient failures only. 401/403/404 cannot be fixed by asking again. */
+/**
+ * Retry transient failures only. 401/403/404 cannot be fixed by asking again.
+ *
+ * 429 IS retried, and with a longer backoff than the rest: it means "you asked
+ * too fast", so the useful response is to wait, not to give up. Honours
+ * Retry-After when the server sends one.
+ */
 async function fetchFeed(target) {
+  const cached = cacheGet(target);
+  if (cached) return { ok: true, text: cached.text, cached: true };
+
   const backoffs = [0, 400, 1200];
   let last = { status: 0, err: 'unknown' };
 
   for (let i = 0; i < backoffs.length; i++) {
     if (backoffs[i]) await sleep(backoffs[i]);
     try {
-      const r = await fetch(target, {
-        headers: FEED_HEADERS,
+      // Pace inside the retry loop so a retry also waits its turn behind any
+      // other request queued for the same host.
+      const r = await paced(target, () => fetch(target, {
+        headers: headersFor(target),
         redirect: 'follow',
         cache: 'no-store',
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-      if (r.ok) return { ok: true, text: await r.text() };
+      }));
+
+      if (r.ok) {
+        const text = await r.text();
+        cacheSet(target, { ok: true, text });
+        return { ok: true, text };
+      }
+
       last = { status: r.status, err: `HTTP ${r.status}` };
+
+      if (r.status === 429) {
+        // Rate limited: back off harder than the standard ladder before the
+        // next attempt, and respect Retry-After if it is present and sane.
+        const retryAfter = Number(r.headers.get('retry-after'));
+        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 5000)
+          : 2000;
+        last.err = 'rate limited (429)';
+        await sleep(waitMs);
+        continue;
+      }
+
       if ([400, 401, 402, 403, 404, 410].includes(r.status)) break;
     } catch (e) {
       last = { status: 0, err: e?.name === 'TimeoutError' ? 'timeout' : (e?.message || 'network') };
@@ -204,9 +335,38 @@ async function fetchFeed(target) {
 }
 
 /** Relative routes go through RSSHub; absolute ones (Reddit) go direct. */
+// ── Test fixture redirection ────────────────────────────────────────────────
+// RSSHUB_BASE_URL only redirects RELATIVE routes. Reddit sources are ABSOLUTE
+// (Reddit serves its own RSS and never touches RSSHub), so they escape it and
+// hit the real reddit.com — including from the responsive audit, whose comment
+// claimed it kept CI off the network entirely. That was only ever true of the
+// RSSHub half.
+//
+// Harmless while those 18 fetches ran in parallel. Once they were paced at
+// 1100ms with Retry-After backoff, and 429s deliberately went uncached, every
+// one of the audit's 66 page loads re-paid the full serialised cost against a
+// live host that rate-limits datacenter IPs. The audit stopped finishing.
+//
+// SOCIAL_FIXTURE_BASE redirects EVERY route, absolute ones included, keeping
+// path and query. Unset in production and in any real deployment; the audit
+// sets it, and that is what finally makes "no network in CI" true.
+const fixtureBase = () => (process.env.SOCIAL_FIXTURE_BASE || '').trim().replace(/\/+$/, '');
+
 function resolveTarget(route) {
   const r = String(route || '');
-  if (/^https?:\/\//i.test(r)) return { url: r, viaRsshub: false };
+  const absolute = /^https?:\/\//i.test(r);
+
+  const fixture = fixtureBase();
+  if (fixture) {
+    const path = absolute
+      ? (u => u.pathname + u.search)(new URL(r))
+      : (r.startsWith('/') ? r : `/${r}`);
+    // viaRsshub still reflects what this source WOULD be, so the degraded-source
+    // reporting the audit renders stays the same shape as in production.
+    return { url: `${fixture}${path}`, viaRsshub: !absolute };
+  }
+
+  if (absolute) return { url: r, viaRsshub: false };
   return { url: `${baseUrl()}${r.startsWith('/') ? '' : '/'}${r}`, viaRsshub: true };
 }
 
@@ -291,9 +451,29 @@ export async function GET(request) {
     return Response.json({ items: [], sources: [], base: baseUrl() });
   }
 
+  // A deadline, so a slow host cannot turn into a dead endpoint. Whatever has
+  // arrived by the cutoff is returned; the rest report as degraded with a
+  // reason. Partial and honest beats a timeout that returns nothing — and
+  // crucially, the sources that DID arrive get cached, so the next load is
+  // faster rather than identically slow.
+  // ASSUMPTION: 20s leaves headroom under maxDuration=60 and still fits a
+  // 25s-ish platform cap. Lower it if you deploy somewhere stricter.
+  const DEADLINE_MS = Number(process.env.SOCIAL_DEADLINE_MS) || 20_000;
+  const deadline = new Promise(res => setTimeout(() => res('__deadline__'), DEADLINE_MS));
+
   try {
-    // allSettled, not all: one rejection must not lose the other twelve feeds.
-    const settled = await Promise.allSettled(selected.map(loadSource));
+    // allSettled, not all: one rejection must not lose the other feeds.
+    const settled = await Promise.allSettled(selected.map(src =>
+      Promise.race([loadSource(src), deadline.then(() => ({
+        items: [],
+        report: {
+          label: src.label, platform: src.platform, category: src.category,
+          ok: false, status: 0, count: 0,
+          error: `not finished within ${Math.round(DEADLINE_MS / 1000)}s`,
+          deadline: true,
+        },
+      }))])
+    ));
 
     const items = [];
     const sources = [];
