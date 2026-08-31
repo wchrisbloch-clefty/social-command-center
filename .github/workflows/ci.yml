@@ -88,7 +88,7 @@ jobs:
 
       # Fails on horizontal overflow, an element wider than its parent, a
       # collapsed nav/tab strip, a sub-34px tap target at a touch breakpoint,
-      # or a console error — across 3 breakpoints x 2 themes x 11 views.
+      # or a console error — across 3 breakpoints x 2 themes x 12 views.
       # The contract these defend is documented in docs/RESPONSIVE.md.
       # A crashed run must never look like a pass. The script prints exactly one
       # PASSED/FAILED line, so its absence means it died before reporting — the

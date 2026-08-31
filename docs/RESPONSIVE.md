@@ -64,7 +64,7 @@ device slightly wider than the target still gets the right layout.
 
 ## The four rules the gate enforces
 
-`scripts/responsive-audit.mjs` runs **3 breakpoints × 2 themes × 11 views = 66
+`scripts/responsive-audit.mjs` runs **3 breakpoints × 2 themes × 12 views = 72
 cases** and fails the build on any violation.
 
 ### 1. No document-level horizontal overflow
@@ -121,7 +121,7 @@ found: it fired on the Intelligence view at every breakpoint on a fresh clone.
 
 ## Dark mode
 
-Verified at **all three** breakpoints, both themes, all eleven views — the full
+Verified at **all three** breakpoints, both themes, all twelve views — the full
 42-case matrix runs twice over, once per theme.
 
 Theme is a single `data-theme` attribute on `<html>`. Every view reads the same
