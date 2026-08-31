@@ -25,7 +25,7 @@ import {
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
 // `T` reads those tokens rather than carrying hex literals, so the whole app —
-// all seven views, not just the feed — retheme from one file and the dark-mode
+// all eleven views, not just the feed — retheme from one file and the dark-mode
 // toggle is a single data-theme swap on <html> instead of a JS branch.
 //
 // Both entries are identical because the CSS vars already resolve per theme.
