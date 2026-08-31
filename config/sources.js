@@ -92,6 +92,12 @@ export const PLATFORM_TIER = {
   LinkedIn:  'mainstream',
   X:         'street',
   Reddit:    'street',
+  // Podcasts are their own tier, not a flavour of the other two. A long-form
+  // interview show is neither a vetted publisher nor an anonymous street
+  // account: it is a named host talking at length, and the reader judges it on
+  // that basis. Folding it into 'mainstream' would have said something false
+  // about it, so the tier vocabulary grew by one instead.
+  Podcast:   'podcast',
 };
 
 // ASSUMPTION: an unknown platform is treated as street rather than dropped, so a
@@ -203,6 +209,89 @@ export const TOPIC_SOURCES = [
     label: 'AI for BD', category: 'tech', limit: 5 },
 ];
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PODCASTS — the show's own RSS feed. No RSSHub, no API key, no account.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// A podcast IS an RSS feed by definition — that is what the medium is. So this
+// is the one source type with no intermediary at all: AetherHub fetches the
+// publisher's feed directly, through the same paced/cached fetcher every other
+// source uses (lib/feed-fetch.js).
+//
+//   { platform: 'Podcast', show, feedUrl, label, category, limit }
+//
+//   feedUrl   the show's RSS feed, absolute. NOT derivable from the show name —
+//             https://feeds.megaphone.fm/GLT1412515089 does not follow from
+//             "Joe Rogan Experience" by any rule, which is why podcasts resolve
+//             by DIRECTORY LOOKUP rather than by guessing a handle.
+//   show      the publisher's own name for the show, used on the card.
+//
+// ── HOW THESE WERE RESOLVED, AND WHAT IS STILL PENDING ──────────────────────
+// Every URL below has TWO independent sources: the user's own production
+// intelligence-hub config (feeds in live use), and a web search confirming the
+// same URL and identifying the publisher. That is evidence, and it is why these
+// are wired rather than parked.
+//
+// It is NOT content-verification. The build sandbox cannot reach a single
+// podcast host or the iTunes directory:
+//
+//     itunes.apple.com     → 403 (CONNECT rejected by the egress policy)
+//     feeds.megaphone.fm   → 403
+//     feeds.simplecast.com → 403
+//
+// So the last step — fetch the feed, confirm it parses to real recent episodes,
+// confirm the channel title is the show we think it is — runs with one command
+// where the network works:
+//
+//     npm run podcasts:verify          report only
+//     npm run podcasts:verify -- --fix  correct any feed that resolved elsewhere
+//
+// Until then each source carries `pendingVerification: true`, the UI says so,
+// and a feed that turns out wrong degrades honestly instead of rendering
+// someone else's show under the right name.
+export const PODCAST_SOURCES = [
+  // ASSUMPTION (identity solid, content-verification pending): Megaphone feed
+  // in live use in intelligence-hub. The long-form interview show.
+  { platform: 'Podcast', show: 'The Joe Rogan Experience',
+    feedUrl: 'https://feeds.megaphone.fm/GLT1412515089',
+    label: 'Joe Rogan Experience', category: 'popculture', limit: 4,
+    pendingVerification: true },
+
+  // ASSUMPTION: Libsyn feed, in live use in intelligence-hub. Chamath,
+  // Sacks, Friedberg and Calacanis on markets and technology.
+  { platform: 'Podcast', show: 'All-In with Chamath, Jason, Sacks & Friedberg',
+    feedUrl: 'https://allinchamathjason.libsyn.com/rss',
+    label: 'All-In', category: 'business', limit: 4,
+    pendingVerification: true },
+
+  // ASSUMPTION: Simplecast feed, in live use in intelligence-hub. Ben Gilbert
+  // and David Rosenthal on company histories — the deepest show notes of the
+  // five, which makes it the best case for episode summaries.
+  { platform: 'Podcast', show: 'Acquired',
+    feedUrl: 'https://feeds.simplecast.com/jeNJI0r9',
+    label: 'Acquired', category: 'business', limit: 4,
+    pendingVerification: true },
+
+  // ASSUMPTION: Megaphone feed. Corroborated by search, which also resolved the
+  // full title — the show is listed as "Andrew Schulz's Flagrant with Akaash
+  // Singh", so "Flagrant" alone is the short name, not the feed's title.
+  { platform: 'Podcast', show: "Andrew Schulz's Flagrant",
+    feedUrl: 'https://feeds.megaphone.fm/APPI6857213837',
+    label: 'Flagrant', category: 'popculture', limit: 4,
+    pendingVerification: true },
+
+  // ASSUMPTION: Megaphone feed. THE NAME-COLLISION CASE, and the reason
+  // verify-then-wire exists: "Morning Wire" matches several unrelated shows in
+  // any directory. Search confirmed this ID is The Daily Wire's news briefing
+  // hosted by John Bickley (Apple id 1576594336) — not another show of the same
+  // name. Verification will re-confirm the channel title matches.
+  { platform: 'Podcast', show: 'Morning Wire',
+    feedUrl: 'https://feeds.megaphone.fm/BVDWV8747925072',
+    label: 'Morning Wire', category: 'general', limit: 4,
+    pendingVerification: true },
+];
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  YOUTUBE — official Data API v3, NOT RSSHub. Left on its own path on purpose.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -263,7 +352,7 @@ export const TRACKED_QUERIES = {
 
 /** All sources (social + YouTube) for a category, or all of them when null. */
 export function sourcesForCategory(category = null) {
-  const all = [...SOCIAL_SOURCES, ...YOUTUBE_SOURCES];
+  const all = [...SOCIAL_SOURCES, ...YOUTUBE_SOURCES, ...PODCAST_SOURCES];
   if (!category) return all;
   return all.filter(s => s.category === category);
 }

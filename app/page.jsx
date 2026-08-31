@@ -9,7 +9,7 @@ import {
   Key, Palette, Star, Flame, BellRing, Check, Bell, Settings, TrendingUp,
   BarChart2, FileText, Link, Copy, ChevronRight, Globe, Eye, Users,
   Heart, Filter, Menu, Compass, MoreHorizontal, Play, BookOpen, Layers,
-  MessageSquare, Send, Upload,
+  MessageSquare, Send, Upload, Mic,
 } from 'lucide-react';
 
 import { getFeed } from '../lib/adapters.js';
@@ -21,11 +21,14 @@ import {
   groupByCategory, velocitySummary, rankByVelocity,
   WINDOW_OPTIONS, DEFAULT_WINDOW_HOURS, VELOCITY_WORD,
 } from '../lib/velocity.js';
+// The SAME theme miner Discover and the category manager use, pointed at
+// podcast text. A second clustering implementation would only drift.
+import { crossShowTopics } from '../lib/themes.js';
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
 // `T` reads those tokens rather than carrying hex literals, so the whole app —
-// all eleven views, not just the feed — retheme from one file and the dark-mode
+// all twelve views, not just the feed — retheme from one file and the dark-mode
 // toggle is a single data-theme swap on <html> instead of a JS branch.
 //
 // Both entries are identical because the CSS vars already resolve per theme.
@@ -107,6 +110,7 @@ const NAV_TABS = [
   { id:'feed',         label:'Feed',         icon:<Zap size={16}/>         },
   { id:'discover',     label:'Discover',     icon:<Compass size={16}/>     },
   { id:'recommended',  label:'Recommended',  icon:<Users size={16}/>       },
+  { id:'podcasts',     label:'Podcasts',     icon:<Mic size={16}/>         },
   { id:'intelligence', label:'Intelligence', icon:<Brain size={16}/>       },
   { id:'studio',       label:'Studio',       icon:<FileText size={16}/>    },
   { id:'alerts',       label:'Alerts',       icon:<Bell size={16}/>        },
@@ -738,7 +742,9 @@ function MorningDigest({ t }) {
   );
 }
 
-const TIER_WORD = { mainstream: 'Verified', street: 'Alt. perspective' };
+// A word, never an icon — the same rule the whole desk follows. 'podcast' is a
+// third tier, not a decoration on the other two.
+const TIER_WORD = { mainstream: 'Verified', street: 'Alt. perspective', podcast: 'Podcast' };
 const categoryLabelOf = id => categoryLabel(id);
 // Nav order comes from the collection's `order`, not import order.
 const NAV_CATEGORIES = () => sortedCategories(CATEGORIES);
@@ -982,6 +988,328 @@ function DiscoverView() {
 }
 
 // ─── RECOMMENDED TO FOLLOW (B3) ───────────────────────────────────────────────
+// ─── PODCASTS ─────────────────────────────────────────────────────────────────
+// Episodes are signals like any other: same card, same category stripe, same
+// velocity and tier words. What a podcast adds is an AI summary built strictly
+// from show notes, and a strip of subjects that recur across DIFFERENT shows.
+
+function usePodcasts() {
+  const [state, setState] = useState({ items: [], sources: [], limits: [], loading: true });
+
+  const load = useCallback(() => {
+    setState(s => ({ ...s, loading: true }));
+    fetch('/api/podcasts', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setState({
+        items: Array.isArray(d.items) ? d.items : [],
+        sources: Array.isArray(d.sources) ? d.sources : [],
+        limits: Array.isArray(d.limits) ? d.limits : [],
+        loading: false,
+      }))
+      // A dead route is a render state, never a thrown error — a console error
+      // fails the responsive gate, and an empty tab is not a crash.
+      .catch(() => setState({ items: [], sources: [], limits: ['Podcast feed could not be loaded.'], loading: false }));
+  }, []);
+
+  useEffect(load, [load]);
+  return { ...state, refresh: load };
+}
+
+/**
+ * One episode's AI summary, fetched on demand.
+ *
+ * On demand rather than eagerly because each summary is a provider call: the
+ * page would otherwise fire one per episode on mount, most of them never read.
+ */
+function EpisodeSummary({ episode }) {
+  const [state, setState] = useState({ loading: false, done: false, summary: '', reason: '', provider: null, label: '' });
+
+  const generate = () => {
+    if (state.loading || state.done) return;
+    setState(s => ({ ...s, loading: true }));
+    fetch('/api/podcast-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ episode }),
+    })
+      .then(r => r.json())
+      .then(d => setState({
+        loading: false, done: true,
+        summary: d.summary || '',
+        reason: d.reason || '',
+        provider: d.provider || null,
+        label: d.provenanceLabel || 'Summarised from show notes',
+      }))
+      .catch(() => setState({ loading: false, done: true, summary: '', reason: 'Could not reach the summariser.', provider: null, label: '' }));
+  };
+
+  if (!state.done) {
+    return (
+      <button className="ep-summarise" onClick={generate} disabled={state.loading}>
+        {state.loading ? 'Summarising…' : 'Summarise from show notes'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="ep-summary">
+      {state.summary
+        ? <p className="ep-summary-text">{state.summary}</p>
+        : <p className="ep-summary-none">{state.reason}</p>}
+      <p className="ep-provenance">
+        {/* The honesty line. Stated on every summary, not only the thin ones:
+            a reader must never have to wonder whether the AI heard the episode. */}
+        {state.summary ? state.label : 'No summary'}
+        {' · built from the publisher’s notes, not the audio'}
+        {state.provider && ` · via ${state.provider}`}
+      </p>
+    </div>
+  );
+}
+
+/** One episode. The Signal Desk card, plus what only an episode has. */
+function EpisodeCard({ item }) {
+  const pod = item.podcast || {};
+  return (
+    <article className="episode" data-cat={item.category}>
+      <div className="signal-meta">
+        <span className="cat-label" data-cat={item.category}>{categoryLabelOf(item.category)}</span>
+        <span>·</span><span>{pod.show || item.sourceLabel}</span>
+        <span>·</span><time dateTime={item.publishedAt}>{item.time}</time>
+        {pod.duration && <><span>·</span><span>{pod.duration}</span></>}
+      </div>
+
+      <h3 className="ep-title">
+        {item.url
+          ? <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a>
+          : item.title}
+      </h3>
+
+      <div className="ep-side">
+        <span className={`vel vel-${item.signal}`}>{VELOCITY_WORD[item.signal]}</span>
+        <span className="tier">{TIER_WORD[item.tier]}</span>
+      </div>
+
+      <EpisodeSummary episode={item}/>
+    </article>
+  );
+}
+
+/**
+ * Subjects appearing across more than one show.
+ *
+ * A topic here is not "what my podcasts covered" — it is what SEVERAL of them
+ * covered independently, which is a much stronger signal and the only reason
+ * this strip earns its space.
+ */
+function CrossShowTopics({ topics, limits }) {
+  if (!topics.length) {
+    return (
+      <section className="sop-strip">
+        <div className="sop-head"><span className="sop-label">Across your shows</span></div>
+        <p className="empty-note" style={{ margin: 0 }}>
+          {limits[0] || 'No subject has appeared across two or more shows yet.'}
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="sop-strip">
+      <div className="sop-head"><span className="sop-label">Across your shows</span></div>
+      <ul className="topic-strip">
+        {topics.map(t => (
+          <li key={t.term} className="topic-chip">
+            <span className="topic-term">{t.label}</span>
+            <span className="topic-why">{t.reason}</span>
+            <span className="topic-shows">{t.shows.join(' · ')}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Add a show by name or RSS URL.
+ *
+ * Two steps, deliberately. Step one RESOLVES and shows what came back; step two
+ * commits. A show name is not a unique key — "Morning Wire" matches several
+ * unrelated podcasts — so the confirmation is not politeness, it is the thing
+ * that stops you subscribing to a stranger's show under a name you recognise.
+ */
+function AddPodcast({ onAdded }) {
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('general');
+  const [busy, setBusy] = useState(false);
+  const [found, setFound] = useState(null);
+  const [msg, setMsg] = useState('');
+
+  const resolve = async (q = query) => {
+    if (!q.trim()) return;
+    setBusy(true); setMsg(''); setFound(null);
+    try {
+      const r = await fetch('/api/podcasts/resolve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q.trim() }),
+      });
+      const d = await r.json();
+      setFound(d);
+      if (!d.verified) setMsg(d.reason || 'That did not resolve to a podcast feed.');
+    } catch {
+      setMsg('Could not reach the resolver.');
+    }
+    setBusy(false);
+  };
+
+  const commit = async () => {
+    if (!found?.verified) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/sources', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: 'Podcast',
+          feedUrl: found.feedUrl,
+          show: found.showTitle,
+          label: found.showTitle,
+          category,
+          // The server REFUSES an unverified feed. Passing this is not what
+          // makes it true — the resolve step is — but the server checks.
+          verified: true,
+          reason: `resolved and verified ${found.episodeCount} episodes`,
+        }),
+      });
+      const d = await r.json();
+      setMsg(d.message || (d.added ? 'Added.' : d.error || 'Could not add.'));
+      if (d.added) { setFound(null); setQuery(''); onAdded?.(); }
+      if (d.line && !d.added) setMsg(`${d.message} ${d.line}`);
+    } catch {
+      setMsg('Could not write the source.');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <section className="pod-add">
+      <div className="section-head"><span className="section-label">Add a show</span></div>
+
+      <div className="cat-add-form">
+        <input className="search-input cat-input" value={query} placeholder="Show name, or an RSS feed URL"
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') resolve(); }}
+          aria-label="Show name or RSS feed URL"/>
+        <select className="search-input cat-select" value={category} aria-label="Category"
+          onChange={e => setCategory(e.target.value)}>
+          {NAV_CATEGORIES().map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <button className="btn-primary" onClick={() => resolve()} disabled={busy || !query.trim()}>
+          {busy ? 'Checking…' : 'Find show'}
+        </button>
+      </div>
+
+      <p className="pod-add-note">
+        Nothing is added until you confirm it. The feed is fetched and its episodes read first —
+        a show name is not unique, and this is what stops the wrong show being wired.
+      </p>
+
+      {found?.verified && (
+        <div className="cat-confirm pod-confirm">
+          <div className="cat-confirm-text">
+            <strong>Is this the right show?</strong>
+            <div className="pod-confirm-show">{found.showTitle}</div>
+            {found.publisher && <div className="pod-confirm-meta">{found.publisher}</div>}
+            {found.latestEpisode && (
+              <div className="pod-confirm-meta">
+                Latest: “{found.latestEpisode.title}”
+                {found.latestEpisode.publishedAt ? ` · ${found.latestEpisode.publishedAt}` : ''}
+              </div>
+            )}
+            <div className="pod-confirm-meta">{found.episodeCount} recent episodes read from the feed</div>
+            {found.thinNotes && (
+              <div className="pod-confirm-warn">
+                This show publishes very short episode notes, so its summaries will be brief
+                and it will rarely appear in cross-show topics.
+              </div>
+            )}
+          </div>
+          <div className="cat-actions">
+            <button className="btn-primary" onClick={commit} disabled={busy}>Yes, add it</button>
+            <button className="nav-btn" onClick={() => { setFound(null); setMsg(''); }}>No</button>
+          </div>
+        </div>
+      )}
+
+      {found?.alternatives?.length > 0 && (
+        <div className="pod-alts">
+          <span className="pod-alts-label">Or did you mean:</span>
+          <ul className="pod-alt-list">
+            {found.alternatives.map(a => (
+              <li key={a.feedUrl}>
+                <button className="nav-btn" onClick={() => resolve(a.feedUrl)}>
+                  {a.collectionName}{a.artistName ? ` — ${a.artistName}` : ''}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {msg && <p className="pod-add-msg">{msg}</p>}
+    </section>
+  );
+}
+
+function PodcastView() {
+  const { items, sources, limits, loading, refresh } = usePodcasts();
+  const { topics, limits: topicLimits } = crossShowTopics(items, { windowHours: 336 });
+  const ok = sources.filter(s => s.ok).length;
+
+  return (
+    <div className="stack">
+      <div className="view-head">
+        <div className="view-head-text">
+          <h2 className="view-title">Podcasts</h2>
+          <p className="view-sub">
+            {loading
+              ? 'Reading your shows…'
+              : `${items.length} episodes from ${ok} of ${sources.length} shows. Summaries are built from published show notes — nothing here is transcribed from audio.`}
+          </p>
+        </div>
+      </div>
+
+      {!loading && <CrossShowTopics topics={topics} limits={[...topicLimits, ...limits]}/>}
+
+      {loading && <div className="empty-note">Reading your shows…</div>}
+
+      {!loading && !items.length && (
+        <div className="empty-note">
+          <strong>No episodes.</strong>
+          <div style={{ marginTop: 8 }}>
+            {limits[0] || 'Every configured show is degraded, or none is wired yet.'}
+          </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div className="episode-list">
+          {items.map(i => <EpisodeCard key={i.id} item={i}/>)}
+        </div>
+      )}
+
+      {!loading && limits.length > 0 && (
+        <section className="sop-strip">
+          <div className="sop-head"><span className="sop-label">What this can and cannot see</span></div>
+          <ul className="limit-list">
+            {limits.map((l, i) => <li key={i}>{l}</li>)}
+          </ul>
+        </section>
+      )}
+
+      <AddPodcast onAdded={refresh}/>
+    </div>
+  );
+}
+
 function RecommendedView() {
   const [state, setState] = useState({ recommendations: [], limits: [], mined: null, loading: true });
   const [added, setAdded] = useState({});
@@ -2036,6 +2364,7 @@ export default function AetherHub() {
         {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}/>}
         {view === 'discover'     && <DiscoverView/>}
         {view === 'recommended'  && <RecommendedView/>}
+        {view === 'podcasts'     && <PodcastView/>}
         {view === 'intelligence' && <IntelligenceView t={t}/>}
         {view === 'studio'       && <StudioView       t={t} isMobile={isMobile}/>}
         {view === 'alerts'       && <AlertsView       t={t}/>}

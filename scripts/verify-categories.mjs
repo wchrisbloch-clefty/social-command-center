@@ -12,12 +12,16 @@
 import {
   CATEGORIES, DEFAULT_CATEGORIES, FALLBACK_CATEGORY_ID, PALETTE,
 } from '../config/categories.js';
-import { SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES } from '../config/sources.js';
+import { SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES, PODCAST_SOURCES } from '../config/sources.js';
 
 const all = [
   ...SOCIAL_SOURCES.map(s => ({ ...s, _list: 'SOCIAL_SOURCES' })),
   ...YOUTUBE_SOURCES.map(s => ({ ...s, _list: 'YOUTUBE_SOURCES' })),
   ...TOPIC_SOURCES.map(s => ({ ...s, _list: 'TOPIC_SOURCES' })),
+  // Podcasts are sources like any other and must be covered by the same
+  // integrity check — a detached podcast is exactly as silent as a detached
+  // subreddit: the episodes just stop appearing under any tab.
+  ...PODCAST_SOURCES.map(s => ({ ...s, _list: 'PODCAST_SOURCES' })),
 ];
 
 const ids = new Set(CATEGORIES.map(c => c.id));

@@ -13,10 +13,10 @@ Next 16.2.6 · React 19.2.4 · Tailwind 4 · deployed on Vercel.
 
 ## Current state — read this first
 
-**Seven of eleven views are live. Four still render mock data.**
+**Eight of twelve views are live. Four still render mock data.**
 
-Live, reading the real feed: **Feed, Discover, Recommended, Categories, Sports,
-Sports (team drill-down)**, and the source-health rail. They pull real posts
+Live, reading the real feed: **Feed, Discover, Recommended, Podcasts,
+Categories, Sports, Sports (team drill-down)**, and the source-health rail. They pull real posts
 from Instagram, LinkedIn, X and Reddit through RSSHub, plus YouTube through its
 official Data API — see *Social ingestion* below. Every signal carries a tier
 badge (`mainstream` / `street`), and any source that failed is named with its
@@ -35,7 +35,7 @@ What is real:
 
 | Area | State |
 |---|---|
-| UI shell, navigation, all eleven views | Working, responsive, deployed |
+| UI shell, navigation, all twelve views | Working, responsive, deployed |
 | **Feed — live social signal** | **Working.** RSSHub + YouTube Data API, category-filtered |
 | `/api/social` — Instagram, LinkedIn, X, Reddit | Working. Fails soft per source |
 | `/api/youtube` — official Data API v3 | Working. Needs `YOUTUBE_API_KEY`, degrades without it |
@@ -47,6 +47,9 @@ What is real:
 | Categories — add, rename, recolor, merge, delete, reorder | Working. `/api/categories` is the one writer |
 | `/api/recommend`, `/api/suggest-categories` | Working. Advisory only; both cached in-process |
 | `lib/source-resolver.js` + `npm run sources:resolve` | Working. Verify-then-wire; needs `YOUTUBE_API_KEY` |
+| **Podcasts** — `/api/podcasts`, 5 shows | **Working.** Direct RSS, no key of any kind |
+| Episode summaries — `/api/podcast-summary` | Working. Show notes ONLY, never audio. See [docs/PODCASTS.md](docs/PODCASTS.md) |
+| Cross-show topics | Working. Same theme engine as Discover, pointed at episodes |
 | Intelligence / Studio / Alerts / Sources data | Fabricated, labeled |
 | Voice UI (Settings → Voice) | Not built. Step 3 |
 | Auth | None. Single-tenant by design |
@@ -123,7 +126,7 @@ a crash that prints nothing would otherwise look like success.
 **[`docs/RESPONSIVE.md`](docs/RESPONSIVE.md) is the layout contract — read it
 before touching a view.** Mobile-first is a hard requirement and it is enforced,
 not advisory: `npm run audit:responsive` drives a real Chromium across
-**3 breakpoints × 2 themes × 11 views = 66 cases** and fails CI on horizontal
+**3 breakpoints × 2 themes × 12 views = 72 cases** and fails CI on horizontal
 overflow, an element wider than its parent, a collapsed nav/tab strip, a
 sub-34px tap target at a touch breakpoint, or a console error.
 
