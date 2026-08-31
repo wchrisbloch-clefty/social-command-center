@@ -335,9 +335,38 @@ async function fetchFeed(target) {
 }
 
 /** Relative routes go through RSSHub; absolute ones (Reddit) go direct. */
+// ── Test fixture redirection ────────────────────────────────────────────────
+// RSSHUB_BASE_URL only redirects RELATIVE routes. Reddit sources are ABSOLUTE
+// (Reddit serves its own RSS and never touches RSSHub), so they escape it and
+// hit the real reddit.com — including from the responsive audit, whose comment
+// claimed it kept CI off the network entirely. That was only ever true of the
+// RSSHub half.
+//
+// Harmless while those 18 fetches ran in parallel. Once they were paced at
+// 1100ms with Retry-After backoff, and 429s deliberately went uncached, every
+// one of the audit's 66 page loads re-paid the full serialised cost against a
+// live host that rate-limits datacenter IPs. The audit stopped finishing.
+//
+// SOCIAL_FIXTURE_BASE redirects EVERY route, absolute ones included, keeping
+// path and query. Unset in production and in any real deployment; the audit
+// sets it, and that is what finally makes "no network in CI" true.
+const fixtureBase = () => (process.env.SOCIAL_FIXTURE_BASE || '').trim().replace(/\/+$/, '');
+
 function resolveTarget(route) {
   const r = String(route || '');
-  if (/^https?:\/\//i.test(r)) return { url: r, viaRsshub: false };
+  const absolute = /^https?:\/\//i.test(r);
+
+  const fixture = fixtureBase();
+  if (fixture) {
+    const path = absolute
+      ? (u => u.pathname + u.search)(new URL(r))
+      : (r.startsWith('/') ? r : `/${r}`);
+    // viaRsshub still reflects what this source WOULD be, so the degraded-source
+    // reporting the audit renders stays the same shape as in production.
+    return { url: `${fixture}${path}`, viaRsshub: !absolute };
+  }
+
+  if (absolute) return { url: r, viaRsshub: false };
   return { url: `${baseUrl()}${r.startsWith('/') ? '' : '/'}${r}`, viaRsshub: true };
 }
 

@@ -110,6 +110,16 @@ function startFixtureFeed() {
       if ((m = u.match(/^\/instagram\/2\/(?:user|tags)\/([^/]+)/)))    handle = '@' + m[1];
       else if ((m = u.match(/^\/linkedin\/company\/([^/]+)\/posts$/))) handle = m[1];
       else if ((m = u.match(/^\/twitter\/user\/([^/]+)/)))             handle = '@' + m[1];
+      // Reddit. These paths reach the fixture because the app is started with
+      // SOCIAL_FIXTURE_BASE, which redirects ABSOLUTE source routes too — not
+      // just the relative RSSHub ones. Without them the 18 Reddit sources went
+      // to the real reddit.com from CI, and once they were paced at 1100ms each
+      // the audit stopped finishing. Serving them here keeps the feed fully
+      // populated, so the audit still measures a real layout rather than a
+      // page of degraded-source notices.
+      else if ((m = u.match(/^\/r\/([^/]+)\/(?:hot|new)\/\.rss$/)))    handle = 'r/' + m[1];
+      else if ((m = u.match(/^\/r\/([^/]+)\/search\.rss$/)))          handle = 'r/' + m[1];
+      else if (u === '/search.rss')                                     handle = 'r/search';
       else { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('no route'); }
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
       res.end(fixtureRss(handle));
@@ -147,6 +157,13 @@ function startApp(rsshubBase) {
     env: {
       ...process.env,
       RSSHUB_BASE_URL: rsshubBase,
+      // Redirects EVERY source route at the fixture, absolute ones included, so
+      // the audit genuinely touches no network. See resolveTarget() in
+      // app/api/social/route.js.
+      SOCIAL_FIXTURE_BASE: rsshubBase,
+      // Nothing should be paced when everything is a local fixture; an
+      // inherited value would reintroduce the delay this fix removes.
+      SOCIAL_THROTTLE_HOSTS: '',
       // Deliberately unset: the audit must pass in the degraded, no-credential
       // state, because that is what CI and a fresh clone actually look like.
       YOUTUBE_API_KEY: '',
