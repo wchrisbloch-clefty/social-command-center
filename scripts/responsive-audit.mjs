@@ -57,12 +57,13 @@ const ONLY_BP = (process.env.AUDIT_BREAKPOINT || '').split(',').map(x => x.trim(
 // own navigation recipe — otherwise the gate would report it green having never
 // rendered it.
 const VIEWS = [
-  'feed', 'discover', 'recommended', 'intelligence', 'studio', 'alerts',
-  'sources', 'settings', 'categories', 'sports', 'sports-team',
+  'feed', 'discover', 'recommended', 'podcasts', 'intelligence', 'studio',
+  'alerts', 'sources', 'settings', 'categories', 'sports', 'sports-team',
 ];
 const VIEW_LABEL = {
   discover: 'Discover', recommended: 'Recommended', intelligence: 'Intelligence', studio: 'Studio',
   alerts: 'Alerts', sources: 'Sources', settings: 'Settings', categories: 'Categories',
+  podcasts: 'Podcasts',
 };
 // view id → how to get there when it is not a section-nav button.
 const CATEGORY_VIEWS = {
@@ -120,6 +121,13 @@ function startFixtureFeed() {
       else if ((m = u.match(/^\/r\/([^/]+)\/(?:hot|new)\/\.rss$/)))    handle = 'r/' + m[1];
       else if ((m = u.match(/^\/r\/([^/]+)\/search\.rss$/)))          handle = 'r/' + m[1];
       else if (u === '/search.rss')                                     handle = 'r/search';
+      // Podcast feeds, LAST and deliberately loose. Once rewritten onto the
+      // fixture a feed URL keeps only its path, and those share no shape —
+      // megaphone is /GLT1412515089, libsyn is /rss. So this is the catch-all,
+      // after every structured route above has had its say. Without it the
+      // Podcast tab audits as an empty page and its episode card, summary
+      // control and topic strip all go unmeasured.
+      else if (/^\/[A-Za-z0-9_-]+$/.test(u) || /rss/i.test(u))          handle = 'Fixture Show';
       else { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('no route'); }
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
       res.end(fixtureRss(handle));

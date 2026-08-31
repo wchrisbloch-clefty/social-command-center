@@ -102,6 +102,12 @@ be visible without scrolling under a pointer.
 Applies at **touch breakpoints only** (mobile, iPad). `button`, `a[href]`,
 `input`, `select`, `textarea`, `[role="button"]`.
 
+> **A bare inline `<a>` cannot be fixed by the blanket rule.** `min-height` has
+> no effect on a non-replaced inline box, so a text link is whatever height its
+> line box is — 17px, and failing. Give it `display: block` (or
+> `inline-block`) at touch widths. The gate caught exactly this on the podcast
+> episode title, reported as `538x17 (min 24x34)`.
+
 > The floor is enforced by a blanket rule in `globals.css` under
 > `@media (max-width: 1100px)`, not per component — the four remaining mock
 > dashboard views (Intelligence, Studio, Alerts, Sources) style hundreds of

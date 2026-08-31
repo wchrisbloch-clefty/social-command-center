@@ -21,7 +21,7 @@ import { join } from 'node:path';
 // in a production build this module is bundled into .next/server, so a
 // module-relative path points at the build output instead of the file you
 // actually edit — and the write would appear to succeed while changing nothing.
-import { SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES, CATEGORY_IDS } from '../../../config/sources.js';
+import { SOCIAL_SOURCES, YOUTUBE_SOURCES, TOPIC_SOURCES, PODCAST_SOURCES, CATEGORY_IDS } from '../../../config/sources.js';
 import { alreadyFollowed } from '../../../lib/categorize.js';
 import { configLineFor } from '../../../lib/recommend.js';
 
@@ -35,7 +35,8 @@ export async function GET() {
     social: SOCIAL_SOURCES,
     youtube: YOUTUBE_SOURCES,
     topics: TOPIC_SOURCES,
-    total: SOCIAL_SOURCES.length + YOUTUBE_SOURCES.length + TOPIC_SOURCES.length,
+    podcasts: PODCAST_SOURCES,
+    total: SOCIAL_SOURCES.length + YOUTUBE_SOURCES.length + TOPIC_SOURCES.length + PODCAST_SOURCES.length,
   });
 }
 
@@ -47,20 +48,46 @@ export async function POST(request) {
     return Response.json({ error: 'Malformed request body' }, { status: 400 });
   }
 
-  const { platform, handle, label, category, person, reason } = body || {};
-  if (!platform || !handle) {
+  const { platform, handle, label, category, person, reason, feedUrl, show, verified } = body || {};
+
+  // ── Podcasts ──────────────────────────────────────────────────────────────
+  // Keyed by feed URL, and REFUSED unless the caller states the feed was
+  // verified. /api/podcasts/resolve is what produces that flag, by actually
+  // fetching the feed and reading its episodes. Accepting an unverified feed
+  // here would route around the whole confirmation step, so this is the guard
+  // that makes "verify-then-wire" structural rather than a UI convention.
+  const isPodcast = platform === 'Podcast';
+  if (isPodcast) {
+    if (!feedUrl) {
+      return Response.json({ error: 'feedUrl is required for a podcast' }, { status: 400 });
+    }
+    if (!verified) {
+      return Response.json({
+        added: false, unverified: true,
+        error: 'This feed has not been verified. Resolve it through /api/podcasts/resolve first — a feed that has not returned real episodes is never wired.',
+      }, { status: 400 });
+    }
+    if (PODCAST_SOURCES.some(p => p.feedUrl === feedUrl)) {
+      return Response.json({ added: false, duplicate: true, message: `${label || show} is already in your shows.` });
+    }
+  } else if (!platform || !handle) {
     return Response.json({ error: 'platform and handle are required' }, { status: 400 });
   }
   const cat = CATEGORY_IDS.includes(category) ? category : 'general';
 
   // Additive only, and never twice.
   const existing = [...SOCIAL_SOURCES, ...YOUTUBE_SOURCES];
-  if (alreadyFollowed(existing, { platform, handle, route: '' })) {
+  if (!isPodcast && alreadyFollowed(existing, { platform, handle, route: '' })) {
     return Response.json({ added: false, duplicate: true, message: `${label || handle} is already in your sources.` });
   }
 
   const built = configLineFor(
-    { display: label || `@${handle}`, handle, platform, category: cat, reason: reason || 'added manually' },
+    {
+      display: label || show || `@${handle}`,
+      handle, platform, feedUrl, show,
+      category: cat,
+      reason: reason || (isPodcast ? 'added and verified via the podcast resolver' : 'added manually'),
+    },
     { category: cat }
   );
   if (!built) {
