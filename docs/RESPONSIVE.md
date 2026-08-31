@@ -64,7 +64,7 @@ device slightly wider than the target still gets the right layout.
 
 ## The four rules the gate enforces
 
-`scripts/responsive-audit.mjs` runs **3 breakpoints × 2 themes × 7 views = 42
+`scripts/responsive-audit.mjs` runs **3 breakpoints × 2 themes × 11 views = 66
 cases** and fails the build on any violation.
 
 ### 1. No document-level horizontal overflow
@@ -103,9 +103,10 @@ Applies at **touch breakpoints only** (mobile, iPad). `button`, `a[href]`,
 `input`, `select`, `textarea`, `[role="button"]`.
 
 > The floor is enforced by a blanket rule in `globals.css` under
-> `@media (max-width: 1100px)`, not per component — the six legacy dashboard
-> views style hundreds of controls inline, and a rule there cannot be forgotten
-> by whatever view gets added next.
+> `@media (max-width: 1100px)`, not per component — the four remaining mock
+> dashboard views (Intelligence, Studio, Alerts, Sources) style hundreds of
+> controls inline, and a rule there cannot be forgotten by whatever view gets
+> added next.
 
 **Console errors also fail the build.** They are how the `/api/brief` 500 was
 found: it fired on the Intelligence view at every breakpoint on a fresh clone.
@@ -114,7 +115,7 @@ found: it fired on the Intelligence view at every breakpoint on a fresh clone.
 
 ## Dark mode
 
-Verified at **all three** breakpoints, both themes, all seven views — the full
+Verified at **all three** breakpoints, both themes, all eleven views — the full
 42-case matrix runs twice over, once per theme.
 
 Theme is a single `data-theme` attribute on `<html>`. Every view reads the same

@@ -10,7 +10,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 is the layout contract, and it is enforced — not advisory.
 
 `npm run audit:responsive` drives a real Chromium across **3 breakpoints × 2
-themes × 7 views** and fails CI on any of:
+themes × 11 views** and fails CI on any of:
 
 1. document-level horizontal overflow
 2. an element wider than its parent's content box
