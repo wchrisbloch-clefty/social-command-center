@@ -684,6 +684,10 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 .src-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .src-dot.ok   { background: var(--green); }
 .src-dot.fail { background: var(--red); }
+/* Still fetching, not broken. Amber rather than red because the distinction is
+   the point: this source is queued behind a rate limit and will be in cache by
+   the next load. Colouring it red sent people chasing a bug that was not there. */
+.src-dot.pending { background: var(--ah-signal-rising, #b8860b); }
 .src-name { color: var(--text2); font-weight: var(--fw-regular); }
 .src-note { margin-left: auto; color: var(--text3); white-space: nowrap; }
 

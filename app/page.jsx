@@ -845,15 +845,24 @@ function LiveSignalRail({ items }) {
   );
 }
 
-/** Which feeds answered and which didn't. Degradation is visible, not silent. */
+/**
+ * Which feeds answered and which didn't. Degradation is visible, not silent.
+ *
+ * THREE states, not two. A source still being fetched behind a rate limit has
+ * not failed, and showing it in red alongside genuinely broken feeds sent
+ * people hunting a bug that was not there. Pending is amber and says so.
+ */
 function SourceHealth({ sources, youtubeNeedsKey }) {
   if (!sources.length && !youtubeNeedsKey) return null;
   const ok = sources.filter(s => s.ok).length;
+  const pending = sources.filter(s => !s.ok && s.pending).length;
   return (
     <section className="sop-strip">
       <div className="sop-head">
         <span className="sop-label">Sources</span>
-        <span className="section-sub">{ok}/{sources.length} live</span>
+        <span className="section-sub">
+          {ok}/{sources.length} live{pending ? ` · ${pending} still loading` : ''}
+        </span>
       </div>
       <div className="src-health">
         {youtubeNeedsKey && (
@@ -865,12 +874,14 @@ function SourceHealth({ sources, youtubeNeedsKey }) {
         )}
         {sources.map((s, i) => (
           <div className="src-row" key={`${s.platform}-${s.label}-${i}`}>
-            <span className={`src-dot ${s.ok ? 'ok' : 'fail'}`}/>
+            <span className={`src-dot ${s.ok ? 'ok' : s.pending ? 'pending' : 'fail'}`}/>
             <span className="src-name">{s.label}</span>
             <span className="src-note" title={s.limitation ? `Needs ${s.needs} on your RSSHub instance` : undefined}>
-              {s.ok ? `${s.count} items`
-                    : s.limitation ? `needs ${s.needs}`
-                    : (s.error || `HTTP ${s.status}`)}
+              {s.ok
+                ? `${s.count} items${s.cached === 'stale' ? ' · refreshing' : ''}`
+                : s.pending ? 'still loading'
+                : s.limitation ? `needs ${s.needs}`
+                : (s.error || `HTTP ${s.status}`)}
             </span>
           </div>
         ))}

@@ -165,7 +165,17 @@ async function loadSource(source) {
     { platform: source.platform, category: source.category, label: source.label, subcategory: source.subcategory || null }
   ));
 
-  return { items, report: { label: source.label, platform: source.platform, category: source.category, ok: true, status: 200, count: items.length, topic: Boolean(source.topic) } };
+  return {
+    items,
+    report: {
+      label: source.label, platform: source.platform, category: source.category,
+      ok: true, status: 200, count: items.length, topic: Boolean(source.topic),
+      // 'fresh' | 'stale' | undefined (came off the wire). A stale hit means the
+      // caller was served instantly and a refresh is running behind them, which
+      // is worth surfacing rather than hiding — it is why the load was fast.
+      ...(res.cached ? { cached: res.cached, ageSeconds: res.ageSeconds } : {}),
+    },
+  };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -185,13 +195,26 @@ export async function GET(request) {
   }
 
   // A deadline, so a slow host cannot turn into a dead endpoint. Whatever has
-  // arrived by the cutoff is returned; the rest report as degraded with a
-  // reason. Partial and honest beats a timeout that returns nothing — and
-  // crucially, the sources that DID arrive get cached, so the next load is
-  // faster rather than identically slow.
-  // ASSUMPTION: 20s leaves headroom under maxDuration=60 and still fits a
-  // 25s-ish platform cap. Lower it if you deploy somewhere stricter.
-  const DEADLINE_MS = Number(process.env.SOCIAL_DEADLINE_MS) || 20_000;
+  // arrived by the cutoff is returned; the rest are reported as STILL LOADING,
+  // which is a different thing from broken and must not look the same.
+  //
+  // The source whose fetch is still running has not failed — it is simply
+  // behind a rate limit doing exactly what it was told. Reporting that as
+  // `error: "not finished within 20s"` sent people hunting a bug that was not
+  // there. It now reports `pending: true` with the reason, and the UI can say
+  // "still loading" instead of colouring it red.
+  //
+  // Nothing is cancelled at the deadline. Promise.race abandons the RESULT, not
+  // the work: every in-flight fetch runs to completion and populates the cache,
+  // so the load that timed out is precisely what makes the next one instant.
+  // That is the warm-up, and it is why partial beats failing the whole request.
+  //
+  // ASSUMPTION: 25s. Measured cold cost for the 13 sports subreddits is 13.6s
+  // at normal latency and 15.7s when Reddit is slow (scripts/tune-throttle.mjs),
+  // so 25s clears both with margin and still fits under maxDuration=60. A
+  // platform with a shorter function cap should lower this — on Vercel Hobby
+  // (10s) the warm-up cron below is what keeps loads inside the cap.
+  const DEADLINE_MS = Number(process.env.SOCIAL_DEADLINE_MS) || 25_000;
   const deadline = new Promise(res => setTimeout(() => res('__deadline__'), DEADLINE_MS));
 
   try {
@@ -202,7 +225,11 @@ export async function GET(request) {
         report: {
           label: src.label, platform: src.platform, category: src.category,
           ok: false, status: 0, count: 0,
-          error: `not finished within ${Math.round(DEADLINE_MS / 1000)}s`,
+          // Not an error. This source is queued behind a rate limit and is
+          // still being fetched; it will be in cache before the next load.
+          pending: true,
+          error: `still loading — queued behind the ${src.platform} rate limit, ` +
+                 `not finished within ${Math.round(DEADLINE_MS / 1000)}s`,
           deadline: true,
         },
       }))])
@@ -222,10 +249,23 @@ export async function GET(request) {
       }
     }
 
-    const degraded = sources.filter(s => !s.ok).length;
-    if (degraded) console.warn(`[social] ${degraded}/${sources.length} sources degraded`);
+    // Three states, counted separately, because they mean different things and
+    // a single "degraded" number hid the distinction that mattered.
+    const pending  = sources.filter(s => !s.ok && s.pending).length;
+    const degraded = sources.filter(s => !s.ok && !s.pending).length;
+    const served   = sources.filter(s => s.ok).length;
+    // How much of this response came from cache — the number that says whether
+    // the warm-up is doing its job.
+    const fromCache = sources.filter(s => s.cached).length;
 
-    return Response.json({ items, sources, degraded, base: baseUrl() });
+    if (degraded) console.warn(`[social] ${degraded}/${sources.length} sources degraded`);
+    if (pending)  console.warn(`[social] ${pending}/${sources.length} still loading at the deadline (cache warming)`);
+
+    return Response.json({
+      items, sources,
+      degraded, pending, served, fromCache,
+      base: baseUrl(),
+    });
   } catch (err) {
     // Must never take the request down.
     console.warn(`[social] EXCEPTION ${err?.message}`);
