@@ -17,7 +17,10 @@
     "categories:verify": "node scripts/verify-categories.mjs",
     "verify:pacing": "node scripts/verify-reddit-pacing.mjs",
     "sources:resolve": "node scripts/resolve-sources.mjs",
-    "podcasts:verify": "node scripts/verify-podcasts.mjs"
+    "podcasts:verify": "node scripts/verify-podcasts.mjs",
+    "tune:throttle": "node scripts/tune-throttle.mjs",
+    "verify:throughput": "node scripts/verify-throughput.mjs",
+    "verify:swr": "node scripts/verify-swr.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
