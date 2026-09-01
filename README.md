@@ -47,6 +47,7 @@ What is real:
 | Categories — add, rename, recolor, merge, delete, reorder | Working. `/api/categories` is the one writer |
 | `/api/recommend`, `/api/suggest-categories` | Working. Advisory only; both cached in-process |
 | `lib/source-resolver.js` + `npm run sources:resolve` | Working. Verify-then-wire; needs `YOUTUBE_API_KEY` |
+| Warm-up cron — `/api/cron/warm` | Working, but **daily** on Hobby. See below |
 | **Podcasts** — `/api/podcasts`, 5 shows | **Working.** Direct RSS, no key of any kind |
 | Episode summaries — `/api/podcast-summary` | Working. Show notes ONLY, never audio. See [docs/PODCASTS.md](docs/PODCASTS.md) |
 | Cross-show topics | Working. Same theme engine as Discover, pointed at episodes |
@@ -120,6 +121,31 @@ but run `npm run build` first, because it audits the production build.
 suite reports skipping rather than running. The responsive job applies the same
 reasoning: it fails if the audit never printed a PASSED/FAILED verdict, because
 a crash that prints nothing would otherwise look like success.
+
+## Warm-up cron and the Hobby plan
+
+`/api/cron/warm` pre-fetches every feed so page loads hit cache rather than the
+network. `vercel.json` schedules it **daily** (`0 6 * * *`), and that is a plan
+limit, not a preference:
+
+**Vercel Hobby rejects any cron more frequent than once per day, at config
+validation — before a deployment record exists.** A `*/5 * * * *` schedule does
+not fail loudly; the project simply stops deploying, with no build log to read.
+It cost one silent non-deploy here before the cause was found.
+
+The same applies to `maxDuration`: Hobby caps a function at 60s.
+
+**On Pro**, change two things together and the warm-up becomes the real fix:
+
+| | Hobby (now) | Pro |
+|---|---|---|
+| `vercel.json` schedule | `0 6 * * *` | `*/5 * * * *` |
+| `maxDuration` in the route | `60` | `300` |
+
+Be honest about what daily buys on Hobby: **not much.** Against a 5-minute
+freshness window the cache is cold again minutes later, so what actually carries
+page loads is stale-while-revalidate plus the on-demand cache. The job is wired
+because it costs nothing and becomes worthwhile the moment the schedule can rise.
 
 ## Responsive contract
 

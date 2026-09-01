@@ -13,9 +13,23 @@
 // hit. Combined with stale-while-revalidate the cache then never goes cold:
 // entries stay fresh, and if a run is missed the stale band covers the gap.
 //
-// ── WIRING IT ───────────────────────────────────────────────────────────────
-// vercel.json schedules this every 5 minutes, matching CACHE_FRESH_MS so an
-// entry is refreshed about when it stops being fresh.
+// ── WIRING IT, AND THE PLAN LIMIT THAT SHAPES IT ────────────────────────────
+// vercel.json schedules this DAILY (`0 6 * * *`), not every 5 minutes, because
+// this account is on the Vercel HOBBY plan and Hobby rejects any cron schedule
+// more frequent than once per day. It rejects it at CONFIG VALIDATION — before
+// a deployment record is even created — so a sub-daily schedule does not fail
+// loudly, it silently stops the project deploying at all. That happened once
+// here; hence this paragraph.
+//
+// ON PRO, change the schedule to `*/5 * * * *` and raise maxDuration below to
+// 300. Five minutes matches CACHE_FRESH_MS, so every entry is refreshed about
+// when it stops being fresh, and no page load ever fetches.
+//
+// BE HONEST ABOUT WHAT DAILY BUYS: not much. A once-a-day warm-up against a
+// 5-minute freshness window means the cache is cold again minutes later, so on
+// Hobby the thing actually carrying page loads is stale-while-revalidate plus
+// the on-demand cache — not this job. It is wired because it costs nothing and
+// becomes the real fix the moment the schedule can be raised.
 //
 // IMPORTANT, and the reason this is honest rather than theatre: Vercel runs
 // each cron in its own lambda, and the response cache is per-instance memory.
@@ -36,8 +50,12 @@ import { fetchFeed, cacheStatus } from '../../../../lib/feed-fetch.js';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 // The whole point is to absorb the slow path so requests do not. Every source
-// in the app, paced, needs more room than a single category does.
-export const maxDuration = 300;
+// in the app, paced, needs more room than a single category does — but Hobby
+// caps a function at 60s, and asking for more is another config rejection.
+// ASSUMPTION: 60 is the Hobby ceiling. On Pro raise this to 300 alongside the
+// */5 schedule; the warm-up will then finish every source in one run rather
+// than as far as it gets.
+export const maxDuration = 60;
 
 /** Every fetchable URL in the app, de-duplicated. */
 function allTargets() {
