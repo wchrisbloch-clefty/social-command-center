@@ -27,6 +27,7 @@ import { crossShowTopics } from '../lib/themes.js';
 // Chart series. Pure, and the only place chart maths lives.
 import { categoryBars, topicBars, signalMix, bucketByTime, bucketLabel, SPARK_BUCKETS }
   from '../lib/chart-data.js';
+import { toCsv, csvFilename } from '../lib/csv.js';
 
 // The widest window the segmented control offers — "look further back" is the
 // action an empty velocity view offers, and it must agree with that control
@@ -860,6 +861,61 @@ function BarSeries({ label, sub, bars, unit = 'signal', empty, max: maxProp }) {
 }
 
 /**
+ * Export the rows a view is showing, as CSV.
+ *
+ * There is no export endpoint and there does not need to be one: the rows are
+ * already in the browser, already ranked, already through normalizeSignal().
+ * Serialising them client-side means the file always matches what is on screen,
+ * which a server-side export could not promise once a window filter is
+ * involved.
+ *
+ * The button states its ROW COUNT, so you know what you are getting before you
+ * click, and so a degraded feed exports a small file rather than a surprising
+ * one.
+ *
+ * Every DOM call is guarded. A blocked object URL or a sandboxed download must
+ * degrade to a visible message here — an uncaught throw would be a console
+ * error, and a console error fails the responsive gate on every view that
+ * renders this button.
+ */
+function ExportCsv({ columns, rows, prefix, label = 'Export CSV' }) {
+  const [msg, setMsg] = useState('');
+  const count = (rows || []).length;
+
+  const download = () => {
+    setMsg('');
+    let url = null;
+    try {
+      const blob = new Blob([toCsv(columns, rows)], { type: 'text/csv;charset=utf-8' });
+      url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = csvFilename(prefix);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.warn('[export] CSV download failed', e?.message);
+      setMsg('This browser blocked the download.');
+    } finally {
+      // Revoked on a timeout rather than immediately: Safari reads the URL
+      // asynchronously after the click and gets an empty file otherwise.
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
+  };
+
+  if (!count) return null;
+  return (
+    <div className="export">
+      <button className="nav-btn" onClick={download}>
+        {label} · {count} row{count === 1 ? '' : 's'}
+      </button>
+      {msg && <span className="rec-note">{msg}</span>}
+    </div>
+  );
+}
+
+/**
  * The velocity mix as one 100%-stacked strip.
  *
  * Deliberately not a pie. A pie would be the only circle on an otherwise
@@ -888,7 +944,7 @@ function SignalMixStrip({ label, summary, windowHours, empty }) {
           <ul className="chart-mix-key">
             {mix.segments.map(s => (
               <li key={s.id}>
-                <span className={`vel vel-${s.id}`}>{s.label}</span>
+                <span className={`vel vel-${s.id}`}>{s.label}</span>{' '}
                 {s.value} · {Math.round(s.pct)}%
               </li>
             ))}
@@ -1216,12 +1272,28 @@ function VelocityRow({ item }) {
   );
 }
 
+// The export is the ranked feed, not the six-per-category display list: the
+// columns are exactly the fields normalizeSignal() guarantees, so a row can
+// never be half-populated.
+const DISCOVER_CSV_COLUMNS = [
+  { label: 'published',  value: r => r.publishedAt || '' },
+  { label: 'age_hours',  value: r => (Number.isFinite(r.ageHours) ? r.ageHours.toFixed(1) : '') },
+  { label: 'category',   value: r => categoryLabelOf(r.category) },
+  { label: 'source',     key: 'sourceLabel' },
+  { label: 'platform',   key: 'platform' },
+  { label: 'tier',       value: r => TIER_WORD[r.tier] },
+  { label: 'velocity',   value: r => VELOCITY_WORD[r.signal] },
+  { label: 'title',      key: 'title' },
+  { label: 'url',        key: 'url' },
+];
+
 function DiscoverView() {
   const { items, loading, refresh } = useAllSignals();
   const [windowHours, setWindowHours] = useState(DEFAULT_WINDOW_HOURS);
 
   const groups = groupByCategory(items, { windowHours, perCategory: 6 });
   const summary = velocitySummary(items, windowHours);
+  const exportRows = rankByVelocity(items, { windowHours });
 
   useEffect(() => {
     window.__aetherRefreshFeed = refresh;
@@ -1239,13 +1311,20 @@ function DiscoverView() {
               : `${summary.total} signals in the last ${windowHours}h · ${summary.high} High · ${summary.rising} Rising`}
           </p>
         </div>
-        <div className="seg" role="group" aria-label="Time window">
-          {WINDOW_OPTIONS.map(w => (
-            <button key={w.hours}
-              className={`seg-btn${windowHours === w.hours ? ' active' : ''}`}
-              aria-pressed={windowHours === w.hours}
-              onClick={() => setWindowHours(w.hours)}>{w.label}</button>
-          ))}
+        <div className="view-head-actions">
+          <div className="seg" role="group" aria-label="Time window">
+            {WINDOW_OPTIONS.map(w => (
+              <button key={w.hours}
+                className={`seg-btn${windowHours === w.hours ? ' active' : ''}`}
+                aria-pressed={windowHours === w.hours}
+                onClick={() => setWindowHours(w.hours)}>{w.label}</button>
+            ))}
+          </div>
+          {/* E2 — the file matches what is on screen, including the window. */}
+          {!loading && (
+            <ExportCsv columns={DISCOVER_CSV_COLUMNS} rows={exportRows}
+              prefix={`aetherhub-discover-${windowHours}h`}/>
+          )}
         </div>
       </div>
 

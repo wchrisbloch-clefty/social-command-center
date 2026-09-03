@@ -217,8 +217,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Numbers read as data everywhere — tickers, counts, timestamps. */
-.tnum, time, [data-num] {
+/* ── Numbers read as data everywhere — counts, timestamps, percentages ─────
+   Tabular figures are not a typographic flourish here. Every number in this app
+   sits in a column, a right-aligned note or a value that changes in place while
+   the layout stays still — a source count ticking 4→5, a signal count
+   refreshing, a bar value beside a bar. Proportional figures make those jitter
+   sideways, which reads as the layout moving rather than the number changing.
+
+   This list is every class that renders a digit. E1 in the design pass was
+   "some of these have it": the utility classes did, the metadata lines did not,
+   so a `4 items` and a `41 items` in the same column did not line up. */
+.tnum, time, [data-num],
+.view-sub, .section-sub, .signal-meta, .vrow-meta, .sop-item-meta, .sop-item-time,
+.src-note, .rec-meta, .rec-why, .rec-note, .empty-note, .empty-body,
+.limit-list, .cat-meta, .nav-tab, .pod-add-note, .ep-provenance, .ep-summary-none,
+.export,
+.seg-btn, .sop-label, .note-block, .cat-confirm-text, .drill-label,
+.chart-bar-value, .chart-bar-detail, .chart-spark-foot, .chart-mix-key,
+.drill-count, .sop-num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
@@ -445,7 +461,7 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 .sop-item:hover { opacity: 0.68; }
 .sop-num {
   font-weight: var(--fw-medium); font-size: var(--fs-meta);
-  min-width: 20px; font-variant-numeric: tabular-nums; flex-shrink: 0;
+  min-width: 20px; flex-shrink: 0;
   color: var(--cat, var(--text3));
 }
 .sop-item-title {
@@ -472,6 +488,13 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   padding-bottom: var(--s3); border-bottom: 1px solid var(--border);
 }
 .view-head-text { flex: 1 1 260px; min-width: 0; }
+/* The window selector and the export button. Wraps to its own line before the
+   head does, so at 390px you get title / subtitle / controls stacked rather
+   than a segmented control squeezed against a button. */
+.view-head-actions {
+  flex: 0 1 auto; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+}
 .view-title { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); margin: 0; }
 .view-sub { font-size: var(--fs-body); color: var(--text3); margin: 4px 0 0; max-width: 62ch; line-height: 1.5; }
 
@@ -661,7 +684,6 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 }
 .drill-count {
   font-size: var(--fs-meta); color: var(--text3); flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
 }
 /* Teams read as a level below their leagues. */
 .drill-teams .drill-item { background: transparent; }
@@ -766,6 +788,9 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   .skel-side { flex-direction: row; align-items: center; gap: 8px; }
 }
 
+/* CSV export: the button plus, if the browser refuses the download, why. */
+.export { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    CHARTS — one bar, one line, one strip. Nothing else.
    ═══════════════════════════════════════════════════════════════════════════
@@ -805,7 +830,6 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 .chart-bar-value {
   grid-column: 2; white-space: nowrap;
   font-size: var(--fs-meta); color: var(--text3);
-  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
 }
 .chart-bar-track {
   grid-column: 1 / -1;
@@ -844,7 +868,6 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   display: flex; flex-wrap: wrap; gap: 4px 14px;
   margin-top: 7px;
   font-size: var(--fs-meta); color: var(--text3);
-  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
 }
 
 /* ── Signal-mix strip: one 100%-stacked bar, three known segments ────────── */
@@ -866,7 +889,6 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   display: flex; flex-wrap: wrap; gap: 4px 14px;
   margin: 8px 0 0; padding: 0; list-style: none;
   font-size: var(--fs-meta);
-  font-variant-numeric: tabular-nums;
 }
 .chart-mix-key li { color: var(--text3); white-space: nowrap; }
 .chart-mix-key .vel { margin-right: 4px; }

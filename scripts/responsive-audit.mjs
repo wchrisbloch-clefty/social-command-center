@@ -20,6 +20,7 @@
 //      scrolls on purpose — a tab strip is allowed to overflow itself).
 //   3. No collapsed nav/tab strip: every category tab renders with real width.
 //   4. No tap target under 34px tall or 24px wide.
+//   5. No number rendered with proportional figures (Signal Desk views only).
 //
 // ── RUNNING IT ──────────────────────────────────────────────────────────────
 // By default it builds nothing and starts nothing you must manage: it boots a
@@ -92,6 +93,11 @@ const DATA_ROUTES = [
   '**/api/social**', '**/api/podcasts**', '**/api/recommend**',
   '**/api/suggest-categories**', '**/api/youtube**',
 ];
+
+// The six inline-styled legacy dashboard views. They are mock data behind a
+// separate reskin, so the typographic rules the Signal Desk views are held to
+// do not apply to them yet — but their geometry still is.
+const LEGACY_VIEWS = ['intelligence', 'studio', 'alerts', 'sources', 'settings'];
 
 const MIN_TAP_HEIGHT = 34;
 const MIN_TAP_WIDTH  = 24;
@@ -208,7 +214,7 @@ function startApp(rsshubBase) {
 }
 
 // ── Measurement, run inside the page ────────────────────────────────────────
-function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
+function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch, checkTnum }) {
   const de = document.documentElement;
   const vw = de.clientWidth;
 
@@ -336,6 +342,33 @@ function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
     }
   }
 
+  // (5) Tabular figures. Every number in a Signal Desk view sits in a column, a
+  //     right-aligned note, or a value that refreshes in place. Proportional
+  //     figures make those jitter sideways as the digits change, which reads as
+  //     the layout moving rather than the number changing. This is checked by
+  //     COMPUTED STYLE on the elements that actually render digits, because the
+  //     failure mode is a new view whose metadata class nobody added to the
+  //     shared rule — invisible in the stylesheet, obvious in a column.
+  if (checkTnum) {
+    const seen = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.children.length) continue;                    // leaves only
+      if (!visible(el)) continue;
+      // .sr-only is clipped to 1x1 and never rendered as glyphs — a live region
+      // announcing "28 of 29 sources live" has no figures to set.
+      if (el.classList.contains('sr-only')) continue;
+      const txt = (el.textContent || '');
+      if (!/[0-9]/.test(txt)) continue;
+      const fvn = getComputedStyle(el).fontVariantNumeric || '';
+      const ffs = getComputedStyle(el).fontFeatureSettings || '';
+      if (fvn.includes('tabular-nums') || /"tnum"\s*(1|on)?/.test(ffs)) continue;
+      const key = describe(el);
+      if (seen.has(key)) continue;                          // one report per shape
+      seen.add(key);
+      violations.push({ rule: 'proportional-figures', detail: key });
+    }
+  }
+
   return {
     violations,
     theme: de.getAttribute('data-theme'),
@@ -446,6 +479,9 @@ async function main() {
           const m = await page.evaluate(measure, {
             minTapH: MIN_TAP_HEIGHT, minTapW: MIN_TAP_WIDTH,
             minTabStrip: MIN_TAB_STRIP, expectedTabs, touch: bp.mobile,
+            // Skeletons carry no numbers, so the tnum rule has nothing to say
+            // about them and would only report the shared masthead twice.
+            checkTnum: !LEGACY_VIEWS.includes(view) && !LOADING_MODE,
           });
 
           // A skeleton case that measured no skeleton measured nothing. Without

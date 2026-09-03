@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/verify-charts.mjs — the chart honesty check.
+// scripts/verify-charts.mjs — the chart and export honesty check.
 //
 //   npm run verify:charts
 //
@@ -19,10 +19,16 @@
 //   4. Mix percentages are derived from the raw counts and sum to 100 — and
 //      the raw counts survive, because the counts are what get rendered.
 //   5. Nothing is smoothed: a single item produces a single non-zero bucket.
+//
+// It also covers the CSV export, for the same reason: a mis-serialised file
+// opens misaligned in a spreadsheet with no error anywhere, and the feed
+// contains exactly the text that breaks a naive join(','): commas in headlines,
+// quotes in pull-quotes, literal newlines out of RSS descriptions.
 
 import {
   bucketByTime, bucketLabel, categoryBars, topicBars, signalMix, SPARK_BUCKETS,
 } from '../lib/chart-data.js';
+import { csvField, toCsv, csvFilename } from '../lib/csv.js';
 
 const problems = [];
 const checks = [];
@@ -160,6 +166,76 @@ const item = (ageHours, extra = {}) => ({ id: `i${ageHours}`, ageHours, ...extra
     bucketLabel(SPARK_BUCKETS - 1, 0.5) === 'last 30m', bucketLabel(SPARK_BUCKETS - 1, 0.5));
 }
 
+// ── 8. CSV export survives real headlines ──────────────────────────────────
+// Every one of these appears in the live feed. A join(',') export of them
+// produces a file that opens misaligned in every spreadsheet, silently.
+{
+  ok('a plain field is not quoted', csvField('Sports') === 'Sports');
+  ok('a comma forces quoting',
+    csvField('Webb, again') === '"Webb, again"', csvField('Webb, again'));
+  ok('a double quote is doubled inside quotes',
+    csvField('He said "no"') === '"He said ""no"""', csvField('He said "no"'));
+  ok('a literal newline forces quoting',
+    csvField('line one\nline two') === '"line one\nline two"');
+  ok('a carriage return forces quoting', csvField('a\rb') === '"a\rb"');
+  ok('null and undefined are empty, not the strings',
+    csvField(null) === '' && csvField(undefined) === '');
+  ok('a number survives as text', csvField(0) === '0');
+  ok('an em dash and curly quotes need no quoting — they are not delimiters',
+    csvField('Webb — “Pillars”') === 'Webb — “Pillars”');
+
+  const rows = [
+    { title: 'Plain headline', cat: 'Space', n: 3 },
+    { title: 'Margins expand, again', cat: 'Business & Markets', n: 12 },
+    { title: 'She said "it doubled"', cat: 'Health', n: 1 },
+  ];
+  const cols = [
+    { label: 'title', key: 'title' },
+    { label: 'category', key: 'cat' },
+    { label: 'count', value: r => r.n },
+  ];
+  const out = toCsv(cols, rows);
+  const lines = out.split('\r\n');
+  ok('CRLF line endings, per RFC 4180', out.includes('\r\n') && !/[^\r]\n/.test(out));
+  ok('a header row plus one row per record, then a trailing terminator',
+    lines.length === 5 && lines[4] === '', String(lines.length));
+  ok('the header is the column labels', lines[0] === 'title,category,count');
+  ok('a comma inside a field does not become a column',
+    lines[2] === '"Margins expand, again",Business & Markets,12', lines[2]);
+  ok('a quote inside a field is doubled in the row',
+    lines[3] === '"She said ""it doubled""",Health,1', lines[3]);
+  ok('every row has the same field count as the header',
+    lines.slice(0, 4).every(l => splitCsvLine(l).length === 3),
+    JSON.stringify(lines.slice(1, 4).map(l => splitCsvLine(l).length)));
+  ok('no rows still produces a header', toCsv(cols, []) === 'title,category,count\r\n');
+
+  const name = csvFilename('AetherHub Discover 48h', new Date('2026-09-03T14:05:09Z'));
+  ok('the filename is slugged and stamped',
+    name === 'aetherhub-discover-48h-2026-09-03-14-05.csv', name);
+  ok('two exports a minute apart do not collide',
+    csvFilename('x', new Date('2026-09-03T14:05:00Z'))
+      !== csvFilename('x', new Date('2026-09-03T14:06:00Z')));
+}
+
+// A minimal RFC 4180 reader, used only to prove the writer round-trips. If it
+// disagrees with the writer, one of the two is wrong and the check says so.
+function splitCsvLine(line) {
+  const out = [];
+  let field = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quoted) {
+      if (c === '"' && line[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') { out.push(field); field = ''; }
+    else field += c;
+  }
+  out.push(field);
+  return out;
+}
+
 // ── Report ─────────────────────────────────────────────────────────────────
 process.stdout.write(`\nChart honesty check — ${checks.length} assertions\n\n`);
 for (const c of checks) {
@@ -170,5 +246,8 @@ if (problems.length) {
   process.stdout.write(`\nFAILED — ${problems.length} of ${checks.length}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write('\nPASSED — every series draws only what the pipeline produced.\n');
+  process.stdout.write(
+    '\nPASSED — every series draws only what the pipeline produced, and the ' +
+    'export round-trips.\n'
+  );
 }
