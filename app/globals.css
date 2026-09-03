@@ -701,6 +701,77 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   line-height: 1.6;
 }
 
+/* An empty state is a sentence plus a way out. The title says what is empty,
+   the body says why, and the actions are real controls — never "try again
+   later", which is not an action. */
+.empty-title { display: block; color: var(--text2); font-weight: var(--fw-medium); }
+.empty-body  { margin-top: 8px; }
+.empty-actions {
+  margin-top: var(--s3);
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETONS — loading geometry, not decoration
+   ═══════════════════════════════════════════════════════════════════════════
+   A skeleton is the exact shape of the row that will replace it, drawn in the
+   hairline grey. It is STATIC: DESIGN.md forbids glow, shadow and pulse, and a
+   motionless placeholder is also the only kind that costs nothing over the
+   fourteen seconds a cold /api/social call can take. No spinner anywhere. */
+
+.skel-bar {
+  background: var(--border);
+  border-radius: 3px;
+  height: 9px;
+  max-width: 100%;
+}
+.skel-bar.tall { height: 13px; }
+
+/* Mirrors .signal — same border, same 3px left edge, same padding. */
+.skel-signal {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.skel-signal.lead { padding: 16px 18px; }
+.skel-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.skel-side {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+}
+.skel-side .skel-bar { width: 54px; }
+
+/* Mirrors .vrow — no card, one bottom hairline. */
+.skel-vrow {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  border-bottom: 1px solid var(--border2);
+  padding: 14px 0;
+}
+
+/* Mirrors .src-row. */
+.skel-srow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-top: 1px solid var(--border2);
+}
+.skel-srow:first-child { border-top: none; }
+.skel-srow .skel-bar:last-child { margin-left: auto; width: 52px; }
+
+@media (max-width: 720px) {
+  .skel-signal { padding: 11px 12px; gap: var(--s2); }
+  .skel-signal.lead { padding: 13px 14px; }
+  .skel-side { flex-direction: row; align-items: center; gap: 8px; }
+}
+
+/* Announced, not shown. The only correct way to give a screen reader a status
+   update that the sighted layout already communicates by position. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LEGACY VIEWS — the six inline-styled dashboard views
    ═══════════════════════════════════════════════════════════════════════════ */

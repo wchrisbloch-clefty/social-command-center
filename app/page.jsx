@@ -25,6 +25,11 @@ import {
 // podcast text. A second clustering implementation would only drift.
 import { crossShowTopics } from '../lib/themes.js';
 
+// The widest window the segmented control offers — "look further back" is the
+// action an empty velocity view offers, and it must agree with that control
+// rather than hard-coding 168.
+const WIDEST_WINDOW = WINDOW_OPTIONS.reduce((m, w) => Math.max(m, w.hours), DEFAULT_WINDOW_HOURS);
+
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
 // `T` reads those tokens rather than carrying hex literals, so the whole app —
@@ -777,6 +782,109 @@ function useLiveFeed(category) {
   return { ...state, refresh: () => setNonce(n => n + 1) };
 }
 
+// ─── LOADING / EMPTY PRIMITIVES ───────────────────────────────────────────────
+// Two components, used by every real-data view. They exist so that "what does
+// this look like before the data arrives" and "what does this say when there is
+// no data" are answered once, the same way, in every view — rather than seven
+// slightly different sentences in a dashed box.
+
+/** One grey bar. Width is the only thing a caller varies. */
+const SkelBar = ({ w, tall = false }) =>
+  <span className={`skel-bar${tall ? ' tall' : ''}`} style={{ width: w }}/>;
+
+// Deterministic widths. Random ones make the skeleton twitch on every re-render
+// during a 14-second load, which reads as a bug.
+const SKEL_META  = ['58%', '44%', '66%', '38%', '52%', '61%'];
+const SKEL_TITLE = ['86%', '72%', '94%', '64%', '80%', '90%'];
+
+/**
+ * The signal list, before it has any signals.
+ *
+ * Same card, same hairline, same 3px left edge, same two-line headline — so the
+ * page does not reflow when the real cards land. `lead` renders the larger
+ * first card the real list renders.
+ */
+function SkeletonSignalList({ rows = 5, lead = true }) {
+  const n = Math.max(1, rows);
+  return (
+    <div className="signal-list" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className={`skel-signal${lead && i === 0 ? ' lead' : ''}`}>
+          <span className="skel-main">
+            <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+            <SkelBar w={SKEL_TITLE[i % SKEL_TITLE.length]} tall/>
+            {lead && i === 0 && <SkelBar w="70%"/>}
+          </span>
+          <span className="skel-side"><SkelBar w="46px"/><SkelBar w="54px"/></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The Discover / drill-down row list, before it has any rows. */
+function SkeletonRowList({ rows = 6 }) {
+  const n = Math.max(1, rows);
+  return (
+    <div className="vlist" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="skel-vrow">
+          <span className="skel-main">
+            <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+            <SkelBar w={SKEL_TITLE[i % SKEL_TITLE.length]} tall/>
+          </span>
+          <span className="skel-side"><SkelBar w="46px"/><SkelBar w="54px"/></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The source-health strip, before any source has answered. */
+function SkeletonSourceList({ rows = 6 }) {
+  return (
+    <div className="src-health" aria-hidden="true">
+      {Array.from({ length: Math.max(1, rows) }, (_, i) => (
+        <div key={i} className="skel-srow">
+          <span className="src-dot" style={{ background: 'var(--border)' }}/>
+          <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+          <SkelBar w="52px"/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * An empty state that can be acted on.
+ *
+ * Title says WHAT is empty, body says WHY, actions are real controls. A state
+ * with nothing a person can do about it passes no actions and still reads as a
+ * sentence — but every degraded path here has at least a retry, because a
+ * degraded source is usually degraded for this one request only.
+ */
+function EmptyState({ title, children, actions = null, className = '' }) {
+  return (
+    <div className={`empty-note${className ? ` ${className}` : ''}`}>
+      {title && <strong className="empty-title">{title}</strong>}
+      {children && <div className="empty-body">{children}</div>}
+      {actions && <div className="empty-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/**
+ * One live region per view.
+ *
+ * Source health changes state — pending, live, degraded — with no visual event
+ * a screen reader can follow, because the change is a colour on a 6px dot and a
+ * word in a right-aligned note. This announces the roll-up instead, politely,
+ * so it never interrupts what is being read.
+ */
+function LiveStatus({ children }) {
+  return <p className="sr-only" role="status" aria-live="polite">{children}</p>;
+}
+
 /**
  * One signal. Metadata line, headline, then velocity + tier as WORDS.
  *
@@ -969,15 +1077,26 @@ function DiscoverView() {
         </div>
       </div>
 
-      {loading && <div className="empty-note">Ranking your sources…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Ranking your sources.'
+          : `${summary.total} signals in the last ${windowHours} hours across ${groups.length} categories. ${summary.high} High, ${summary.rising} Rising.`}
+      </LiveStatus>
+
+      {loading && <SkeletonRowList rows={7}/>}
 
       {!loading && !groups.length && (
-        <div className="empty-note">
-          <strong>Nothing in the last {windowHours}h.</strong>
-          <div style={{ marginTop: 8 }}>
-            Widen the window, or check the source list — every source may be degraded.
-          </div>
-        </div>
+        <EmptyState title={`Nothing in the last ${windowHours}h.`} actions={<>
+          {windowHours !== WIDEST_WINDOW && (
+            <button className="nav-btn" onClick={() => setWindowHours(WIDEST_WINDOW)}>
+              Widen to {WIDEST_WINDOW / 24} days
+            </button>
+          )}
+          <button className="nav-btn" onClick={refresh}>Refetch sources</button>
+        </>}>
+          Either your sources were quiet, or every one of them is degraded for this
+          request. Refetching hits the feeds again; widening the window looks further back.
+        </EmptyState>
       )}
 
       {groups.map(g => (
@@ -1205,7 +1324,8 @@ function AddPodcast({ onAdded }) {
       <div className="section-head"><span className="section-label">Add a show</span></div>
 
       <div className="cat-add-form">
-        <input className="search-input cat-input" value={query} placeholder="Show name, or an RSS feed URL"
+        <input className="search-input cat-input" id="add-podcast-url" value={query}
+          placeholder="Show name, or an RSS feed URL"
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') resolve(); }}
           aria-label="Show name or RSS feed URL"/>
@@ -1290,15 +1410,25 @@ function PodcastView() {
 
       {!loading && <CrossShowTopics topics={topics} limits={[...topicLimits, ...limits]}/>}
 
-      {loading && <div className="empty-note">Reading your shows…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Reading your shows.'
+          : `${items.length} episode${items.length === 1 ? '' : 's'} from ${ok} of ${sources.length} shows.`}
+      </LiveStatus>
+
+      {loading && <SkeletonSignalList rows={4} lead={false}/>}
 
       {!loading && !items.length && (
-        <div className="empty-note">
-          <strong>No episodes.</strong>
-          <div style={{ marginTop: 8 }}>
-            {limits[0] || 'Every configured show is degraded, or none is wired yet.'}
-          </div>
-        </div>
+        <EmptyState title="No episodes." actions={<>
+          <button className="nav-btn" onClick={refresh}>Refetch shows</button>
+          <button className="nav-btn" onClick={() => {
+            const el = document.getElementById('add-podcast-url');
+            el?.scrollIntoView({ block: 'center' });
+            el?.focus();
+          }}>Add a show</button>
+        </>}>
+          {limits[0] || 'Every configured show is degraded, or none is wired yet.'}
+        </EmptyState>
       )}
 
       {!loading && items.length > 0 && (
@@ -1325,9 +1455,12 @@ function RecommendedView() {
   const [state, setState] = useState({ recommendations: [], limits: [], mined: null, loading: true });
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
+  const [nonce, setNonce] = useState(0);
+  const refresh = () => setNonce(n => n + 1);
 
   useEffect(() => {
     let alive = true;
+    setState(s => ({ ...s, loading: true }));
     fetch('/api/recommend', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { if (alive) setState({ ...d, loading: false }); })
@@ -1336,7 +1469,7 @@ function RecommendedView() {
         if (alive) setState({ recommendations: [], limits: ['Could not mine recommendations.'], mined: null, loading: false });
       });
     return () => { alive = false; };
-  }, []);
+  }, [nonce]);
 
   const add = async rec => {
     setBusy(rec.key);
@@ -1377,17 +1510,22 @@ function RecommendedView() {
         </div>
       )}
 
-      {loading && <div className="empty-note">Mining your feed for referenced accounts…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Mining your feed for referenced accounts.'
+          : `${recommendations.length} candidate account${recommendations.length === 1 ? '' : 's'} found.`}
+      </LiveStatus>
+
+      {loading && <SkeletonRowList rows={5}/>}
 
       {!loading && !recommendations.length && (
-        <div className="empty-note">
-          <strong>No candidates yet.</strong>
-          <div style={{ marginTop: 8 }}>
-            This mines co-mentions out of the feed your own sources produced, so it
-            needs a populated feed to work from. With YouTube unconfigured and X
-            degraded on the free instance, there is very little text to read.
-          </div>
-        </div>
+        <EmptyState title="No candidates yet." actions={
+          <button className="nav-btn" onClick={refresh}>Mine the feed again</button>
+        }>
+          This mines co-mentions out of the feed your own sources produced, so it
+          needs a populated feed to work from. With YouTube unconfigured and X
+          degraded on the free instance, there is very little text to read.
+        </EmptyState>
       )}
 
       <div className="rec-list">
@@ -1555,17 +1693,28 @@ function SportsView({ items, loading, windowHours = DEFAULT_WINDOW_HOURS }) {
             </span>
           </div>
 
-          {loading && <div className="empty-note">Loading sports signal…</div>}
+          <LiveStatus>
+            {loading
+              ? 'Loading sports signal.'
+              : `${feed.length} signal${feed.length === 1 ? '' : 's'} for ` +
+                `${team ? team.label : league ? league.label : 'all sports'} in the last ${windowHours} hours.`}
+          </LiveStatus>
+
+          {loading && <SkeletonSignalList rows={4}/>}
 
           {!loading && !feed.length && (
-            <div className="empty-note">
-              <strong>Nothing here in the last {windowHours}h.</strong>
-              <div style={{ marginTop: 8 }}>
-                Sports pulls from Reddit, which needs no credentials — so an empty
-                result here means the subreddit was quiet or unreachable, not that
-                something is unconfigured. The source list shows which.
-              </div>
-            </div>
+            <EmptyState title={`Nothing here in the last ${windowHours}h.`} actions={<>
+              {active && (
+                <button className="nav-btn" onClick={openRoot}>Show all sports</button>
+              )}
+              <button className="nav-btn" onClick={() => window.__aetherRefreshFeed?.()}>
+                Refetch
+              </button>
+            </>}>
+              Sports pulls from Reddit, which needs no credentials — so an empty
+              result here means the subreddit was quiet or unreachable, not that
+              something is unconfigured. The source list shows which.
+            </EmptyState>
           )}
 
           {!loading && feed.length > 0 && <SignalList lead={feed[0]} items={feed.slice(1)}/>}
@@ -1607,9 +1756,12 @@ function ColorSwatches({ palette, value, onPick }) {
 function SuggestedCategories({ onCreate, busyKey }) {
   const [state, setState] = useState({ suggestions: [], limits: [], mined: null, loading: true });
   const [dismissed, setDismissed] = useState([]);
+  const [nonce, setNonce] = useState(0);
+  const refresh = () => setNonce(n => n + 1);
 
   useEffect(() => {
     let alive = true;
+    setState(s => ({ ...s, loading: true }));
     fetch('/api/suggest-categories', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { if (alive) setState({ ...d, loading: false }); })
@@ -1618,7 +1770,7 @@ function SuggestedCategories({ onCreate, busyKey }) {
         if (alive) setState({ suggestions: [], limits: ['Could not read your feed for themes.'], mined: null, loading: false });
       });
     return () => { alive = false; };
-  }, []);
+  }, [nonce]);
 
   const { suggestions, limits, mined, loading } = state;
   const visible = suggestions.filter(s => !dismissed.includes(s.term));
@@ -1646,17 +1798,21 @@ function SuggestedCategories({ onCreate, busyKey }) {
         </div>
       )}
 
-      {loading && <div className="empty-note">Reading your feed for recurring themes…</div>}
+      {loading && <SkeletonRowList rows={3}/>}
 
       {!loading && !visible.length && (
-        <div className="empty-note">
-          <strong>No themes stand out yet.</strong>
-          <div style={{ marginTop: 8 }}>
-            A theme needs to appear across at least two of your sources before it
-            is worth a category — one source talking about something is that
-            source&apos;s interest, not a category.
-          </div>
-        </div>
+        <EmptyState title="No themes stand out yet." actions={<>
+          <button className="nav-btn" onClick={refresh}>Read the feed again</button>
+          {dismissed.length > 0 && (
+            <button className="nav-btn" onClick={() => setDismissed([])}>
+              Restore {dismissed.length} dismissed
+            </button>
+          )}
+        </>}>
+          A theme needs to appear across at least two of your sources before it
+          is worth a category — one source talking about something is that
+          source&apos;s interest, not a category.
+        </EmptyState>
       )}
 
       <div className="rec-list">
@@ -1769,7 +1925,7 @@ function CategoryManager() {
         </div>
       )}
 
-      {loading && <div className="empty-note">Loading categories…</div>}
+      {loading && <SkeletonRowList rows={5}/>}
 
       {/* ── The collection ── */}
       <div className="cat-list">
@@ -1880,7 +2036,7 @@ function CategoryManager() {
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
-function FeedView({ t, category, search, isMobile }) {
+function FeedView({ t, category, search, isMobile, onSearch, onCategory }) {
   // "General" is the everything page, not a bucket. After the roster landed,
   // no source is filed under `general`, so treating it as a filter opened the
   // app on an empty feed. Every other tab filters; General shows the lot.
@@ -1923,33 +2079,62 @@ function FeedView({ t, category, search, isMobile }) {
           </span>
         </div>
 
-        {loading && (
-          <div className="empty-note" style={{ animation:'pulse 1.4s ease-in-out infinite' }}>
-            Pulling live signal…
-          </div>
-        )}
+        {/* The cold path here is the slowest in the app — a cache-miss
+            /api/social can take fourteen seconds. A skeleton in the exact
+            geometry of the cards that follow means the page is laid out and
+            legible for those fourteen seconds instead of showing one line of
+            text in a dashed box. */}
+        {loading && <SkeletonSignalList rows={5}/>}
 
         {!loading && !visible.length && (
           // Graceful fallback: the app renders, and it says exactly WHY it is
           // empty rather than quietly substituting invented posts.
-          <div className="empty-note">
-            <strong style={{ color:'var(--text2)' }}>No live signal for this category.</strong>
-            <div style={{ marginTop:8 }}>
-              {q
-                ? <>Nothing matches “{search}”. Clear the search to see the full feed.</>
-                : <>Every configured source for this category came back empty or unreachable.
-                   The source list on the right shows which ones and why. Edit{' '}
-                   <code>config/sources.js</code> to change what is pulled.</>}
-            </div>
-          </div>
+          <EmptyState
+            title={q ? `Nothing matches “${search}”.` : 'No live signal for this category.'}
+            actions={q
+              ? <button className="nav-btn" onClick={() => onSearch?.('')}>Clear the search</button>
+              : <>
+                  <button className="nav-btn" onClick={refresh}>Refetch this category</button>
+                  {category !== 'general' && (
+                    <button className="nav-btn" onClick={() => onCategory?.('general')}>
+                      See all signal
+                    </button>
+                  )}
+                </>}>
+            {q
+              ? <>The full feed has {items.length} signal{items.length === 1 ? '' : 's'} right now.</>
+              : <>Every configured source for this category came back empty or unreachable.
+                 The source list on the right shows which ones and why. Edit{' '}
+                 <code>config/sources.js</code> to change what is pulled.</>}
+          </EmptyState>
         )}
 
         {!loading && lead && <SignalList lead={lead} items={[...rail, ...more]}/>}
       </div>
 
       <aside>
+        {/* Source health is the one thing on this page that changes state
+            without a visible event a screen reader can follow — the change is a
+            colour on a 6px dot. Announce the roll-up instead. */}
+        <LiveStatus>
+          {loading
+            ? 'Pulling live signal.'
+            : `${visible.length} signal${visible.length === 1 ? '' : 's'}. ` +
+              `${sources.filter(s => s.ok).length} of ${sources.length} sources live` +
+              (sources.some(s => !s.ok && s.pending)
+                ? `, ${sources.filter(s => !s.ok && s.pending).length} still loading` : '') +
+              (degraded > 0 ? `, ${degraded} degraded` : '') + '.'}
+        </LiveStatus>
         <LiveSignalRail items={visible}/>
-        <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>
+        {loading
+          ? <section className="sop-strip">
+              <div className="sop-head">
+                <span className="sop-label">Sources</span>
+                <span className="section-sub">checking…</span>
+              </div>
+              <SkeletonSourceList rows={6}/>
+            </section>
+          : <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>}
       </aside>
     </div>
   );
@@ -2372,7 +2557,8 @@ export default function AetherHub() {
           </div>
         )}
 
-        {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}/>}
+        {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}
+                                                       onSearch={setSearch} onCategory={setCategory}/>}
         {view === 'discover'     && <DiscoverView/>}
         {view === 'recommended'  && <RecommendedView/>}
         {view === 'podcasts'     && <PodcastView/>}
