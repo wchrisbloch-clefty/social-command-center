@@ -764,6 +764,100 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   .skel-side { flex-direction: row; align-items: center; gap: 8px; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHARTS — one bar, one line, one strip. Nothing else.
+   ═══════════════════════════════════════════════════════════════════════════
+   Every mark on screen inherits a colour that already exists: a category bar
+   takes --cat (the same custom property the signal card's left stripe uses), a
+   velocity segment takes the three velocity tokens, and anything without a
+   category is var(--text3). No chart introduces a hue.
+
+   Every chart also states its numbers as TEXT. The bar is the supplement, not
+   the data — which is why none of these needs a role="img" description, and why
+   a screen reader gets the whole series by reading the list.
+
+   No axes, no gridlines, no legends, no tooltips, no rounded caps, no gradient.
+   A gridline on a five-row bar chart is decoration. */
+
+.chart-bars { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+/* Two rows per bar: label + value, then the track spanning both columns. This
+   layout is used rather than a three-column label|bar|value grid because a
+   topic label ("federal reserve balance sheet") has no width it can be trusted
+   to fit into at 390px, and a truncated label is worse than a stacked one. */
+.chart-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 5px 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border2);
+}
+.chart-bars > .chart-bar:first-child { border-top: none; }
+
+.chart-bar-label {
+  grid-column: 1; min-width: 0;
+  font-size: var(--fs-body); color: var(--text2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chart-bar-value {
+  grid-column: 2; white-space: nowrap;
+  font-size: var(--fs-meta); color: var(--text3);
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.chart-bar-track {
+  grid-column: 1 / -1;
+  height: 5px; border-radius: 2px;
+  background: var(--border2);
+  overflow: hidden;
+}
+.chart-bar-fill {
+  display: block; height: 100%; border-radius: 2px;
+  background: var(--cat, var(--text3));
+  min-width: 2px; /* a value of 1 out of 400 must still be visible */
+}
+.chart-bar-detail {
+  grid-column: 1 / -1;
+  font-size: var(--fs-meta); color: var(--text4);
+}
+
+/* ── Sparkline ───────────────────────────────────────────────────────────── */
+.chart-spark { display: block; width: 100%; height: 44px; overflow: visible; }
+.chart-spark-line {
+  fill: none;
+  stroke: var(--text2);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+.chart-spark-peak { fill: var(--text2); }
+.chart-spark-base { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart-spark-foot {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  margin-top: 6px;
+  font-size: var(--fs-meta); color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Signal-mix strip: one 100%-stacked bar, three known segments ────────── */
+.chart-mix {
+  display: flex; width: 100%; height: 7px;
+  border-radius: 2px; overflow: hidden;
+  background: var(--border2);
+}
+.chart-mix-seg { height: 100%; min-width: 2px; }
+.chart-mix-seg[data-vel="high"]     { background: var(--ah-signal-high); }
+.chart-mix-seg[data-vel="rising"]   { background: var(--ah-signal-rising); }
+.chart-mix-seg[data-vel="moderate"] { background: var(--text4); }
+
+.chart-mix-key {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin: 8px 0 0; padding: 0; list-style: none;
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+}
+.chart-mix-key li { color: var(--text3); white-space: nowrap; }
+.chart-mix-key .vel { margin-right: 4px; }
+
 /* Announced, not shown. The only correct way to give a screen reader a status
    update that the sighted layout already communicates by position. */
 .sr-only {

@@ -24,6 +24,9 @@ import {
 // The SAME theme miner Discover and the category manager use, pointed at
 // podcast text. A second clustering implementation would only drift.
 import { crossShowTopics } from '../lib/themes.js';
+// Chart series. Pure, and the only place chart maths lives.
+import { categoryBars, topicBars, signalMix, bucketByTime, bucketLabel, SPARK_BUCKETS }
+  from '../lib/chart-data.js';
 
 // The widest window the segmented control offers — "look further back" is the
 // action an empty velocity view offers, and it must agree with that control
@@ -782,6 +785,80 @@ function useLiveFeed(category) {
   return { ...state, refresh: () => setNonce(n => n + 1) };
 }
 
+// ─── CHARTS ───────────────────────────────────────────────────────────────────
+// Three components, and they are the only charting in the app. Discover's
+// category bars, the Podcast tab's topic bars, the signal-volume sparkline and
+// the velocity mix strip all come from here, which is why adding the fourth
+// chart cost almost nothing.
+//
+// THE CONTRACT
+//   1. Every series comes from lib/chart-data.js, which reads only items that
+//      have been through normalizeSignal(). Nothing is generated, smoothed,
+//      interpolated or projected.
+//   2. Nothing renders with no data. Each component takes an `empty` message
+//      and shows it instead of drawing — a row of zero-width bars or a flat
+//      line would read as "we measured, and the answer was nothing", which is
+//      not the same claim as "nothing has arrived yet".
+//   3. The numbers are TEXT. The mark is the supplement. That is what makes
+//      these readable by a screen reader without a parallel description, and
+//      it is why the marks themselves are aria-hidden.
+//   4. No mark introduces a colour. A category bar inherits --cat via
+//      data-cat; a velocity segment uses the three velocity tokens; anything
+//      uncategorised is var(--text3).
+
+/** Section frame shared by every chart, so they line up with the other strips. */
+function ChartFrame({ label, sub, children }) {
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">{label}</span>
+        {sub && <span className="section-sub">{sub}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Horizontal bars, sorted descending, scaled against the LARGEST value.
+ *
+ * Scaled against the largest rather than the total on purpose: this chart
+ * answers "which of these is biggest, and by how much" — a part-to-whole scale
+ * would squash every bar to nothing as soon as the collection grows.
+ *
+ * @param bars  rows from categoryBars() / topicBars(): {id, catId, label, value, detail}
+ * @param unit  singular noun for the value, pluralised with an "s"
+ * @param empty what to say when there are no rows. Required — see contract (2).
+ */
+function BarSeries({ label, sub, bars, unit = 'signal', empty, max: maxProp }) {
+  const rows = bars || [];
+  const max = maxProp || rows.reduce((m, b) => Math.max(m, b.value), 0);
+
+  return (
+    <ChartFrame label={label} sub={sub}>
+      {!rows.length ? (
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      ) : (
+        <ul className="chart-bars">
+          {rows.map(b => (
+            <li className="chart-bar" key={b.id} {...(b.catId ? { 'data-cat': b.catId } : {})}>
+              <span className="chart-bar-label">{b.label}</span>
+              <span className="chart-bar-value">
+                {b.value} {unit}{b.value === 1 ? '' : 's'}
+              </span>
+              <span className="chart-bar-track" aria-hidden="true">
+                <span className="chart-bar-fill"
+                  style={{ width: `${max ? (b.value / max) * 100 : 0}%` }}/>
+              </span>
+              {b.detail && <span className="chart-bar-detail">{b.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </ChartFrame>
+  );
+}
+
 // ─── LOADING / EMPTY PRIMITIVES ───────────────────────────────────────────────
 // Two components, used by every real-data view. They exist so that "what does
 // this look like before the data arrives" and "what does this say when there is
@@ -1082,6 +1159,17 @@ function DiscoverView() {
           ? 'Ranking your sources.'
           : `${summary.total} signals in the last ${windowHours} hours across ${groups.length} categories. ${summary.high} High, ${summary.rising} Rising.`}
       </LiveStatus>
+
+      {/* A1 — the whole feed in one glance, before any scrolling. Bars come
+          from the SAME groupByCategory() call the sections below render, so the
+          chart and the list can never disagree. */}
+      {!loading && groups.length > 0 && (
+        <BarSeries
+          label="Signal by category"
+          sub={`last ${windowHours}h`}
+          bars={categoryBars(groups)}
+          empty={`Nothing in the last ${windowHours}h to chart.`}/>
+      )}
 
       {loading && <SkeletonRowList rows={7}/>}
 
