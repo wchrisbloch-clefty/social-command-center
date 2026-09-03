@@ -113,7 +113,7 @@
   --border2:  #212121;
   --text:     #ededed;
   --text2:    #a3a3a3;
-  --text3:    #7d7d7d;
+  --text3:    #838383;   /* 4.71:1 on --surface, 5.04:1 on --bg */
   --text4:    #525252;
 
   --accent:    #ededed;
@@ -240,7 +240,9 @@ body {
 @keyframes spin  { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-input::placeholder, textarea::placeholder { color: var(--text4); }
+/* --text3, not --text4. --text4 is 2.5:1 against white — fine for a scrollbar
+   thumb or a border, never legible as type. */
+input::placeholder, textarea::placeholder { color: var(--text3); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -528,7 +530,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   font-size: var(--fs-meta); color: var(--text3); margin-top: 3px;
 }
-.rec-why { font-size: var(--fs-meta); color: var(--text4); margin-top: 4px; }
+.rec-why { font-size: var(--fs-meta); color: var(--text3); margin-top: 4px; }
 .rec-action { flex: 0 0 auto; display: flex; align-items: center; }
 .rec-ok   { font-size: var(--fs-meta); color: var(--ah-signal-high); font-weight: 500; }
 .rec-note { font-size: var(--fs-meta); color: var(--text3); }
@@ -632,7 +634,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 .crumb:hover { color: var(--text); }
 .crumb.current { color: var(--text); cursor: default; }
-.crumb-sep { color: var(--text4); font-size: var(--fs-body); }
+.crumb-sep { color: var(--text3); font-size: var(--fs-body); }
 
 /* Wraps at every width — a fixed row of seven leagues cannot fit a phone, and a
    horizontally scrolling strip here would compete with the category nav above
@@ -818,24 +820,31 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 .chart-bar-detail {
   grid-column: 1 / -1;
-  font-size: var(--fs-meta); color: var(--text4);
+  font-size: var(--fs-meta); color: var(--text3);
 }
 
 /* ── Sparkline ───────────────────────────────────────────────────────────── */
-.chart-spark { display: block; width: 100%; height: 44px; overflow: visible; }
+/* One stroke. The baseline is a CSS border rather than an SVG <line>, and there
+   is no peak dot: the peak is stated in the foot as text, which is both the
+   accessible version and the only version that survives the non-uniform scale
+   this viewBox is stretched by. */
+.chart-spark {
+  display: block; width: 100%; height: 40px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
 .chart-spark-line {
   fill: none;
   stroke: var(--text2);
   stroke-width: 1.25;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
-.chart-spark-peak { fill: var(--text2); }
-.chart-spark-base { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chart-spark-foot {
-  display: flex; flex-wrap: wrap; gap: 4px 10px;
-  margin-top: 6px;
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin-top: 7px;
   font-size: var(--fs-meta); color: var(--text3);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
 }
 
 /* ── Signal-mix strip: one 100%-stacked bar, three known segments ────────── */
@@ -847,7 +856,11 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 .chart-mix-seg { height: 100%; min-width: 2px; }
 .chart-mix-seg[data-vel="high"]     { background: var(--ah-signal-high); }
 .chart-mix-seg[data-vel="rising"]   { background: var(--ah-signal-rising); }
-.chart-mix-seg[data-vel="moderate"] { background: var(--text4); }
+/* --text3, not --text4: --text4 measures 2.5:1 against the surface in light and
+   2.3:1 in dark, under the 3.0:1 WCAG minimum for a non-text mark that carries
+   meaning. --text3 clears it in both, and it is already the colour of the
+   "Moderate" velocity WORD, so the strip and the word agree. */
+.chart-mix-seg[data-vel="moderate"] { background: var(--text3); }
 
 .chart-mix-key {
   display: flex; flex-wrap: wrap; gap: 4px 14px;

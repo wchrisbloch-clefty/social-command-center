@@ -859,6 +859,61 @@ function BarSeries({ label, sub, bars, unit = 'signal', empty, max: maxProp }) {
   );
 }
 
+/**
+ * Signal volume over the window — one stroke, no axes.
+ *
+ * A sparkline answers one question: is this accelerating or dying off. It does
+ * not need a y-axis to answer it, and a y-axis on a 40px-tall shape is
+ * decoration. The numbers that DO matter — the total, the peak and when the
+ * peak was — are stated underneath as text, which is also the whole accessible
+ * reading of the chart.
+ *
+ * The shape is stretched to the container width by preserveAspectRatio="none".
+ * That is deliberate and it is why the stroke carries non-scaling-stroke: the
+ * line must stay 1.25px at 390px and at 1280px, and the peak is not marked with
+ * a dot because a dot would become an ellipse under the same stretch.
+ */
+function Sparkline({ label, items, windowHours, empty }) {
+  const b = bucketByTime(items, windowHours);
+
+  if (b.empty) {
+    return (
+      <ChartFrame label={label} sub={`last ${windowHours}h`}>
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      </ChartFrame>
+    );
+  }
+
+  // viewBox units, not pixels: the whole point is that this scales.
+  const W = 100, H = 30, PAD = 1.5;
+  const step = W / (b.points.length - 1);
+  const points = b.points
+    .map((v, i) => {
+      const x = i * step;
+      const y = H - PAD - (b.peak ? (v / b.peak) * (H - PAD * 2) : 0);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+
+  const per = b.bucketHours < 1
+    ? `${Math.round(b.bucketHours * 60)}m`
+    : `${b.bucketHours % 1 === 0 ? b.bucketHours : b.bucketHours.toFixed(1)}h`;
+
+  return (
+    <ChartFrame label={label} sub={`last ${windowHours}h`}>
+      <svg className="chart-spark" viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <polyline className="chart-spark-line" points={points}/>
+      </svg>
+      <div className="chart-spark-foot">
+        <span>{b.total} signal{b.total === 1 ? '' : 's'}</span>
+        <span>peak {b.peak} in {bucketLabel(b.peakIndex, b.bucketHours)}</span>
+        <span>{per} per point · {b.points.length} points</span>
+      </div>
+    </ChartFrame>
+  );
+}
+
 // ─── LOADING / EMPTY PRIMITIVES ───────────────────────────────────────────────
 // Two components, used by every real-data view. They exist so that "what does
 // this look like before the data arrives" and "what does this say when there is
@@ -1159,6 +1214,17 @@ function DiscoverView() {
           ? 'Ranking your sources.'
           : `${summary.total} signals in the last ${windowHours} hours across ${groups.length} categories. ${summary.high} High, ${summary.rising} Rising.`}
       </LiveStatus>
+
+      {/* A3 — the temporal frame for everything below it: is the feed
+          accelerating or dying off. Placed first because it is the shortest
+          element and it dates the numbers that follow. */}
+      {!loading && (
+        <Sparkline
+          label="Signal volume"
+          items={items}
+          windowHours={windowHours}
+          empty={`Nothing arrived in the last ${windowHours}h, so there is no shape to draw yet.`}/>
+      )}
 
       {/* A1 — the whole feed in one glance, before any scrolling. Bars come
           from the SAME groupByCategory() call the sections below render, so the
