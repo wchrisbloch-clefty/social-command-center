@@ -126,7 +126,7 @@
 
   --ah-signal-high:     #4ade80;
   --ah-signal-rising:   #fbbf24;
-  --ah-signal-moderate: #7d7d7d;
+  --ah-signal-moderate: #838383;   /* tracks --text3, which .vel-moderate uses */
   --ah-sev-critical: #f87171;
   --ah-sev-high:     #fbbf24;
   --ah-sev-medium:   #a3a3a3;
