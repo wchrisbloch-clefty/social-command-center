@@ -241,55 +241,77 @@ export const TOPIC_SOURCES = [
 //     feeds.simplecast.com → 403
 //
 // So the last step — fetch the feed, confirm it parses to real recent episodes,
-// confirm the channel title is the show we think it is — runs with one command
-// where the network works:
+// confirm the channel title is the show we think it is — runs where the network
+// works:
 //
 //     npm run podcasts:verify          report only
 //     npm run podcasts:verify -- --fix  correct any feed that resolved elsewhere
 //
-// Until then each source carries `pendingVerification: true`, the UI says so,
-// and a feed that turns out wrong degrades honestly instead of rendering
-// someone else's show under the right name.
+// ── VERIFICATION STATUS (2026-09-02) ────────────────────────────────────────
+// FOUR OF FIVE ARE NOW VERIFIED, and not by this sandbox — by the DEPLOYMENT,
+// which has the network access the build environment lacks. /api/podcasts on
+// production returned, for each: a 200, real recent episodes, and a channel
+// title that matched the wired show name. That is exactly the check
+// `podcasts:verify` performs, so their `pendingVerification` flags are cleared
+// and each carries what the verification actually found.
+//
+//   Joe Rogan Experience  4 episodes, title matched, avg  512 chars of notes
+//   All-In                4 episodes, title matched, avg 1396
+//   Flagrant              4 episodes, title matched, avg 1796
+//   Morning Wire          4 episodes, title matched, avg 1001
+//   Acquired              HTTP 404 — STILL FLAGGED, see its note below
+//
+// A source that keeps the flag is one nothing has confirmed. It degrades
+// honestly rather than rendering someone else's show under the right name,
+// which is the whole reason the flag exists.
 export const PODCAST_SOURCES = [
-  // ASSUMPTION (identity solid, content-verification pending): Megaphone feed
-  // in live use in intelligence-hub. The long-form interview show.
+  // VERIFIED 2026-09-02 against the live deployment: feed returned 4 episodes,
+  // channel title "The Joe Rogan Experience" matched, avg 512 chars of notes.
   { platform: 'Podcast', show: 'The Joe Rogan Experience',
     feedUrl: 'https://feeds.megaphone.fm/GLT1412515089',
-    label: 'Joe Rogan Experience', category: 'popculture', limit: 4,
-    pendingVerification: true },
+    label: 'Joe Rogan Experience', category: 'popculture', limit: 4 },
 
-  // ASSUMPTION: Libsyn feed, in live use in intelligence-hub. Chamath,
-  // Sacks, Friedberg and Calacanis on markets and technology.
+  // VERIFIED 2026-09-02: 4 episodes, channel title
+  // "All-In with Chamath, Jason, Sacks & Friedberg" matched, avg 1396 chars of
+  // notes — the richest of the five, and the best case for summaries.
   { platform: 'Podcast', show: 'All-In with Chamath, Jason, Sacks & Friedberg',
     feedUrl: 'https://allinchamathjason.libsyn.com/rss',
-    label: 'All-In', category: 'business', limit: 4,
-    pendingVerification: true },
+    label: 'All-In', category: 'business', limit: 4 },
 
-  // ASSUMPTION: Simplecast feed, in live use in intelligence-hub. Ben Gilbert
-  // and David Rosenthal on company histories — the deepest show notes of the
-  // five, which makes it the best case for episode summaries.
+  // ⚠ BROKEN, AND STILL FLAGGED. Verification on 2026-09-02 returned HTTP 404
+  // from this Simplecast feed — the only one of the five that failed. The show
+  // appears to have MIGRATED to Transistor, so this is a dead host rather than
+  // a typo, and the replacement URL cannot be resolved from the build sandbox
+  // (itunes.apple.com and every podcast CDN are blocked by the egress policy).
+  //
+  // Left wired and flagged on purpose: a 404 fails loudly and the UI says so,
+  // which is strictly better than a guessed Transistor slug that might return
+  // 200 for somebody else's show under this name.
+  //
+  // To fix: `npm run podcasts:verify -- --fix`, or type "Acquired" into Add a
+  // show in the Podcast tab — that route runs on the deployment, which can
+  // reach the directory.
   { platform: 'Podcast', show: 'Acquired',
     feedUrl: 'https://feeds.simplecast.com/jeNJI0r9',
     label: 'Acquired', category: 'business', limit: 4,
     pendingVerification: true },
 
-  // ASSUMPTION: Megaphone feed. Corroborated by search, which also resolved the
-  // full title — the show is listed as "Andrew Schulz's Flagrant with Akaash
-  // Singh", so "Flagrant" alone is the short name, not the feed's title.
+  // VERIFIED 2026-09-02: 4 episodes, avg 1796 chars of notes. The feed calls
+  // itself "Flagrant" while this is wired as "Andrew Schulz's Flagrant", and
+  // the title check correctly read that as a match rather than a collision.
   { platform: 'Podcast', show: "Andrew Schulz's Flagrant",
     feedUrl: 'https://feeds.megaphone.fm/APPI6857213837',
-    label: 'Flagrant', category: 'popculture', limit: 4,
-    pendingVerification: true },
+    label: 'Flagrant', category: 'popculture', limit: 4 },
 
-  // ASSUMPTION: Megaphone feed. THE NAME-COLLISION CASE, and the reason
-  // verify-then-wire exists: "Morning Wire" matches several unrelated shows in
-  // any directory. Search confirmed this ID is The Daily Wire's news briefing
-  // hosted by John Bickley (Apple id 1576594336) — not another show of the same
-  // name. Verification will re-confirm the channel title matches.
+  // VERIFIED 2026-09-02, and this is THE ONE THAT MATTERED. "Morning Wire"
+  // matches several unrelated shows in any directory, which is why
+  // verify-then-wire exists at all. The feed's own channel title came back
+  // "Morning Wire" and the episodes are The Daily Wire's briefing (Ep. 3068-3071,
+  // John Bickley) — the right show, confirmed by the feed rather than by a name.
+  // 4 episodes, avg 1001 chars of notes.
   { platform: 'Podcast', show: 'Morning Wire',
     feedUrl: 'https://feeds.megaphone.fm/BVDWV8747925072',
-    label: 'Morning Wire', category: 'general', limit: 4,
-    pendingVerification: true },
+    label: 'Morning Wire', category: 'general', limit: 4 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
