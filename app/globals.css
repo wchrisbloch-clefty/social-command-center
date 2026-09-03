@@ -113,7 +113,7 @@
   --border2:  #212121;
   --text:     #ededed;
   --text2:    #a3a3a3;
-  --text3:    #7d7d7d;
+  --text3:    #838383;   /* 4.71:1 on --surface, 5.04:1 on --bg */
   --text4:    #525252;
 
   --accent:    #ededed;
@@ -126,7 +126,7 @@
 
   --ah-signal-high:     #4ade80;
   --ah-signal-rising:   #fbbf24;
-  --ah-signal-moderate: #7d7d7d;
+  --ah-signal-moderate: #838383;   /* tracks --text3, which .vel-moderate uses */
   --ah-sev-critical: #f87171;
   --ah-sev-high:     #fbbf24;
   --ah-sev-medium:   #a3a3a3;
@@ -217,8 +217,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Numbers read as data everywhere — tickers, counts, timestamps. */
-.tnum, time, [data-num] {
+/* ── Numbers read as data everywhere — counts, timestamps, percentages ─────
+   Tabular figures are not a typographic flourish here. Every number in this app
+   sits in a column, a right-aligned note or a value that changes in place while
+   the layout stays still — a source count ticking 4→5, a signal count
+   refreshing, a bar value beside a bar. Proportional figures make those jitter
+   sideways, which reads as the layout moving rather than the number changing.
+
+   This list is every class that renders a digit. E1 in the design pass was
+   "some of these have it": the utility classes did, the metadata lines did not,
+   so a `4 items` and a `41 items` in the same column did not line up. */
+.tnum, time, [data-num],
+.view-sub, .section-sub, .signal-meta, .vrow-meta, .sop-item-meta, .sop-item-time,
+.src-note, .rec-meta, .rec-why, .rec-note, .empty-note, .empty-body,
+.limit-list, .cat-meta, .nav-tab, .pod-add-note, .ep-provenance, .ep-summary-none,
+.export,
+.seg-btn, .sop-label, .note-block, .cat-confirm-text, .drill-label,
+.chart-bar-value, .chart-bar-detail, .chart-spark-foot, .chart-mix-key,
+.drill-count, .sop-num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
@@ -240,7 +256,9 @@ body {
 @keyframes spin  { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-input::placeholder, textarea::placeholder { color: var(--text4); }
+/* --text3, not --text4. --text4 is 2.5:1 against white — fine for a scrollbar
+   thumb or a border, never legible as type. */
+input::placeholder, textarea::placeholder { color: var(--text3); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -443,7 +461,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 .sop-item:hover { opacity: 0.68; }
 .sop-num {
   font-weight: var(--fw-medium); font-size: var(--fs-meta);
-  min-width: 20px; font-variant-numeric: tabular-nums; flex-shrink: 0;
+  min-width: 20px; flex-shrink: 0;
   color: var(--cat, var(--text3));
 }
 .sop-item-title {
@@ -470,6 +488,13 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   padding-bottom: var(--s3); border-bottom: 1px solid var(--border);
 }
 .view-head-text { flex: 1 1 260px; min-width: 0; }
+/* The window selector and the export button. Wraps to its own line before the
+   head does, so at 390px you get title / subtitle / controls stacked rather
+   than a segmented control squeezed against a button. */
+.view-head-actions {
+  flex: 0 1 auto; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+}
 .view-title { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); margin: 0; }
 .view-sub { font-size: var(--fs-body); color: var(--text3); margin: 4px 0 0; max-width: 62ch; line-height: 1.5; }
 
@@ -528,7 +553,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   font-size: var(--fs-meta); color: var(--text3); margin-top: 3px;
 }
-.rec-why { font-size: var(--fs-meta); color: var(--text4); margin-top: 4px; }
+.rec-why { font-size: var(--fs-meta); color: var(--text3); margin-top: 4px; }
 .rec-action { flex: 0 0 auto; display: flex; align-items: center; }
 .rec-ok   { font-size: var(--fs-meta); color: var(--ah-signal-high); font-weight: 500; }
 .rec-note { font-size: var(--fs-meta); color: var(--text3); }
@@ -632,7 +657,7 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 .crumb:hover { color: var(--text); }
 .crumb.current { color: var(--text); cursor: default; }
-.crumb-sep { color: var(--text4); font-size: var(--fs-body); }
+.crumb-sep { color: var(--text3); font-size: var(--fs-body); }
 
 /* Wraps at every width — a fixed row of seven leagues cannot fit a phone, and a
    horizontally scrolling strip here would compete with the category nav above
@@ -659,7 +684,6 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 }
 .drill-count {
   font-size: var(--fs-meta); color: var(--text3); flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
 }
 /* Teams read as a level below their leagues. */
 .drill-teams .drill-item { background: transparent; }
@@ -699,6 +723,182 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   color: var(--text3);
   font-size: var(--fs-body);
   line-height: 1.6;
+}
+
+/* An empty state is a sentence plus a way out. The title says what is empty,
+   the body says why, and the actions are real controls — never "try again
+   later", which is not an action. */
+.empty-title { display: block; color: var(--text2); font-weight: var(--fw-medium); }
+.empty-body  { margin-top: 8px; }
+.empty-actions {
+  margin-top: var(--s3);
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETONS — loading geometry, not decoration
+   ═══════════════════════════════════════════════════════════════════════════
+   A skeleton is the exact shape of the row that will replace it, drawn in the
+   hairline grey. It is STATIC: DESIGN.md forbids glow, shadow and pulse, and a
+   motionless placeholder is also the only kind that costs nothing over the
+   fourteen seconds a cold /api/social call can take. No spinner anywhere. */
+
+.skel-bar {
+  background: var(--border);
+  border-radius: 3px;
+  height: 9px;
+  max-width: 100%;
+}
+.skel-bar.tall { height: 13px; }
+
+/* Mirrors .signal — same border, same 3px left edge, same padding. */
+.skel-signal {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.skel-signal.lead { padding: 16px 18px; }
+.skel-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.skel-side {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+}
+.skel-side .skel-bar { width: 54px; }
+
+/* Mirrors .vrow — no card, one bottom hairline. */
+.skel-vrow {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  border-bottom: 1px solid var(--border2);
+  padding: 14px 0;
+}
+
+/* Mirrors .src-row. */
+.skel-srow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-top: 1px solid var(--border2);
+}
+.skel-srow:first-child { border-top: none; }
+.skel-srow .skel-bar:last-child { margin-left: auto; width: 52px; }
+
+@media (max-width: 720px) {
+  .skel-signal { padding: 11px 12px; gap: var(--s2); }
+  .skel-signal.lead { padding: 13px 14px; }
+  .skel-side { flex-direction: row; align-items: center; gap: 8px; }
+}
+
+/* CSV export: the button plus, if the browser refuses the download, why. */
+.export { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHARTS — one bar, one line, one strip. Nothing else.
+   ═══════════════════════════════════════════════════════════════════════════
+   Every mark on screen inherits a colour that already exists: a category bar
+   takes --cat (the same custom property the signal card's left stripe uses), a
+   velocity segment takes the three velocity tokens, and anything without a
+   category is var(--text3). No chart introduces a hue.
+
+   Every chart also states its numbers as TEXT. The bar is the supplement, not
+   the data — which is why none of these needs a role="img" description, and why
+   a screen reader gets the whole series by reading the list.
+
+   No axes, no gridlines, no legends, no tooltips, no rounded caps, no gradient.
+   A gridline on a five-row bar chart is decoration. */
+
+.chart-bars { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+/* Two rows per bar: label + value, then the track spanning both columns. This
+   layout is used rather than a three-column label|bar|value grid because a
+   topic label ("federal reserve balance sheet") has no width it can be trusted
+   to fit into at 390px, and a truncated label is worse than a stacked one. */
+.chart-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 5px 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border2);
+}
+.chart-bars > .chart-bar:first-child { border-top: none; }
+
+.chart-bar-label {
+  grid-column: 1; min-width: 0;
+  font-size: var(--fs-body); color: var(--text2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chart-bar-value {
+  grid-column: 2; white-space: nowrap;
+  font-size: var(--fs-meta); color: var(--text3);
+}
+.chart-bar-track {
+  grid-column: 1 / -1;
+  height: 5px; border-radius: 2px;
+  background: var(--border2);
+  overflow: hidden;
+}
+.chart-bar-fill {
+  display: block; height: 100%; border-radius: 2px;
+  background: var(--cat, var(--text3));
+  min-width: 2px; /* a value of 1 out of 400 must still be visible */
+}
+.chart-bar-detail {
+  grid-column: 1 / -1;
+  font-size: var(--fs-meta); color: var(--text3);
+}
+
+/* ── Sparkline ───────────────────────────────────────────────────────────── */
+/* One stroke. The baseline is a CSS border rather than an SVG <line>, and there
+   is no peak dot: the peak is stated in the foot as text, which is both the
+   accessible version and the only version that survives the non-uniform scale
+   this viewBox is stretched by. */
+.chart-spark {
+  display: block; width: 100%; height: 40px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.chart-spark-line {
+  fill: none;
+  stroke: var(--text2);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.chart-spark-foot {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin-top: 7px;
+  font-size: var(--fs-meta); color: var(--text3);
+}
+
+/* ── Signal-mix strip: one 100%-stacked bar, three known segments ────────── */
+.chart-mix {
+  display: flex; width: 100%; height: 7px;
+  border-radius: 2px; overflow: hidden;
+  background: var(--border2);
+}
+.chart-mix-seg { height: 100%; min-width: 2px; }
+.chart-mix-seg[data-vel="high"]     { background: var(--ah-signal-high); }
+.chart-mix-seg[data-vel="rising"]   { background: var(--ah-signal-rising); }
+/* --text3, not --text4: --text4 measures 2.5:1 against the surface in light and
+   2.3:1 in dark, under the 3.0:1 WCAG minimum for a non-text mark that carries
+   meaning. --text3 clears it in both, and it is already the colour of the
+   "Moderate" velocity WORD, so the strip and the word agree. */
+.chart-mix-seg[data-vel="moderate"] { background: var(--text3); }
+
+.chart-mix-key {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin: 8px 0 0; padding: 0; list-style: none;
+  font-size: var(--fs-meta);
+}
+.chart-mix-key li { color: var(--text3); white-space: nowrap; }
+.chart-mix-key .vel { margin-right: 4px; }
+
+/* Announced, not shown. The only correct way to give a screen reader a status
+   update that the sighted layout already communicates by position. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -895,38 +1095,9 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
   overflow-wrap: anywhere;
 }
 
-/* ── Cross-show topic strip ──────────────────────────────────────────────── */
-.topic-strip {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  /* minmax(0, …) — a bare 1fr is minmax(auto, 1fr) and refuses to shrink
-     below min-content, which is the blowout the gate catches. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  gap: 8px;
-}
-.topic-chip {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.topic-term {
-  font-size: var(--fs-body);
-  font-weight: var(--fw-medium);
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.topic-why, .topic-shows {
-  font-size: var(--fs-meta);
-  color: var(--text3);
-  overflow-wrap: anywhere;
-}
+/* The cross-show topic chips are gone: the strip is now the shared BarSeries,
+   because episode count is the thing that varies between topics and a chip grid
+   gave every subject the same visual weight. See CrossShowTopics. */
 
 .limit-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
 .limit-list li { font-size: var(--fs-meta); color: var(--text3); line-height: 1.5; }
@@ -985,5 +1156,4 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 
 @media (max-width: 720px) {
   .episode { padding: 12px 13px; }
-  .topic-strip { grid-template-columns: minmax(0, 1fr); }
 }

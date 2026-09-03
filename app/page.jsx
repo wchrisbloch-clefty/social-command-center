@@ -24,6 +24,15 @@ import {
 // The SAME theme miner Discover and the category manager use, pointed at
 // podcast text. A second clustering implementation would only drift.
 import { crossShowTopics } from '../lib/themes.js';
+// Chart series. Pure, and the only place chart maths lives.
+import { categoryBars, topicBars, signalMix, bucketByTime, bucketLabel, SPARK_BUCKETS }
+  from '../lib/chart-data.js';
+import { toCsv, csvFilename } from '../lib/csv.js';
+
+// The widest window the segmented control offers — "look further back" is the
+// action an empty velocity view offers, and it must agree with that control
+// rather than hard-coding 168.
+const WIDEST_WINDOW = WINDOW_OPTIONS.reduce((m, w) => Math.max(m, w.hours), DEFAULT_WINDOW_HOURS);
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 // The palette now lives in app/globals.css as the MyNewsHub editorial token set.
@@ -777,6 +786,333 @@ function useLiveFeed(category) {
   return { ...state, refresh: () => setNonce(n => n + 1) };
 }
 
+// ─── CHARTS ───────────────────────────────────────────────────────────────────
+// Three components, and they are the only charting in the app. Discover's
+// category bars, the Podcast tab's topic bars, the signal-volume sparkline and
+// the velocity mix strip all come from here, which is why adding the fourth
+// chart cost almost nothing.
+//
+// THE CONTRACT
+//   1. Every series comes from lib/chart-data.js, which reads only items that
+//      have been through normalizeSignal(). Nothing is generated, smoothed,
+//      interpolated or projected.
+//   2. Nothing renders with no data. Each component takes an `empty` message
+//      and shows it instead of drawing — a row of zero-width bars or a flat
+//      line would read as "we measured, and the answer was nothing", which is
+//      not the same claim as "nothing has arrived yet".
+//   3. The numbers are TEXT. The mark is the supplement. That is what makes
+//      these readable by a screen reader without a parallel description, and
+//      it is why the marks themselves are aria-hidden.
+//   4. No mark introduces a colour. A category bar inherits --cat via
+//      data-cat; a velocity segment uses the three velocity tokens; anything
+//      uncategorised is var(--text3).
+
+/** Section frame shared by every chart, so they line up with the other strips. */
+function ChartFrame({ label, sub, children }) {
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">{label}</span>
+        {sub && <span className="section-sub">{sub}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Horizontal bars, sorted descending, scaled against the LARGEST value.
+ *
+ * Scaled against the largest rather than the total on purpose: this chart
+ * answers "which of these is biggest, and by how much" — a part-to-whole scale
+ * would squash every bar to nothing as soon as the collection grows.
+ *
+ * @param bars  rows from categoryBars() / topicBars(): {id, catId, label, value, detail}
+ * @param unit  singular noun for the value, pluralised with an "s"
+ * @param empty what to say when there are no rows. Required — see contract (2).
+ */
+function BarSeries({ label, sub, bars, unit = 'signal', empty, max: maxProp }) {
+  const rows = bars || [];
+  const max = maxProp || rows.reduce((m, b) => Math.max(m, b.value), 0);
+
+  return (
+    <ChartFrame label={label} sub={sub}>
+      {!rows.length ? (
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      ) : (
+        <ul className="chart-bars">
+          {rows.map(b => (
+            <li className="chart-bar" key={b.id} {...(b.catId ? { 'data-cat': b.catId } : {})}>
+              <span className="chart-bar-label">{b.label}</span>
+              <span className="chart-bar-value">
+                {b.value} {unit}{b.value === 1 ? '' : 's'}
+              </span>
+              <span className="chart-bar-track" aria-hidden="true">
+                <span className="chart-bar-fill"
+                  style={{ width: `${max ? (b.value / max) * 100 : 0}%` }}/>
+              </span>
+              {b.detail && <span className="chart-bar-detail">{b.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </ChartFrame>
+  );
+}
+
+/**
+ * Export the rows a view is showing, as CSV.
+ *
+ * There is no export endpoint and there does not need to be one: the rows are
+ * already in the browser, already ranked, already through normalizeSignal().
+ * Serialising them client-side means the file always matches what is on screen,
+ * which a server-side export could not promise once a window filter is
+ * involved.
+ *
+ * The button states its ROW COUNT, so you know what you are getting before you
+ * click, and so a degraded feed exports a small file rather than a surprising
+ * one.
+ *
+ * Every DOM call is guarded. A blocked object URL or a sandboxed download must
+ * degrade to a visible message here — an uncaught throw would be a console
+ * error, and a console error fails the responsive gate on every view that
+ * renders this button.
+ */
+function ExportCsv({ columns, rows, prefix, label = 'Export CSV' }) {
+  const [msg, setMsg] = useState('');
+  const count = (rows || []).length;
+
+  const download = () => {
+    setMsg('');
+    let url = null;
+    try {
+      const blob = new Blob([toCsv(columns, rows)], { type: 'text/csv;charset=utf-8' });
+      url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = csvFilename(prefix);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.warn('[export] CSV download failed', e?.message);
+      setMsg('This browser blocked the download.');
+    } finally {
+      // Revoked on a timeout rather than immediately: Safari reads the URL
+      // asynchronously after the click and gets an empty file otherwise.
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
+  };
+
+  if (!count) return null;
+  return (
+    <div className="export">
+      <button className="nav-btn" onClick={download}>
+        {label} · {count} row{count === 1 ? '' : 's'}
+      </button>
+      {msg && <span className="rec-note">{msg}</span>}
+    </div>
+  );
+}
+
+/**
+ * The velocity mix as one 100%-stacked strip.
+ *
+ * Deliberately not a pie. A pie would be the only circle on an otherwise
+ * rectangular desk, and it is the harder shape to read at three segments.
+ *
+ * The three counts are listed underneath in the velocity words and colours the
+ * rest of the app already uses, so this adds no vocabulary: it just makes the
+ * proportion visible at a glance instead of requiring you to divide the numbers
+ * in the header.
+ */
+function SignalMixStrip({ label, summary, windowHours, empty }) {
+  const mix = signalMix(summary);
+
+  return (
+    <ChartFrame label={label} sub={`last ${windowHours}h`}>
+      {mix.empty ? (
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      ) : (
+        <>
+          <div className="chart-mix" aria-hidden="true">
+            {mix.segments.filter(s => s.value > 0).map(s => (
+              <span key={s.id} className="chart-mix-seg" data-vel={s.id}
+                style={{ width: `${s.pct}%` }}/>
+            ))}
+          </div>
+          <ul className="chart-mix-key">
+            {mix.segments.map(s => (
+              <li key={s.id}>
+                <span className={`vel vel-${s.id}`}>{s.label}</span>{' '}
+                {s.value} · {Math.round(s.pct)}%
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </ChartFrame>
+  );
+}
+
+/**
+ * Signal volume over the window — one stroke, no axes.
+ *
+ * A sparkline answers one question: is this accelerating or dying off. It does
+ * not need a y-axis to answer it, and a y-axis on a 40px-tall shape is
+ * decoration. The numbers that DO matter — the total, the peak and when the
+ * peak was — are stated underneath as text, which is also the whole accessible
+ * reading of the chart.
+ *
+ * The shape is stretched to the container width by preserveAspectRatio="none".
+ * That is deliberate and it is why the stroke carries non-scaling-stroke: the
+ * line must stay 1.25px at 390px and at 1280px, and the peak is not marked with
+ * a dot because a dot would become an ellipse under the same stretch.
+ */
+function Sparkline({ label, items, windowHours, empty }) {
+  const b = bucketByTime(items, windowHours);
+
+  if (b.empty) {
+    return (
+      <ChartFrame label={label} sub={`last ${windowHours}h`}>
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      </ChartFrame>
+    );
+  }
+
+  // viewBox units, not pixels: the whole point is that this scales.
+  const W = 100, H = 30, PAD = 1.5;
+  const step = W / (b.points.length - 1);
+  const points = b.points
+    .map((v, i) => {
+      const x = i * step;
+      const y = H - PAD - (b.peak ? (v / b.peak) * (H - PAD * 2) : 0);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+
+  const per = b.bucketHours < 1
+    ? `${Math.round(b.bucketHours * 60)}m`
+    : `${b.bucketHours % 1 === 0 ? b.bucketHours : b.bucketHours.toFixed(1)}h`;
+
+  return (
+    <ChartFrame label={label} sub={`last ${windowHours}h`}>
+      <svg className="chart-spark" viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <polyline className="chart-spark-line" points={points}/>
+      </svg>
+      <div className="chart-spark-foot">
+        <span>{b.total} signal{b.total === 1 ? '' : 's'}</span>
+        <span>peak {b.peak} in {bucketLabel(b.peakIndex, b.bucketHours)}</span>
+        <span>{per} per point · {b.points.length} points</span>
+      </div>
+    </ChartFrame>
+  );
+}
+
+// ─── LOADING / EMPTY PRIMITIVES ───────────────────────────────────────────────
+// Two components, used by every real-data view. They exist so that "what does
+// this look like before the data arrives" and "what does this say when there is
+// no data" are answered once, the same way, in every view — rather than seven
+// slightly different sentences in a dashed box.
+
+/** One grey bar. Width is the only thing a caller varies. */
+const SkelBar = ({ w, tall = false }) =>
+  <span className={`skel-bar${tall ? ' tall' : ''}`} style={{ width: w }}/>;
+
+// Deterministic widths. Random ones make the skeleton twitch on every re-render
+// during a 14-second load, which reads as a bug.
+const SKEL_META  = ['58%', '44%', '66%', '38%', '52%', '61%'];
+const SKEL_TITLE = ['86%', '72%', '94%', '64%', '80%', '90%'];
+
+/**
+ * The signal list, before it has any signals.
+ *
+ * Same card, same hairline, same 3px left edge, same two-line headline — so the
+ * page does not reflow when the real cards land. `lead` renders the larger
+ * first card the real list renders.
+ */
+function SkeletonSignalList({ rows = 5, lead = true }) {
+  const n = Math.max(1, rows);
+  return (
+    <div className="signal-list" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className={`skel-signal${lead && i === 0 ? ' lead' : ''}`}>
+          <span className="skel-main">
+            <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+            <SkelBar w={SKEL_TITLE[i % SKEL_TITLE.length]} tall/>
+            {lead && i === 0 && <SkelBar w="70%"/>}
+          </span>
+          <span className="skel-side"><SkelBar w="46px"/><SkelBar w="54px"/></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The Discover / drill-down row list, before it has any rows. */
+function SkeletonRowList({ rows = 6 }) {
+  const n = Math.max(1, rows);
+  return (
+    <div className="vlist" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="skel-vrow">
+          <span className="skel-main">
+            <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+            <SkelBar w={SKEL_TITLE[i % SKEL_TITLE.length]} tall/>
+          </span>
+          <span className="skel-side"><SkelBar w="46px"/><SkelBar w="54px"/></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The source-health strip, before any source has answered. */
+function SkeletonSourceList({ rows = 6 }) {
+  return (
+    <div className="src-health" aria-hidden="true">
+      {Array.from({ length: Math.max(1, rows) }, (_, i) => (
+        <div key={i} className="skel-srow">
+          <span className="src-dot" style={{ background: 'var(--border)' }}/>
+          <SkelBar w={SKEL_META[i % SKEL_META.length]}/>
+          <SkelBar w="52px"/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * An empty state that can be acted on.
+ *
+ * Title says WHAT is empty, body says WHY, actions are real controls. A state
+ * with nothing a person can do about it passes no actions and still reads as a
+ * sentence — but every degraded path here has at least a retry, because a
+ * degraded source is usually degraded for this one request only.
+ */
+function EmptyState({ title, children, actions = null, className = '' }) {
+  return (
+    <div className={`empty-note${className ? ` ${className}` : ''}`}>
+      {title && <strong className="empty-title">{title}</strong>}
+      {children && <div className="empty-body">{children}</div>}
+      {actions && <div className="empty-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/**
+ * One live region per view.
+ *
+ * Source health changes state — pending, live, degraded — with no visual event
+ * a screen reader can follow, because the change is a colour on a 6px dot and a
+ * word in a right-aligned note. This announces the roll-up instead, politely,
+ * so it never interrupts what is being read.
+ */
+function LiveStatus({ children }) {
+  return <p className="sr-only" role="status" aria-live="polite">{children}</p>;
+}
+
 /**
  * One signal. Metadata line, headline, then velocity + tier as WORDS.
  *
@@ -936,12 +1272,28 @@ function VelocityRow({ item }) {
   );
 }
 
+// The export is the ranked feed, not the six-per-category display list: the
+// columns are exactly the fields normalizeSignal() guarantees, so a row can
+// never be half-populated.
+const DISCOVER_CSV_COLUMNS = [
+  { label: 'published',  value: r => r.publishedAt || '' },
+  { label: 'age_hours',  value: r => (Number.isFinite(r.ageHours) ? r.ageHours.toFixed(1) : '') },
+  { label: 'category',   value: r => categoryLabelOf(r.category) },
+  { label: 'source',     key: 'sourceLabel' },
+  { label: 'platform',   key: 'platform' },
+  { label: 'tier',       value: r => TIER_WORD[r.tier] },
+  { label: 'velocity',   value: r => VELOCITY_WORD[r.signal] },
+  { label: 'title',      key: 'title' },
+  { label: 'url',        key: 'url' },
+];
+
 function DiscoverView() {
   const { items, loading, refresh } = useAllSignals();
   const [windowHours, setWindowHours] = useState(DEFAULT_WINDOW_HOURS);
 
   const groups = groupByCategory(items, { windowHours, perCategory: 6 });
   const summary = velocitySummary(items, windowHours);
+  const exportRows = rankByVelocity(items, { windowHours });
 
   useEffect(() => {
     window.__aetherRefreshFeed = refresh;
@@ -959,25 +1311,74 @@ function DiscoverView() {
               : `${summary.total} signals in the last ${windowHours}h · ${summary.high} High · ${summary.rising} Rising`}
           </p>
         </div>
-        <div className="seg" role="group" aria-label="Time window">
-          {WINDOW_OPTIONS.map(w => (
-            <button key={w.hours}
-              className={`seg-btn${windowHours === w.hours ? ' active' : ''}`}
-              aria-pressed={windowHours === w.hours}
-              onClick={() => setWindowHours(w.hours)}>{w.label}</button>
-          ))}
+        <div className="view-head-actions">
+          <div className="seg" role="group" aria-label="Time window">
+            {WINDOW_OPTIONS.map(w => (
+              <button key={w.hours}
+                className={`seg-btn${windowHours === w.hours ? ' active' : ''}`}
+                aria-pressed={windowHours === w.hours}
+                onClick={() => setWindowHours(w.hours)}>{w.label}</button>
+            ))}
+          </div>
+          {/* E2 — the file matches what is on screen, including the window. */}
+          {!loading && (
+            <ExportCsv columns={DISCOVER_CSV_COLUMNS} rows={exportRows}
+              prefix={`aetherhub-discover-${windowHours}h`}/>
+          )}
         </div>
       </div>
 
-      {loading && <div className="empty-note">Ranking your sources…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Ranking your sources.'
+          : `${summary.total} signals in the last ${windowHours} hours across ${groups.length} categories. ${summary.high} High, ${summary.rising} Rising.`}
+      </LiveStatus>
+
+      {/* A3 — the temporal frame for everything below it: is the feed
+          accelerating or dying off. Placed first because it is the shortest
+          element and it dates the numbers that follow. */}
+      {!loading && (
+        <Sparkline
+          label="Signal volume"
+          items={items}
+          windowHours={windowHours}
+          empty={`Nothing arrived in the last ${windowHours}h, so there is no shape to draw yet.`}/>
+      )}
+
+      {/* A2 — the same three numbers the header states, as a proportion. */}
+      {!loading && (
+        <SignalMixStrip
+          label="Velocity mix"
+          summary={summary}
+          windowHours={windowHours}
+          empty={`No signal in the last ${windowHours}h to break down.`}/>
+      )}
+
+      {/* A1 — the whole feed in one glance, before any scrolling. Bars come
+          from the SAME groupByCategory() call the sections below render, so the
+          chart and the list can never disagree. */}
+      {!loading && groups.length > 0 && (
+        <BarSeries
+          label="Signal by category"
+          sub={`last ${windowHours}h`}
+          bars={categoryBars(groups)}
+          empty={`Nothing in the last ${windowHours}h to chart.`}/>
+      )}
+
+      {loading && <SkeletonRowList rows={7}/>}
 
       {!loading && !groups.length && (
-        <div className="empty-note">
-          <strong>Nothing in the last {windowHours}h.</strong>
-          <div style={{ marginTop: 8 }}>
-            Widen the window, or check the source list — every source may be degraded.
-          </div>
-        </div>
+        <EmptyState title={`Nothing in the last ${windowHours}h.`} actions={<>
+          {windowHours !== WIDEST_WINDOW && (
+            <button className="nav-btn" onClick={() => setWindowHours(WIDEST_WINDOW)}>
+              Widen to {WIDEST_WINDOW / 24} days
+            </button>
+          )}
+          <button className="nav-btn" onClick={refresh}>Refetch sources</button>
+        </>}>
+          Either your sources were quiet, or every one of them is degraded for this
+          request. Refetching hits the feeds again; widening the window looks further back.
+        </EmptyState>
       )}
 
       {groups.map(g => (
@@ -1114,29 +1515,19 @@ function EpisodeCard({ item }) {
  * this strip earns its space.
  */
 function CrossShowTopics({ topics, limits }) {
-  if (!topics.length) {
-    return (
-      <section className="sop-strip">
-        <div className="sop-head"><span className="sop-label">Across your shows</span></div>
-        <p className="empty-note" style={{ margin: 0 }}>
-          {limits[0] || 'No subject has appeared across two or more shows yet.'}
-        </p>
-      </section>
-    );
-  }
+  // A4 — the same BarSeries Discover uses. The bar is episode COUNT, which is
+  // the thing that varies; the show names sit in the detail line because they
+  // are the evidence for the bar, and a topic nobody can attribute is not a
+  // cross-show topic. Bars are neutral, not category-coloured: a topic spans
+  // shows and often categories, so one category's hue would assert a
+  // relationship the data does not have.
   return (
-    <section className="sop-strip">
-      <div className="sop-head"><span className="sop-label">Across your shows</span></div>
-      <ul className="topic-strip">
-        {topics.map(t => (
-          <li key={t.term} className="topic-chip">
-            <span className="topic-term">{t.label}</span>
-            <span className="topic-why">{t.reason}</span>
-            <span className="topic-shows">{t.shows.join(' · ')}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <BarSeries
+      label="Across your shows"
+      sub={topics.length ? `${topics.length} subject${topics.length === 1 ? '' : 's'}` : null}
+      bars={topicBars(topics)}
+      unit="episode"
+      empty={limits[0] || 'No subject has appeared across two or more shows yet.'}/>
   );
 }
 
@@ -1205,7 +1596,8 @@ function AddPodcast({ onAdded }) {
       <div className="section-head"><span className="section-label">Add a show</span></div>
 
       <div className="cat-add-form">
-        <input className="search-input cat-input" value={query} placeholder="Show name, or an RSS feed URL"
+        <input className="search-input cat-input" id="add-podcast-url" value={query}
+          placeholder="Show name, or an RSS feed URL"
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') resolve(); }}
           aria-label="Show name or RSS feed URL"/>
@@ -1290,15 +1682,25 @@ function PodcastView() {
 
       {!loading && <CrossShowTopics topics={topics} limits={[...topicLimits, ...limits]}/>}
 
-      {loading && <div className="empty-note">Reading your shows…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Reading your shows.'
+          : `${items.length} episode${items.length === 1 ? '' : 's'} from ${ok} of ${sources.length} shows.`}
+      </LiveStatus>
+
+      {loading && <SkeletonSignalList rows={4} lead={false}/>}
 
       {!loading && !items.length && (
-        <div className="empty-note">
-          <strong>No episodes.</strong>
-          <div style={{ marginTop: 8 }}>
-            {limits[0] || 'Every configured show is degraded, or none is wired yet.'}
-          </div>
-        </div>
+        <EmptyState title="No episodes." actions={<>
+          <button className="nav-btn" onClick={refresh}>Refetch shows</button>
+          <button className="nav-btn" onClick={() => {
+            const el = document.getElementById('add-podcast-url');
+            el?.scrollIntoView({ block: 'center' });
+            el?.focus();
+          }}>Add a show</button>
+        </>}>
+          {limits[0] || 'Every configured show is degraded, or none is wired yet.'}
+        </EmptyState>
       )}
 
       {!loading && items.length > 0 && (
@@ -1325,9 +1727,12 @@ function RecommendedView() {
   const [state, setState] = useState({ recommendations: [], limits: [], mined: null, loading: true });
   const [added, setAdded] = useState({});
   const [busy, setBusy] = useState(null);
+  const [nonce, setNonce] = useState(0);
+  const refresh = () => setNonce(n => n + 1);
 
   useEffect(() => {
     let alive = true;
+    setState(s => ({ ...s, loading: true }));
     fetch('/api/recommend', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { if (alive) setState({ ...d, loading: false }); })
@@ -1336,7 +1741,7 @@ function RecommendedView() {
         if (alive) setState({ recommendations: [], limits: ['Could not mine recommendations.'], mined: null, loading: false });
       });
     return () => { alive = false; };
-  }, []);
+  }, [nonce]);
 
   const add = async rec => {
     setBusy(rec.key);
@@ -1377,17 +1782,22 @@ function RecommendedView() {
         </div>
       )}
 
-      {loading && <div className="empty-note">Mining your feed for referenced accounts…</div>}
+      <LiveStatus>
+        {loading
+          ? 'Mining your feed for referenced accounts.'
+          : `${recommendations.length} candidate account${recommendations.length === 1 ? '' : 's'} found.`}
+      </LiveStatus>
+
+      {loading && <SkeletonRowList rows={5}/>}
 
       {!loading && !recommendations.length && (
-        <div className="empty-note">
-          <strong>No candidates yet.</strong>
-          <div style={{ marginTop: 8 }}>
-            This mines co-mentions out of the feed your own sources produced, so it
-            needs a populated feed to work from. With YouTube unconfigured and X
-            degraded on the free instance, there is very little text to read.
-          </div>
-        </div>
+        <EmptyState title="No candidates yet." actions={
+          <button className="nav-btn" onClick={refresh}>Mine the feed again</button>
+        }>
+          This mines co-mentions out of the feed your own sources produced, so it
+          needs a populated feed to work from. With YouTube unconfigured and X
+          degraded on the free instance, there is very little text to read.
+        </EmptyState>
       )}
 
       <div className="rec-list">
@@ -1555,17 +1965,28 @@ function SportsView({ items, loading, windowHours = DEFAULT_WINDOW_HOURS }) {
             </span>
           </div>
 
-          {loading && <div className="empty-note">Loading sports signal…</div>}
+          <LiveStatus>
+            {loading
+              ? 'Loading sports signal.'
+              : `${feed.length} signal${feed.length === 1 ? '' : 's'} for ` +
+                `${team ? team.label : league ? league.label : 'all sports'} in the last ${windowHours} hours.`}
+          </LiveStatus>
+
+          {loading && <SkeletonSignalList rows={4}/>}
 
           {!loading && !feed.length && (
-            <div className="empty-note">
-              <strong>Nothing here in the last {windowHours}h.</strong>
-              <div style={{ marginTop: 8 }}>
-                Sports pulls from Reddit, which needs no credentials — so an empty
-                result here means the subreddit was quiet or unreachable, not that
-                something is unconfigured. The source list shows which.
-              </div>
-            </div>
+            <EmptyState title={`Nothing here in the last ${windowHours}h.`} actions={<>
+              {active && (
+                <button className="nav-btn" onClick={openRoot}>Show all sports</button>
+              )}
+              <button className="nav-btn" onClick={() => window.__aetherRefreshFeed?.()}>
+                Refetch
+              </button>
+            </>}>
+              Sports pulls from Reddit, which needs no credentials — so an empty
+              result here means the subreddit was quiet or unreachable, not that
+              something is unconfigured. The source list shows which.
+            </EmptyState>
           )}
 
           {!loading && feed.length > 0 && <SignalList lead={feed[0]} items={feed.slice(1)}/>}
@@ -1607,9 +2028,12 @@ function ColorSwatches({ palette, value, onPick }) {
 function SuggestedCategories({ onCreate, busyKey }) {
   const [state, setState] = useState({ suggestions: [], limits: [], mined: null, loading: true });
   const [dismissed, setDismissed] = useState([]);
+  const [nonce, setNonce] = useState(0);
+  const refresh = () => setNonce(n => n + 1);
 
   useEffect(() => {
     let alive = true;
+    setState(s => ({ ...s, loading: true }));
     fetch('/api/suggest-categories', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { if (alive) setState({ ...d, loading: false }); })
@@ -1618,7 +2042,7 @@ function SuggestedCategories({ onCreate, busyKey }) {
         if (alive) setState({ suggestions: [], limits: ['Could not read your feed for themes.'], mined: null, loading: false });
       });
     return () => { alive = false; };
-  }, []);
+  }, [nonce]);
 
   const { suggestions, limits, mined, loading } = state;
   const visible = suggestions.filter(s => !dismissed.includes(s.term));
@@ -1646,17 +2070,21 @@ function SuggestedCategories({ onCreate, busyKey }) {
         </div>
       )}
 
-      {loading && <div className="empty-note">Reading your feed for recurring themes…</div>}
+      {loading && <SkeletonRowList rows={3}/>}
 
       {!loading && !visible.length && (
-        <div className="empty-note">
-          <strong>No themes stand out yet.</strong>
-          <div style={{ marginTop: 8 }}>
-            A theme needs to appear across at least two of your sources before it
-            is worth a category — one source talking about something is that
-            source&apos;s interest, not a category.
-          </div>
-        </div>
+        <EmptyState title="No themes stand out yet." actions={<>
+          <button className="nav-btn" onClick={refresh}>Read the feed again</button>
+          {dismissed.length > 0 && (
+            <button className="nav-btn" onClick={() => setDismissed([])}>
+              Restore {dismissed.length} dismissed
+            </button>
+          )}
+        </>}>
+          A theme needs to appear across at least two of your sources before it
+          is worth a category — one source talking about something is that
+          source&apos;s interest, not a category.
+        </EmptyState>
       )}
 
       <div className="rec-list">
@@ -1769,7 +2197,7 @@ function CategoryManager() {
         </div>
       )}
 
-      {loading && <div className="empty-note">Loading categories…</div>}
+      {loading && <SkeletonRowList rows={5}/>}
 
       {/* ── The collection ── */}
       <div className="cat-list">
@@ -1880,7 +2308,7 @@ function CategoryManager() {
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
-function FeedView({ t, category, search, isMobile }) {
+function FeedView({ t, category, search, isMobile, onSearch, onCategory }) {
   // "General" is the everything page, not a bucket. After the roster landed,
   // no source is filed under `general`, so treating it as a filter opened the
   // app on an empty feed. Every other tab filters; General shows the lot.
@@ -1923,33 +2351,62 @@ function FeedView({ t, category, search, isMobile }) {
           </span>
         </div>
 
-        {loading && (
-          <div className="empty-note" style={{ animation:'pulse 1.4s ease-in-out infinite' }}>
-            Pulling live signal…
-          </div>
-        )}
+        {/* The cold path here is the slowest in the app — a cache-miss
+            /api/social can take fourteen seconds. A skeleton in the exact
+            geometry of the cards that follow means the page is laid out and
+            legible for those fourteen seconds instead of showing one line of
+            text in a dashed box. */}
+        {loading && <SkeletonSignalList rows={5}/>}
 
         {!loading && !visible.length && (
           // Graceful fallback: the app renders, and it says exactly WHY it is
           // empty rather than quietly substituting invented posts.
-          <div className="empty-note">
-            <strong style={{ color:'var(--text2)' }}>No live signal for this category.</strong>
-            <div style={{ marginTop:8 }}>
-              {q
-                ? <>Nothing matches “{search}”. Clear the search to see the full feed.</>
-                : <>Every configured source for this category came back empty or unreachable.
-                   The source list on the right shows which ones and why. Edit{' '}
-                   <code>config/sources.js</code> to change what is pulled.</>}
-            </div>
-          </div>
+          <EmptyState
+            title={q ? `Nothing matches “${search}”.` : 'No live signal for this category.'}
+            actions={q
+              ? <button className="nav-btn" onClick={() => onSearch?.('')}>Clear the search</button>
+              : <>
+                  <button className="nav-btn" onClick={refresh}>Refetch this category</button>
+                  {category !== 'general' && (
+                    <button className="nav-btn" onClick={() => onCategory?.('general')}>
+                      See all signal
+                    </button>
+                  )}
+                </>}>
+            {q
+              ? <>The full feed has {items.length} signal{items.length === 1 ? '' : 's'} right now.</>
+              : <>Every configured source for this category came back empty or unreachable.
+                 The source list on the right shows which ones and why. Edit{' '}
+                 <code>config/sources.js</code> to change what is pulled.</>}
+          </EmptyState>
         )}
 
         {!loading && lead && <SignalList lead={lead} items={[...rail, ...more]}/>}
       </div>
 
       <aside>
+        {/* Source health is the one thing on this page that changes state
+            without a visible event a screen reader can follow — the change is a
+            colour on a 6px dot. Announce the roll-up instead. */}
+        <LiveStatus>
+          {loading
+            ? 'Pulling live signal.'
+            : `${visible.length} signal${visible.length === 1 ? '' : 's'}. ` +
+              `${sources.filter(s => s.ok).length} of ${sources.length} sources live` +
+              (sources.some(s => !s.ok && s.pending)
+                ? `, ${sources.filter(s => !s.ok && s.pending).length} still loading` : '') +
+              (degraded > 0 ? `, ${degraded} degraded` : '') + '.'}
+        </LiveStatus>
         <LiveSignalRail items={visible}/>
-        <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>
+        {loading
+          ? <section className="sop-strip">
+              <div className="sop-head">
+                <span className="sop-label">Sources</span>
+                <span className="section-sub">checking…</span>
+              </div>
+              <SkeletonSourceList rows={6}/>
+            </section>
+          : <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>}
       </aside>
     </div>
   );
@@ -2372,7 +2829,8 @@ export default function AetherHub() {
           </div>
         )}
 
-        {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}/>}
+        {view === 'feed'         && <FeedView         t={t} category={category} search={search} isMobile={isMobile}
+                                                       onSearch={setSearch} onCategory={setCategory}/>}
         {view === 'discover'     && <DiscoverView/>}
         {view === 'recommended'  && <RecommendedView/>}
         {view === 'podcasts'     && <PodcastView/>}

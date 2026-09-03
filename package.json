@@ -20,7 +20,10 @@
     "podcasts:verify": "node scripts/verify-podcasts.mjs",
     "tune:throttle": "node scripts/tune-throttle.mjs",
     "verify:throughput": "node scripts/verify-throughput.mjs",
-    "verify:swr": "node scripts/verify-swr.mjs"
+    "verify:swr": "node scripts/verify-swr.mjs",
+    "audit:skeletons": "AUDIT_LOADING=1 node scripts/responsive-audit.mjs",
+    "verify:charts": "node scripts/verify-charts.mjs",
+    "verify:contrast": "node scripts/verify-contrast.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

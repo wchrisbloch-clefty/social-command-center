@@ -20,6 +20,7 @@
 //      scrolls on purpose — a tab strip is allowed to overflow itself).
 //   3. No collapsed nav/tab strip: every category tab renders with real width.
 //   4. No tap target under 34px tall or 24px wide.
+//   5. No number rendered with proportional figures (Signal Desk views only).
 //
 // ── RUNNING IT ──────────────────────────────────────────────────────────────
 // By default it builds nothing and starts nothing you must manage: it boots a
@@ -32,6 +33,14 @@
 //   CHROMIUM_PATH    explicit Chromium binary, for environments with a
 //                    pre-provisioned browser that Playwright cannot resolve
 //   AUDIT_HEADED=1   watch it run
+//   AUDIT_LOADING=1  measure the SKELETON state instead of the loaded one: the
+//                    client data routes are stalled, so every view is caught
+//                    mid-fetch.
+//                    A skeleton is layout too, and the cold /api/social path is
+//                    the longest-lived layout in the app — fourteen seconds on
+//                    a cache miss. Not part of the default gate (it deliberately
+//                    wastes wall-clock waiting); run it when the loading shapes
+//                    change.
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -70,6 +79,25 @@ const CATEGORY_VIEWS = {
   'sports':      { tab: 'Sports', drill: null },
   'sports-team': { tab: 'Sports', drill: 'Houston Texans' },
 };
+
+// Skeleton mode. The views worth measuring mid-fetch are the ones that own a
+// real-data skeleton; the mock views have no loading state to catch.
+const LOADING_MODE   = !!process.env.AUDIT_LOADING;
+const LOADING_VIEWS  = ['feed', 'discover', 'recommended', 'podcasts', 'sports'];
+// Every client-side data route. In skeleton mode these are STALLED in the
+// browser rather than slowed in the fixture: a slow fixture warms the server
+// cache partway through the run, and the later cases then render instantly and
+// measure the loaded layout while claiming to measure the skeleton. Stalling
+// per page is deterministic and costs no wall-clock.
+const DATA_ROUTES = [
+  '**/api/social**', '**/api/podcasts**', '**/api/recommend**',
+  '**/api/suggest-categories**', '**/api/youtube**',
+];
+
+// The six inline-styled legacy dashboard views. They are mock data behind a
+// separate reskin, so the typographic rules the Signal Desk views are held to
+// do not apply to them yet — but their geometry still is.
+const LEGACY_VIEWS = ['intelligence', 'studio', 'alerts', 'sources', 'settings'];
 
 const MIN_TAP_HEIGHT = 34;
 const MIN_TAP_WIDTH  = 24;
@@ -186,7 +214,7 @@ function startApp(rsshubBase) {
 }
 
 // ── Measurement, run inside the page ────────────────────────────────────────
-function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
+function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch, checkTnum }) {
   const de = document.documentElement;
   const vw = de.clientWidth;
 
@@ -314,6 +342,33 @@ function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch }) {
     }
   }
 
+  // (5) Tabular figures. Every number in a Signal Desk view sits in a column, a
+  //     right-aligned note, or a value that refreshes in place. Proportional
+  //     figures make those jitter sideways as the digits change, which reads as
+  //     the layout moving rather than the number changing. This is checked by
+  //     COMPUTED STYLE on the elements that actually render digits, because the
+  //     failure mode is a new view whose metadata class nobody added to the
+  //     shared rule — invisible in the stylesheet, obvious in a column.
+  if (checkTnum) {
+    const seen = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.children.length) continue;                    // leaves only
+      if (!visible(el)) continue;
+      // .sr-only is clipped to 1x1 and never rendered as glyphs — a live region
+      // announcing "28 of 29 sources live" has no figures to set.
+      if (el.classList.contains('sr-only')) continue;
+      const txt = (el.textContent || '');
+      if (!/[0-9]/.test(txt)) continue;
+      const fvn = getComputedStyle(el).fontVariantNumeric || '';
+      const ffs = getComputedStyle(el).fontFeatureSettings || '';
+      if (fvn.includes('tabular-nums') || /"tnum"\s*(1|on)?/.test(ffs)) continue;
+      const key = describe(el);
+      if (seen.has(key)) continue;                          // one report per shape
+      seen.add(key);
+      violations.push({ rule: 'proportional-figures', detail: key });
+    }
+  }
+
   return {
     violations,
     theme: de.getAttribute('data-theme'),
@@ -372,19 +427,26 @@ async function main() {
           hasTouch: bp.mobile,
         });
         const page = await ctx.newPage();
+        if (LOADING_MODE) {
+          // Never fulfilled and never aborted — an abort is an error state, and
+          // the state under test is "still waiting".
+          for (const pattern of DATA_ROUTES) await page.route(pattern, () => {});
+        }
         let consoleErrors = [];
         page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
         page.on('pageerror', e => consoleErrors.push(`pageerror: ${e.message}`));
 
-        await page.goto(baseUrl, { waitUntil: 'networkidle' });
-        await page.waitForTimeout(900); // let the feed fetch settle
+        // In skeleton mode we must NOT wait for the network: the whole point is
+        // to measure while the fetch is still outstanding.
+        await page.goto(baseUrl, { waitUntil: LOADING_MODE ? 'domcontentloaded' : 'networkidle' });
+        await page.waitForTimeout(LOADING_MODE ? 250 : 900); // let the feed fetch settle
 
         if (theme === 'dark') {
           await page.locator('button[aria-label*="theme"]').first().click();
           await page.waitForTimeout(300);
         }
 
-        for (const view of VIEWS) {
+        for (const view of (LOADING_MODE ? LOADING_VIEWS : VIEWS)) {
           consoleErrors = [];
           if (view === 'feed') {
             // Already here on load; if we navigated away, come back.
@@ -417,7 +479,23 @@ async function main() {
           const m = await page.evaluate(measure, {
             minTapH: MIN_TAP_HEIGHT, minTapW: MIN_TAP_WIDTH,
             minTabStrip: MIN_TAB_STRIP, expectedTabs, touch: bp.mobile,
+            // Skeletons carry no numbers, so the tnum rule has nothing to say
+            // about them and would only report the shared masthead twice.
+            checkTnum: !LEGACY_VIEWS.includes(view) && !LOADING_MODE,
           });
+
+          // A skeleton case that measured no skeleton measured nothing. Without
+          // this the mode would report a confident green having audited the
+          // loaded layout a second time.
+          if (LOADING_MODE) {
+            const bars = await page.locator('.skel-bar').count();
+            if (!bars) {
+              m.violations.push({
+                rule: 'no-skeleton',
+                detail: 'expected a skeleton on screen while this view\'s data route was stalled, found none',
+              });
+            }
+          }
 
           const key = `${bp.name}/${theme}/${view}`;
           results.push({ bp: bp.name, theme, view, key, ...m });
@@ -445,8 +523,10 @@ async function main() {
   // ── Report ────────────────────────────────────────────────────────────────
   const failed = results.filter(r => r.violations.length);
 
-  process.stdout.write(`\nResponsive geometry audit — ${results.length} cases ` +
-    `(${BREAKPOINTS.length} breakpoints x 2 themes x ${VIEWS.length} views)\n\n`);
+  const viewCount = (LOADING_MODE ? LOADING_VIEWS : VIEWS).length;
+  process.stdout.write(
+    `\nResponsive geometry audit${LOADING_MODE ? ' — SKELETON state' : ''} — ${results.length} cases ` +
+    `(${BREAKPOINTS.length} breakpoints x 2 themes x ${viewCount} views)\n\n`);
 
   for (const r of results) {
     const mark = r.violations.length ? 'FAIL' : ' ok ';

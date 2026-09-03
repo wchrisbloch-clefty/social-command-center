@@ -147,8 +147,34 @@ correct too.
 | `AUDIT_BASE_URL` | Point at an already-running server, skip spawning |
 | `CHROMIUM_PATH` | Explicit Chromium binary where Playwright can't resolve one |
 | `AUDIT_HEADED=1` | Watch it run |
+| `AUDIT_LOADING=1` | Measure the **skeleton** state instead of the loaded one |
 
 First run needs a browser: `npx playwright install --with-deps chromium`.
+
+### Auditing the loading state
+
+```bash
+npm run audit:skeletons
+```
+
+A skeleton is layout too, and on a cache-miss `/api/social` it is the
+longest-lived layout in the app — up to fourteen seconds. This mode stalls
+every client data route in the browser (`/api/social`, `/api/podcasts`,
+`/api/recommend`, `/api/suggest-categories`, `/api/youtube`) so each view is
+measured mid-fetch, then applies the same four geometry rules to what it finds.
+
+It stalls in the *browser* rather than slowing the fixture on purpose: a slow
+fixture warms the server cache partway through the run, and every later case
+then renders instantly and measures the loaded layout while reporting itself as
+a skeleton case.
+
+A case that finds no `.skel-bar` on screen fails with `no-skeleton`. Without
+that guard the mode would report a confident green having audited the loaded
+layout twice — which is exactly what it did before the guard was added, verified
+by pointing it at a view that has no loading state.
+
+It is **not** part of the default gate; run it when the loading shapes change.
+The views it covers are `LOADING_VIEWS` in `scripts/responsive-audit.mjs`.
 
 ---
 
@@ -162,4 +188,22 @@ First run needs a browser: `npx playwright install --with-deps chromium`.
    paint. Use a media query. (This is why `.studio-grid` exists.)
 5. Register the view in `VIEWS` in `scripts/responsive-audit.mjs` so the gate
    covers it. **A view not listed there is a view nobody is checking.**
-6. Run `npm run audit:responsive` before you push.
+6. Run `npm run audit:responsive` before you push. If the view has a loading
+   state, add it to `LOADING_VIEWS` too and run `npm run audit:skeletons`.
+
+---
+
+## Skeletons
+
+A skeleton mirrors the geometry of the row it replaces — same border, same
+padding, same left edge, same number of lines — so nothing reflows when the real
+content lands. `.skel-signal` mirrors `.signal`, `.skel-vrow` mirrors `.vrow`,
+`.skel-srow` mirrors `.src-row`.
+
+They are **static**. `docs/DESIGN.md` forbids glow, shadow and pulse, and a
+motionless placeholder is also the only kind that costs nothing over fourteen
+seconds. There is no spinner anywhere in this app.
+
+Bar widths come from the fixed `SKEL_META` / `SKEL_TITLE` arrays, not
+`Math.random()`: random widths make the skeleton twitch on every re-render
+during a long load, which reads as a bug.

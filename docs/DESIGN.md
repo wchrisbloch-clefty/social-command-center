@@ -12,8 +12,10 @@ file governs surface, type and colour.
 
 These are not preferences. A change that breaks one is a bug.
 
-- **Velocity is a WORD** — High / Rising / Moderate. Never an arrow, gauge,
-  progress bar, sparkline, or glow.
+- **A single signal's velocity is a WORD** — High / Rising / Moderate. Never an
+  arrow, gauge, progress bar, sparkline, dot or glow *on the item itself*.
+  Aggregates are a different question — see [Charts](#charts) — but nothing
+  attached to one row may be a shape.
 - **Tier is a WORD** — Verified / Alt. perspective. Never a shield, dot or icon.
 - **No platform logos.** Platform is plain text in the metadata line.
 - **No monospace or terminal fonts** outside a literal code block.
@@ -72,7 +74,11 @@ The only other colour on screen.
 |---|---|---|
 | High | `#15803d` green | `#4ade80` |
 | Rising | `#b45309` amber | `#fbbf24` |
-| Moderate | `#737373` neutral | `#7d7d7d` |
+| Moderate | `#737373` neutral | `#838383` |
+
+Dark `Moderate` was `#7d7d7d` until `npm run verify:contrast` measured it at
+4.36:1 against a card — under the 4.5:1 WCAG minimum for text. The word tracks
+`--text3`, so both moved together.
 
 ## The signal card
 
@@ -93,6 +99,59 @@ one.
 Simple horizontal tabs. Active is solid near-black with white text; inactive is
 plain gray. No pills, no borders, no underline chrome. It still reflows to the
 mobile scrollable strip — see `docs/RESPONSIVE.md`.
+
+## Charts
+
+Four of them, and there will not be a fifth without a reason. They live in
+`lib/chart-data.js` (the maths, pure) and the `BarSeries` / `Sparkline` /
+`SignalMixStrip` components (the marks).
+
+| Chart | Where | Answers |
+|---|---|---|
+| Category bars | Discover | which categories are moving, and by how much |
+| Volume sparkline | Discover | is the feed accelerating or dying off |
+| Velocity mix strip | Discover | how much of the feed is actually High |
+| Topic bars | Podcasts | which subjects several shows reached independently |
+
+**The rules, which are not negotiable:**
+
+- **A chart may only draw what the pipeline produced.** Every series comes from
+  items that have been through `normalizeSignal()`. No smoothing, no
+  interpolation, no projection, and no zero-filled padding — an empty series
+  renders an empty *state*, because a flat line reads as "we measured, and the
+  answer was nothing", which is a different claim from "nothing has arrived
+  yet". Enforced by `npm run verify:charts`.
+- **The numbers are TEXT; the mark is the supplement.** That is why no chart
+  needs a `role="img"` description and why every track, stroke and segment is
+  `aria-hidden`. A screen reader gets the whole series by reading the list.
+- **No chart introduces a colour.** A category bar carries `data-cat` and
+  inherits `--cat`. A velocity segment uses the three velocity tokens. Anything
+  uncategorised is `--text3`. Enforced by `npm run verify:contrast`, which holds
+  every mark to WCAG 1.4.11's 3.0:1 in both themes.
+- **No axes, gridlines, legends, tooltips, rounded caps or gradients.** A
+  gridline on a five-row bar chart is decoration. Where a number matters it is
+  written underneath.
+- **Aggregate shapes only.** A shape describing the whole feed is fine; a shape
+  attached to one signal is not, and never will be — that is the hard rule at
+  the top of this file.
+
+## Loading and empty states
+
+- **Skeletons, never spinners.** A skeleton mirrors the geometry of the row it
+  replaces so nothing reflows when the content lands, and it is *static*: no
+  pulse, no shimmer. See `docs/RESPONSIVE.md` and `npm run audit:skeletons`.
+- **An empty state is a sentence plus a way out.** Title says what is empty,
+  body says why, and there is at least one real control — refetch, widen the
+  window, clear the search. "Try again later" is not an action.
+
+## Numbers
+
+Tabular figures everywhere a digit appears. Every number in this app sits in a
+column, a right-aligned note, or a value that refreshes in place; proportional
+figures make those jitter sideways as the digits change, which reads as the
+layout moving rather than the number changing. One shared rule in
+`globals.css` names every class that renders one, and rule (5) of the
+responsive audit checks the computed style rather than trusting the list.
 
 ## Dark mode
 
