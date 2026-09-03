@@ -122,9 +122,14 @@ const item = (ageHours, extra = {}) => ({ id: `i${ageHours}`, ageHours, ...extra
   ok('topics sort descending', tbars[0].id === 'fed');
   ok('topic bars are NEUTRAL — no category hue is asserted',
     tbars.every(b => b.catId === null));
-  ok('topic detail pluralises show counts',
-    tbars[0].detail === '2 shows' && tbars[1].detail === '3 shows',
+  ok('topic detail pluralises show counts and names the shows',
+    tbars[0].detail === '2 shows · a · b' && tbars[1].detail === '3 shows · a · b · c',
     `${tbars[0].detail} / ${tbars[1].detail}`);
+  ok('a single-show topic still reads correctly',
+    topicBars([{ term: 'x', label: 'X', episodes: 1, showCount: 1, shows: ['solo'] }])[0].detail
+      === '1 show · solo');
+  ok('a topic with no show list does not invent one',
+    topicBars([{ term: 'y', label: 'Y', episodes: 2, showCount: 2 }])[0].detail === '2 shows');
 }
 
 // ── 6. Mix percentages derive from counts, and counts survive ──────────────

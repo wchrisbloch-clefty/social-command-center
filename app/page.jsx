@@ -860,6 +860,46 @@ function BarSeries({ label, sub, bars, unit = 'signal', empty, max: maxProp }) {
 }
 
 /**
+ * The velocity mix as one 100%-stacked strip.
+ *
+ * Deliberately not a pie. A pie would be the only circle on an otherwise
+ * rectangular desk, and it is the harder shape to read at three segments.
+ *
+ * The three counts are listed underneath in the velocity words and colours the
+ * rest of the app already uses, so this adds no vocabulary: it just makes the
+ * proportion visible at a glance instead of requiring you to divide the numbers
+ * in the header.
+ */
+function SignalMixStrip({ label, summary, windowHours, empty }) {
+  const mix = signalMix(summary);
+
+  return (
+    <ChartFrame label={label} sub={`last ${windowHours}h`}>
+      {mix.empty ? (
+        <p className="empty-note" style={{ margin: 0 }}>{empty}</p>
+      ) : (
+        <>
+          <div className="chart-mix" aria-hidden="true">
+            {mix.segments.filter(s => s.value > 0).map(s => (
+              <span key={s.id} className="chart-mix-seg" data-vel={s.id}
+                style={{ width: `${s.pct}%` }}/>
+            ))}
+          </div>
+          <ul className="chart-mix-key">
+            {mix.segments.map(s => (
+              <li key={s.id}>
+                <span className={`vel vel-${s.id}`}>{s.label}</span>
+                {s.value} · {Math.round(s.pct)}%
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </ChartFrame>
+  );
+}
+
+/**
  * Signal volume over the window — one stroke, no axes.
  *
  * A sparkline answers one question: is this accelerating or dying off. It does
@@ -1226,6 +1266,15 @@ function DiscoverView() {
           empty={`Nothing arrived in the last ${windowHours}h, so there is no shape to draw yet.`}/>
       )}
 
+      {/* A2 — the same three numbers the header states, as a proportion. */}
+      {!loading && (
+        <SignalMixStrip
+          label="Velocity mix"
+          summary={summary}
+          windowHours={windowHours}
+          empty={`No signal in the last ${windowHours}h to break down.`}/>
+      )}
+
       {/* A1 — the whole feed in one glance, before any scrolling. Bars come
           from the SAME groupByCategory() call the sections below render, so the
           chart and the list can never disagree. */}
@@ -1387,29 +1436,19 @@ function EpisodeCard({ item }) {
  * this strip earns its space.
  */
 function CrossShowTopics({ topics, limits }) {
-  if (!topics.length) {
-    return (
-      <section className="sop-strip">
-        <div className="sop-head"><span className="sop-label">Across your shows</span></div>
-        <p className="empty-note" style={{ margin: 0 }}>
-          {limits[0] || 'No subject has appeared across two or more shows yet.'}
-        </p>
-      </section>
-    );
-  }
+  // A4 — the same BarSeries Discover uses. The bar is episode COUNT, which is
+  // the thing that varies; the show names sit in the detail line because they
+  // are the evidence for the bar, and a topic nobody can attribute is not a
+  // cross-show topic. Bars are neutral, not category-coloured: a topic spans
+  // shows and often categories, so one category's hue would assert a
+  // relationship the data does not have.
   return (
-    <section className="sop-strip">
-      <div className="sop-head"><span className="sop-label">Across your shows</span></div>
-      <ul className="topic-strip">
-        {topics.map(t => (
-          <li key={t.term} className="topic-chip">
-            <span className="topic-term">{t.label}</span>
-            <span className="topic-why">{t.reason}</span>
-            <span className="topic-shows">{t.shows.join(' · ')}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <BarSeries
+      label="Across your shows"
+      sub={topics.length ? `${topics.length} subject${topics.length === 1 ? '' : 's'}` : null}
+      bars={topicBars(topics)}
+      unit="episode"
+      empty={limits[0] || 'No subject has appeared across two or more shows yet.'}/>
   );
 }
 

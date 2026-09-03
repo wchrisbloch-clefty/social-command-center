@@ -1073,38 +1073,9 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   overflow-wrap: anywhere;
 }
 
-/* ── Cross-show topic strip ──────────────────────────────────────────────── */
-.topic-strip {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  /* minmax(0, …) — a bare 1fr is minmax(auto, 1fr) and refuses to shrink
-     below min-content, which is the blowout the gate catches. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  gap: 8px;
-}
-.topic-chip {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.topic-term {
-  font-size: var(--fs-body);
-  font-weight: var(--fw-medium);
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.topic-why, .topic-shows {
-  font-size: var(--fs-meta);
-  color: var(--text3);
-  overflow-wrap: anywhere;
-}
+/* The cross-show topic chips are gone: the strip is now the shared BarSeries,
+   because episode count is the thing that varies between topics and a chip grid
+   gave every subject the same visual weight. See CrossShowTopics. */
 
 .limit-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
 .limit-list li { font-size: var(--fs-meta); color: var(--text3); line-height: 1.5; }
@@ -1163,5 +1134,4 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 
 @media (max-width: 720px) {
   .episode { padding: 12px 13px; }
-  .topic-strip { grid-template-columns: minmax(0, 1fr); }
 }
