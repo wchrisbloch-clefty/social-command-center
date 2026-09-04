@@ -23,6 +23,11 @@ import { PODCAST_SOURCES, limitOf } from '../../../config/sources.js';
 import { normalizeSignal } from '../../../lib/adapters.js';
 import { fetchFeed } from '../../../lib/feed-fetch.js';
 import { parseEpisodes, feedTitle, feedArtwork } from '../../../lib/feed-parser.js';
+// The SAME classifier the source map and Add-to-Follow use. A second
+// categorisation implementation would drift from the first, and an episode
+// filed differently from the source that produced it is worse than no
+// classification at all.
+import { classifyEpisode, THIN_NOTES_CHARS } from '../../../lib/categorize.js';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,10 +39,6 @@ export const maxDuration = 60;
 // ASSUMPTION: 45 days. Weekly shows skip weeks; six weeks of silence means the
 // show has stopped or moved.
 const STALE_DAYS = 45;
-
-// Under this much text there is not enough to summarise without padding.
-// ASSUMPTION: 200 characters is roughly one sentence of show notes.
-const THIN_NOTES_CHARS = 200;
 
 /** One show → up to `limit` normalized episode signals. Never throws. */
 async function loadShow(source) {
@@ -71,8 +72,17 @@ async function loadShow(source) {
   const actualTitle = feedTitle(res.text);
   const artwork = feedArtwork(res.text);
 
-  const items = episodes.slice(0, limit).map(ep => normalizeSignal({
+  const items = episodes.slice(0, limit).map(ep => {
+    const placement = classifyEpisode(ep, source.category);
+    return normalizeSignal({
     platform: 'Podcast',
+    // The episode's OWN topic category, not the show's. This is what makes an
+    // episode appear in the category feed where it belongs while staying one
+    // signal — the Podcasts tab and that feed render the same object.
+    category: placement.category,
+    categorySource: placement.categorySource,
+    categoryConfidence: placement.categoryConfidence,
+    categoryMatched: placement.categoryMatched,
     title: ep.title,
     // Show notes are the content, and the ONLY text a summary can be built
     // from. See lib/podcast-summary.js for what that does and does not permit.
@@ -88,7 +98,8 @@ async function loadShow(source) {
     // Today every episode's text provenance is the publisher's own notes.
     // Nothing in this repo produces any other value.
     provenance: 'show-notes',
-  }, { platform: 'Podcast', label: source.label, category: source.category }));
+  }, { platform: 'Podcast', label: source.label, category: source.category });
+  });
 
   const newest = items[0] ? new Date(items[0].publishedAt).getTime() : 0;
   const staleDays = newest ? Math.floor((Date.now() - newest) / 86_400_000) : null;
@@ -148,12 +159,15 @@ function buildLimits(sources) {
 
 export async function GET(request) {
   const category = request.nextUrl.searchParams.get('category');
-  const wanted = category && category !== 'general'
-    ? PODCAST_SOURCES.filter(s => s.category === category)
-    : PODCAST_SOURCES;
-
+  // Every show is fetched whatever the filter, because the filter now applies
+  // to EPISODES and an episode's category is not its show's. Filtering shows
+  // first would hide the exact items dual-surfacing exists to reveal: the
+  // Acquired episode that belongs in Tech lives behind a business-filed show.
+  //
+  // The cost is bounded — five feeds, all cached by lib/feed-fetch.js, and the
+  // unfiltered call the Podcasts tab makes warms the same cache.
   try {
-    const settled = await Promise.all(wanted.map(s =>
+    const settled = await Promise.all(PODCAST_SOURCES.map(s =>
       loadShow(s).catch(e => ({
         items: [],
         report: {
@@ -163,10 +177,27 @@ export async function GET(request) {
         },
       }))));
 
-    const items = settled.flatMap(r => r.items);
-    const sources = settled.map(r => r.report);
+    const all = settled.flatMap(r => r.items);
+    // 'general' is the everything page, not a bucket — same rule the feed uses.
+    const filtering = Boolean(category && category !== 'general');
+    const items = filtering ? all.filter(i => i.category === category) : all;
+
+    // Source reports follow the filter. In the Podcasts tab (no filter) every
+    // show is reported, failures included — that is where a dead feed must be
+    // seen. Inside a topic tab only the shows that actually contributed an
+    // episode to THAT topic are reported, with their per-topic counts:
+    // "Acquired · HTTP 404" in the Sports source list is noise, and
+    // "Acquired · 4 items" next to a Sports feed containing none of them would
+    // be a lie.
+    const sources = filtering
+      ? settled
+          .map(r => ({ ...r.report, count: r.items.filter(i => i.category === category).length }))
+          .filter(r => r.count > 0)
+      : settled.map(r => r.report);
     const ok = sources.filter(s => s.ok).length;
-    console.warn(`[podcasts] ${ok}/${sources.length} shows ok, ${items.length} episodes`);
+    console.warn(
+      `[podcasts] ${ok}/${sources.length} shows ok, ${all.length} episodes` +
+      (category ? ` (${items.length} in ${category})` : ''));
 
     return Response.json({
       items, sources,
