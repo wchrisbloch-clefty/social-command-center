@@ -259,7 +259,13 @@ export const TOPIC_SOURCES = [
 //   All-In                4 episodes, title matched, avg 1396
 //   Flagrant              4 episodes, title matched, avg 1796
 //   Morning Wire          4 episodes, title matched, avg 1001
-//   Acquired              HTTP 404 — STILL FLAGGED, see its note below
+//   Acquired              was HTTP 404 — RESOLVED AND VERIFIED 2026-09-04
+//
+// ALL FIVE ARE NOW VERIFIED. Acquired was the last holdout: its Simplecast
+// host was dead, and when Add-a-show was run on the deployment to replace it
+// the resolver returned the flagship on one run and the ACQ2 spinoff on
+// another. Its note below records which one is wired and why the two are hard
+// to tell apart.
 //
 // A source that keeps the flag is one nothing has confirmed. It degrades
 // honestly rather than rendering someone else's show under the right name,
@@ -278,23 +284,33 @@ export const PODCAST_SOURCES = [
     feedUrl: 'https://allinchamathjason.libsyn.com/rss',
     label: 'All-In', category: 'business', limit: 4 },
 
-  // ⚠ BROKEN, AND STILL FLAGGED. Verification on 2026-09-02 returned HTTP 404
-  // from this Simplecast feed — the only one of the five that failed. The show
-  // appears to have MIGRATED to Transistor, so this is a dead host rather than
-  // a typo, and the replacement URL cannot be resolved from the build sandbox
-  // (itunes.apple.com and every podcast CDN are blocked by the egress policy).
+  // VERIFIED 2026-09-04 against the live deployment, and this one had a SECOND
+  // trap after the dead host. The Simplecast URL wired here until now returned
+  // HTTP 404 — the show had migrated to Transistor — so Add-a-show was run on
+  // the deployment to resolve it. It was run TWICE, and the two runs returned
+  // DIFFERENT FEEDS:
   //
-  // Left wired and flagged on purpose: a 404 fails loudly and the UI says so,
-  // which is strictly better than a guessed Transistor slug that might return
-  // 200 for somebody else's show under this name.
+  //   feeds.transistor.fm/acquired  ← the flagship. Ben Gilbert & David
+  //                                   Rosenthal, company-history deep dives.
+  //                                   Latest: "Disney: The Renaissance and the
+  //                                   Empire". THIS IS THE ONE WIRED.
+  //   feeds.transistor.fm/acq2      ← "ACQ2 by Acquired", their secondary
+  //                                   interview spinoff. Same brand, same
+  //                                   hosts, same publisher, DIFFERENT SHOW.
   //
-  // To fix: `npm run podcasts:verify -- --fix`, or type "Acquired" into Add a
-  // show in the Podcast tab — that route runs on the deployment, which can
-  // reach the directory.
+  // Both are real, both are "Acquired", and a title check alone cannot tell
+  // them apart — ACQ2's channel title literally contains the word. That is a
+  // SAME-BRAND COLLISION, and it is a different failure from the "Morning Wire"
+  // case: there the competing shows were unrelated, here they share a
+  // publisher. See lib/source-resolver.js, which now surfaces every same-brand
+  // match with its latest-episode title rather than auto-picking one.
+  //
+  // The flagship is identified by its EPISODES, not its title: deep dives on
+  // one company per episode, versus ACQ2's guest interviews. That is what the
+  // human confirmed on the deployment, and it is why this entry is now clear.
   { platform: 'Podcast', show: 'Acquired',
-    feedUrl: 'https://feeds.simplecast.com/jeNJI0r9',
-    label: 'Acquired', category: 'business', limit: 4,
-    pendingVerification: true },
+    feedUrl: 'https://feeds.transistor.fm/acquired',
+    label: 'Acquired', category: 'business', limit: 4 },
 
   // VERIFIED 2026-09-02: 4 episodes, avg 1796 chars of notes. The feed calls
   // itself "Flagrant" while this is wired as "Andrew Schulz's Flagrant", and

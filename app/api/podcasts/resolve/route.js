@@ -14,7 +14,9 @@
 // publisher, its latest episode and any alternative matches — enough for a
 // human to say yes or pick a different one.
 
-import { resolvePodcast, searchPodcastDirectory } from '../../../../lib/source-resolver.js';
+import {
+  resolvePodcast, searchPodcastDirectory, rankDirectoryMatches, describeCandidates,
+} from '../../../../lib/source-resolver.js';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -42,10 +44,17 @@ export async function POST(request) {
     let alternatives = result.alternatives || [];
     if (!/^https?:\/\//i.test(query) && alternatives.length === 0) {
       try {
-        const all = await searchPodcastDirectory(query, defaultCtx());
-        alternatives = all.filter(a => a.feedUrl !== result.feedUrl).slice(0, 4);
+        const all = rankDirectoryMatches(await searchPodcastDirectory(query, defaultCtx()), query);
+        // Enriched, not raw. A bare list of titles cannot distinguish siblings
+        // that share a title stem — the latest episode is what does.
+        alternatives = await describeCandidates(
+          all.filter(a => a.feedUrl !== result.feedUrl).slice(0, 4), defaultCtx());
       } catch { /* the primary answer stands on its own */ }
     }
+
+    const siblings = alternatives.filter(a =>
+      a.publisher && result.publisher &&
+      a.publisher.trim().toLowerCase() === result.publisher.trim().toLowerCase());
 
     return Response.json({
       ...result,
@@ -59,6 +68,13 @@ export async function POST(request) {
         latestEpisode: result.latestEpisode,
         episodeCount: result.episodeCount,
         thinNotes: result.thinNotes,
+        // SAME-BRAND COLLISION. Set when the publisher runs more than one feed
+        // answering to this name — "Acquired" and "ACQ2 by Acquired". The UI
+        // must make the user choose here instead of presenting the top-ranked
+        // result as the answer, because both really are the show they asked
+        // for and only they know which they meant.
+        brandCollision: result.brandCollision || siblings.length > 0,
+        siblingCount: siblings.length,
         note: result.thinNotes
           ? 'This show publishes very short episode notes, so its AI summaries will be brief and it will rarely appear in cross-show topics.'
           : null,
@@ -83,6 +99,19 @@ function defaultCtx() {
         const r = await fetch(url, { signal: AbortSignal.timeout(9000), cache: 'no-store' });
         return r.ok ? await r.json() : null;
       } catch { return null; }
+    },
+    // describeCandidates fetches each alternative's feed for its latest
+    // episode, so this context needs getText too.
+    async getText(url) {
+      try {
+        const r = await fetch(url, {
+          headers: { 'User-Agent': 'AetherHub-SourceResolver/1.0', Accept: '*/*' },
+          signal: AbortSignal.timeout(9000), cache: 'no-store', redirect: 'follow',
+        });
+        return { ok: r.ok, status: r.status, text: r.ok ? await r.text() : '' };
+      } catch (e) {
+        return { ok: false, status: 0, text: '', error: e?.message };
+      }
     },
   };
 }

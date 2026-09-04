@@ -1615,10 +1615,30 @@ function AddPodcast({ onAdded }) {
         a show name is not unique, and this is what stops the wrong show being wired.
       </p>
 
+      {/* SAME-BRAND COLLISION. Raised BEFORE the confirmation card, because it
+          changes what that card means: the resolver has not found "the" show,
+          it has found several the publisher runs under this name, and the top
+          one is a ranking rather than an answer.
+
+          This is why it exists: "Acquired" resolved to the flagship on one run
+          and to "ACQ2 by Acquired" — their interview spinoff — on the next. */}
+      {found?.verified && found?.confirmation?.brandCollision && (
+        <div className="pod-collision">
+          <strong>{found.publisher || 'This publisher'} runs more than one show under this name.</strong>
+          <div>
+            Compare the latest episode of each before adding — a flagship and its
+            spinoff share a title, a publisher and artwork, and the newest episode
+            is the only thing that reliably tells them apart.
+          </div>
+        </div>
+      )}
+
       {found?.verified && (
         <div className="cat-confirm pod-confirm">
           <div className="cat-confirm-text">
-            <strong>Is this the right show?</strong>
+            <strong>
+              {found.confirmation?.brandCollision ? 'Best match — is this the one you meant?' : 'Is this the right show?'}
+            </strong>
             <div className="pod-confirm-show">{found.showTitle}</div>
             {found.publisher && <div className="pod-confirm-meta">{found.publisher}</div>}
             {found.latestEpisode && (
@@ -1644,12 +1664,25 @@ function AddPodcast({ onAdded }) {
 
       {found?.alternatives?.length > 0 && (
         <div className="pod-alts">
-          <span className="pod-alts-label">Or did you mean:</span>
+          <span className="pod-alts-label">
+            {found.confirmation?.brandCollision ? 'The other feeds under this name:' : 'Or did you mean:'}
+          </span>
           <ul className="pod-alt-list">
             {found.alternatives.map(a => (
-              <li key={a.feedUrl}>
+              <li key={a.feedUrl} className="pod-alt">
+                <div className="pod-alt-main">
+                  <span className="pod-alt-name">{a.showTitle || a.collectionName}</span>
+                  {(a.publisher || a.artistName) && (
+                    <span className="pod-alt-meta">{a.publisher || a.artistName}</span>
+                  )}
+                  {/* The distinguishing evidence. Without it a sibling list is
+                      just the same name three times. */}
+                  {a.latestEpisode?.title
+                    ? <span className="pod-alt-meta">Latest: “{a.latestEpisode.title}”</span>
+                    : <span className="pod-alt-meta">Latest episode could not be read from this feed.</span>}
+                </div>
                 <button className="nav-btn" onClick={() => resolve(a.feedUrl)}>
-                  {a.collectionName}{a.artistName ? ` — ${a.artistName}` : ''}
+                  Use this one
                 </button>
               </li>
             ))}

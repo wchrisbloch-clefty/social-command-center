@@ -231,6 +231,7 @@ body {
 .view-sub, .section-sub, .signal-meta, .vrow-meta, .sop-item-meta, .sop-item-time,
 .src-note, .rec-meta, .rec-why, .rec-note, .empty-note, .empty-body,
 .limit-list, .cat-meta, .nav-tab, .pod-add-note, .ep-provenance, .ep-summary-none,
+.pod-alt-meta, .pod-collision, .pod-confirm-meta,
 .export,
 .seg-btn, .sop-label, .note-block, .cat-confirm-text, .drill-label,
 .chart-bar-value, .chart-bar-detail, .chart-spark-foot, .chart-mix-key,
@@ -1146,12 +1147,42 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   gap: 4px;
   min-width: 0;
 }
-.pod-alt-list button {
-  text-align: left;
-  width: 100%;
+/* One alternative: name, publisher and its latest episode on the left, the
+   switch button on the right. The episode line is the point — siblings share
+   everything above it, so a list without it is the same name three times. */
+.pod-alt {
+  display: flex; align-items: flex-start; gap: var(--s3);
   min-width: 0;
+  padding: 9px 0;
+  border-top: 1px solid var(--border2);
+}
+.pod-alt-list > .pod-alt:first-child { border-top: none; }
+.pod-alt-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pod-alt-name {
+  font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text);
   overflow-wrap: anywhere;
-  white-space: normal;
+}
+.pod-alt-meta { font-size: var(--fs-meta); color: var(--text3); overflow-wrap: anywhere; }
+.pod-alt > button { flex: 0 0 auto; white-space: nowrap; }
+
+/* Raised above the confirmation card when a publisher runs several feeds under
+   one name. Dashed like every other honest-uncertainty surface in the app —
+   the same treatment .empty-note gets — rather than a new alert colour. */
+.pod-collision {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: var(--s3);
+  font-size: var(--fs-meta);
+  color: var(--text3);
+  line-height: 1.55;
+  display: flex; flex-direction: column; gap: 5px;
+  max-width: 70ch;
+}
+.pod-collision strong { color: var(--text2); font-weight: var(--fw-medium); }
+
+@media (max-width: 720px) {
+  .pod-alt { flex-direction: column; align-items: stretch; gap: 6px; }
+  .pod-alt > button { width: 100%; }
 }
 
 @media (max-width: 720px) {

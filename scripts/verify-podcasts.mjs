@@ -19,6 +19,12 @@
 //   3. does it publish enough notes to summarise?         ← the honesty check
 //
 // Question 2 is the one that matters most and the one a naive check skips.
+//
+// A CONFIG CHECK runs first and runs OFFLINE, so the command still proves
+// something where the network does not work. And when NOTHING is reachable it
+// says so as its verdict instead of reporting five broken shows — five
+// unrelated CDNs and Apple do not fail together, and calling that "needs a
+// human" is how it once told me four already-verified feeds were dead.
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -34,6 +40,37 @@ const out  = s => process.stdout.write(s);
 
 out(`\n${bold('Podcast verification')}  ${dim(FIX ? 'will correct feed URLs (--fix)' : 'report only')}\n`);
 out(`  ${PODCAST_SOURCES.length} shows wired\n\n`);
+
+// ── Config check — runs OFFLINE, every time ─────────────────────────────────
+// The network checks below cannot run in CI or the build sandbox, so without
+// this the command proves nothing there. These are the invariants that hold
+// regardless of whether a feed answers, and the duplicate-URL one is not
+// hypothetical: wiring a show's spinoff alongside the show is exactly what the
+// Acquired/ACQ2 collision would have produced if it had gone unnoticed.
+{
+  const problems = [];
+  const seen = new Map();
+  for (const src of PODCAST_SOURCES) {
+    const name = src.label || src.show || '(unnamed)';
+    if (!src.feedUrl) problems.push(`${name} has no feedUrl`);
+    if (!src.show && !src.label) problems.push('a podcast source has neither show nor label');
+    if (src.feedUrl) {
+      const key = src.feedUrl.replace(/\/+$/, '').toLowerCase();
+      if (seen.has(key)) problems.push(`${name} and ${seen.get(key)} share a feedUrl — ${src.feedUrl}`);
+      else seen.set(key, name);
+    }
+  }
+  const flagged = PODCAST_SOURCES.filter(x => x.pendingVerification).map(x => x.label || x.show);
+
+  out(`  ${bold('Config')}  ${PODCAST_SOURCES.length} shows · ${seen.size} distinct feeds · `);
+  out(`${flagged.length ? `${flagged.length} flagged: ${flagged.join(', ')}` : 'none flagged'}\n`);
+  if (problems.length) {
+    for (const p of problems) out(`    ${bold('PROBLEM')}  ${p}\n`);
+    out('\n');
+    process.exit(1);
+  }
+  out('\n');
+}
 
 const results = [];
 
@@ -69,7 +106,7 @@ for (const src of PODCAST_SOURCES) {
     out(`    ${FIX ? 'rewriting config' : dim('re-run with --fix to adopt it')}\n\n`);
     results.push({ src, ok: false, replacement: byName });
   } else {
-    out(`    the directory has no live feed for "${src.show || src.label}" either — this needs a human.\n\n`);
+    out(`    the directory returned no live feed for "${src.show || src.label}" either.\n\n`);
     results.push({ src, ok: false, replacement: null });
   }
 }
@@ -102,6 +139,30 @@ if (FIX) {
 const good = results.filter(r => r.ok && r.match).length;
 const wrongShow = results.filter(r => r.ok && !r.match);
 const dead = results.filter(r => !r.ok);
+
+// NO EGRESS is not the same finding as FIVE BROKEN SHOWS, and reporting it as
+// the latter is how this script told me four already-verified feeds needed a
+// human. When every show fails AND the directory also answers nothing for any
+// of them, the network is what failed — a real outage does not take out five
+// unrelated CDNs and Apple simultaneously.
+const noEgress = results.length > 1 &&
+  dead.length === results.length &&
+  results.every(r => !r.replacement);
+
+if (noEgress) {
+  out(`${bold('CANNOT VERIFY FROM HERE')} — every feed AND the iTunes directory were unreachable.\n\n`);
+  out(`  That is the network, not the shows. Five unrelated hosts and Apple do not\n`);
+  out(`  fail together; this environment's egress policy blocks them. The build\n`);
+  out(`  sandbox and CI are both like this, which is why this is a command and\n`);
+  out(`  not a test.\n\n`);
+  out(`  Run it where the network works — a local machine, or the deployment via\n`);
+  out(`  the Podcast tab's Add-a-show flow, which resolves server-side.\n\n`);
+  out(`  ${dim(`Config as wired: ${results.length} shows, ` +
+    `${PODCAST_SOURCES.filter(x => x.pendingVerification).length} still flagged pendingVerification.`)}\n\n`);
+  // Exit 0: nothing was proven wrong, and failing the command here would make
+  // it useless in exactly the environments it is expected to run in.
+  process.exit(0);
+}
 
 out(`\n${bold(`${good}/${results.length} verified and matching`)}\n`);
 if (wrongShow.length) {
