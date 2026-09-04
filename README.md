@@ -48,7 +48,8 @@ What is real:
 | `/api/recommend`, `/api/suggest-categories` | Working. Advisory only; both cached in-process |
 | `lib/source-resolver.js` + `npm run sources:resolve` | Working. Verify-then-wire; needs `YOUTUBE_API_KEY` |
 | Warm-up cron — `/api/cron/warm` | Working, but **daily** on Hobby. See below |
-| **Podcasts** — `/api/podcasts`, 5 shows | **Working.** Direct RSS, no key of any kind |
+| **Podcasts** — `/api/podcasts`, 5 shows | **Working.** Direct RSS, no key of any kind. Top-level tab; all 5 content-verified |
+| Episodes in topic feeds | Working. Classified from show notes, one signal in both views — see [docs/PODCASTS.md](docs/PODCASTS.md) |
 | Episode summaries — `/api/podcast-summary` | Working. Show notes ONLY, never audio. See [docs/PODCASTS.md](docs/PODCASTS.md) |
 | Cross-show topics | Working. Same theme engine as Discover, pointed at episodes |
 | Intelligence / Studio / Alerts / Sources data | Fabricated, labeled |
@@ -106,6 +107,17 @@ npm run typecheck   # tsc --noEmit
 npm run voice:sync  # voice profile → about-me.md + voice.md (needs POSTGRES_URL)
 npm run probe:rsshub # which configured feeds actually respond, and with how many items
 npm run audit:responsive # the responsive geometry gate — see docs/RESPONSIVE.md
+npm run audit:skeletons  # the same gate, run against the LOADING state
+```
+
+Checks that need no browser and no network, so they run anywhere:
+
+```bash
+npm run categories:verify # every source attaches to a category that exists, by id
+npm run verify:charts     # a chart draws only what the pipeline produced
+npm run verify:contrast   # every mark at 3.0:1, every text colour at 4.5:1, both themes
+npm run verify:dual       # an episode is ONE signal in two views, counted once
+npm run podcasts:verify   # config check offline; feed + title check where the network reaches
 ```
 
 Tests run on Node's built-in runner with native TypeScript stripping — no test

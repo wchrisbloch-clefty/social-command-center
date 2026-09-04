@@ -114,22 +114,105 @@ street account (`street`), and folding it into either would say something false
 about it. Tier is still derived in `normalizeSignal()` — an episode can no more
 render un-tiered than anything else can.
 
+## Where an episode appears
+
+An episode surfaces in **two** places, and it is **one signal** in both.
+
+The Podcasts tab is the home for the show list, the episodes, cross-show topics
+and Add-a-show. But an episode also appears in the topic category its own show
+notes place it in — an Acquired episode on a chipmaker belongs in Tech as well
+as in the Podcasts tab, and filing every episode under its show's category made
+the Tech feed silently incomplete.
+
+`classifyEpisode()` in `lib/categorize.js` reads the episode's title and notes
+with the show's category as a hint. Nothing is force-assigned:
+
+| Outcome | Category | `categorySource` |
+|---|---|---|
+| Confident, and it moved | the classified one | `episode` |
+| Confident, and it agreed with the show | same as the show | `show-confirmed` |
+| Enough text, no clear call | the **show's** wired category | `show` |
+| Thin notes, no call | `general` | `unclassified-thin` |
+
+Thin notes fall to `general` — the everything page, not a topic tab — because
+there is no text to make an episode-level claim from. The inconclusive-but-
+present case keeps the show's category instead, because that is a human
+decision already made rather than a guess.
+
+**One signal, two views.** An episode's id derives from its URL, so changing its
+category cannot change its identity: the Podcasts tab and the category feed
+render the same object. `getFeed()` merges `/api/podcasts` with the other routes
+and runs the result through `dedupeById()`. That guard matters more than it
+looks — a duplicated episode does not read as a bug, it reads as the show
+publishing twice, while double-counting in every velocity total, category bar
+and cross-show topic. `npm run verify:dual` asserts it, including the
+counterfactual that the same input without the dedupe really does double.
+
+Episodes keep `tier: 'podcast'` everywhere, so they stay identifiable as
+podcasts inside a topic tab.
+
 ## Verification
 
-`config/sources.js` wires five shows with `pendingVerification: true`. Each has
-two independent sources — the user's own production `intelligence-hub` config
-and a web search confirming the URL and publisher — which is evidence, not a
-guess, but it is **not content-verification**: this build sandbox's egress
-policy 403s `itunes.apple.com`, `feeds.megaphone.fm` and `feeds.simplecast.com`.
+All five wired shows are content-verified; none carries
+`pendingVerification`. Verification did not happen in this build sandbox — its
+egress policy 403s `itunes.apple.com` and every podcast CDN — it happened on the
+deployment, which fetched each feed, read real episodes and matched each
+channel title against the wired name.
 
-Finish the loop where the network works:
+### Same-brand collisions
+
+Acquired was the case that needed more than a title check. Its Simplecast feed
+404'd (the show had moved to Transistor), and resolving it returned a
+**different show on two runs**:
+
+| Feed | Show |
+|---|---|
+| `feeds.transistor.fm/acquired` | the flagship — Ben Gilbert & David Rosenthal, one company per episode |
+| `feeds.transistor.fm/acq2` | *ACQ2 by Acquired* — their interview spinoff |
+
+Same brand, same publisher, and ACQ2's own channel title contains the word — so
+the feed-title check that caught the *Morning Wire* collision cannot catch this
+one, and the directory's popularity-weighted order put them in opposite orders
+on the two runs.
+
+The resolver therefore stops picking:
+
+- `rankDirectoryMatches()` prefers an **exact** title match over a prefix over a
+  suffix over a mention, keeping directory order within a tier.
+- `sameBrandGroup()` detects what ranking cannot solve — several feeds,
+  brand-related titles, one publisher — and sets `brandCollision`.
+- `describeCandidates()` fetches each sibling's **newest episode**, because that
+  is the only thing siblings do not share. A list of names is the same name
+  three times; a list showing *"Disney: The Renaissance and the Empire"* against
+  an interview title is a choice a person can make.
+
+Publisher identity comes from iTunes `artistName`, which is publisher-supplied
+free text. A show filing itself under a slightly different name will not group —
+so this fails toward showing **fewer** siblings, never toward auto-picking one.
+
+### Running the check
 
 ```
 npm run podcasts:verify           # report only
 npm run podcasts:verify -- --fix  # adopt a directory correction for a dead feed
 ```
 
-It checks three different things per show:
+A **config check runs offline every time** — shows wired, distinct feeds, flags
+outstanding — so the command proves something in CI and in the sandbox. It
+catches a show wired alongside its own spinoff, which is what the Acquired
+collision would have produced unnoticed.
+
+When *nothing* is reachable it says `CANNOT VERIFY FROM HERE` and exits 0,
+rather than reporting five broken shows: five unrelated CDNs and Apple do not
+fail together. It reported exactly that once, about four feeds that were
+already verified.
+
+The network half checks three different things per show:
+
+```
+npm run podcasts:verify           # report only
+npm run podcasts:verify -- --fix  # adopt a directory correction for a dead feed
+```
 
 1. does the feed respond and parse to real episodes?
 2. **is the feed's own title the show we think it is?** ← the collision check
