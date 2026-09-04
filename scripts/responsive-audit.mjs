@@ -314,6 +314,27 @@ function measure({ minTapH, minTapW, minTabStrip, expectedTabs, touch, checkTnum
     if (overflows && !['auto', 'scroll'].includes(getComputedStyle(strip).overflowX)) {
       violations.push({ rule: 'nav-collapsed', detail: '.nav-tabs overflows but does not scroll — tabs are unreachable' });
     }
+    // Podcasts is a top-level tab in the same strip and a peer of the
+    // categories, so it is held to the same standard — but by its own class,
+    // because the count check above must keep meaning "one tab per category".
+    // Checked explicitly: a tab that exists, has width, and is not clipped is
+    // three different things, and the third is the one that goes wrong.
+    const typeTabs = [...document.querySelectorAll('.nav-type-tab')];
+    if (!typeTabs.length) {
+      violations.push({ rule: 'nav-collapsed', detail: 'the Podcasts tab (.nav-type-tab) is not present' });
+    }
+    for (const t of typeTabs) {
+      const r = t.getBoundingClientRect();
+      if (r.width < 1) {
+        violations.push({ rule: 'nav-collapsed', detail: `${describe(t)} has zero width` });
+      } else if (t.scrollWidth > Math.ceil(r.width) + 1) {
+        violations.push({
+          rule: 'nav-collapsed',
+          detail: `${describe(t)} is squeezed below its label — needs ${t.scrollWidth}px, has ${Math.round(r.width)}px`,
+        });
+      }
+    }
+
     // On a pointer breakpoint every category must be visible without scrolling.
     // Adding an eighth category ("Ancient Mysteries") clipped the last tab by
     // 127px at 1280px while the strip still technically scrolled, so nothing
