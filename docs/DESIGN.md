@@ -100,6 +100,19 @@ Simple horizontal tabs. Active is solid near-black with white text; inactive is
 plain gray. No pills, no borders, no underline chrome. It still reflows to the
 mobile scrollable strip — see `docs/RESPONSIVE.md`.
 
+**Podcasts sits in the same row as a peer, not as a category.** It is a content
+*type*: an episode already carries a topic category of its own and appears in
+that category's feed, so filing "Podcasts" among the topics would put a
+source-type filter in a row of subject filters. It renders after a hairline —
+Signal Desk marks a boundary with a rule, never with a colour, an icon or a
+pill — and carries `.nav-type-tab` rather than `.nav-tab`.
+
+That class split is **load-bearing, not cosmetic**: the responsive gate counts
+`.nav-tab` against `CATEGORIES.length` so a stray ninth one is caught, and a
+Podcasts button wearing that class would read as a ninth category and weaken the
+check. The type tab has its own assertions instead — present, non-zero width,
+not squeezed below its label.
+
 ## Charts
 
 Four of them, and there will not be a fifth without a reason. They live in

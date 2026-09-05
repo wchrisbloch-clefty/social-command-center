@@ -9,7 +9,7 @@ import {
   Key, Palette, Star, Flame, BellRing, Check, Bell, Settings, TrendingUp,
   BarChart2, FileText, Link, Copy, ChevronRight, Globe, Eye, Users,
   Heart, Filter, Menu, Compass, MoreHorizontal, Play, BookOpen, Layers,
-  MessageSquare, Send, Upload, Mic,
+  MessageSquare, Send, Upload,
 } from 'lucide-react';
 
 import { getFeed } from '../lib/adapters.js';
@@ -115,11 +115,13 @@ const DEFAULT_CIRCLE = {
   TikTok:    ['khaby.lame','charlidamelio'],
 };
 
+// The section nav. Podcasts is deliberately ABSENT: it is a top-level tab in
+// the masthead alongside the categories, and listing it twice would give one
+// view two homes and two active states to keep in sync.
 const NAV_TABS = [
   { id:'feed',         label:'Feed',         icon:<Zap size={16}/>         },
   { id:'discover',     label:'Discover',     icon:<Compass size={16}/>     },
   { id:'recommended',  label:'Recommended',  icon:<Users size={16}/>       },
-  { id:'podcasts',     label:'Podcasts',     icon:<Mic size={16}/>         },
   { id:'intelligence', label:'Intelligence', icon:<Brain size={16}/>       },
   { id:'studio',       label:'Studio',       icon:<FileText size={16}/>    },
   { id:'alerts',       label:'Alerts',       icon:<Bell size={16}/>        },
@@ -1615,10 +1617,30 @@ function AddPodcast({ onAdded }) {
         a show name is not unique, and this is what stops the wrong show being wired.
       </p>
 
+      {/* SAME-BRAND COLLISION. Raised BEFORE the confirmation card, because it
+          changes what that card means: the resolver has not found "the" show,
+          it has found several the publisher runs under this name, and the top
+          one is a ranking rather than an answer.
+
+          This is why it exists: "Acquired" resolved to the flagship on one run
+          and to "ACQ2 by Acquired" — their interview spinoff — on the next. */}
+      {found?.verified && found?.confirmation?.brandCollision && (
+        <div className="pod-collision">
+          <strong>{found.publisher || 'This publisher'} runs more than one show under this name.</strong>
+          <div>
+            Compare the latest episode of each before adding — a flagship and its
+            spinoff share a title, a publisher and artwork, and the newest episode
+            is the only thing that reliably tells them apart.
+          </div>
+        </div>
+      )}
+
       {found?.verified && (
         <div className="cat-confirm pod-confirm">
           <div className="cat-confirm-text">
-            <strong>Is this the right show?</strong>
+            <strong>
+              {found.confirmation?.brandCollision ? 'Best match — is this the one you meant?' : 'Is this the right show?'}
+            </strong>
             <div className="pod-confirm-show">{found.showTitle}</div>
             {found.publisher && <div className="pod-confirm-meta">{found.publisher}</div>}
             {found.latestEpisode && (
@@ -1644,12 +1666,25 @@ function AddPodcast({ onAdded }) {
 
       {found?.alternatives?.length > 0 && (
         <div className="pod-alts">
-          <span className="pod-alts-label">Or did you mean:</span>
+          <span className="pod-alts-label">
+            {found.confirmation?.brandCollision ? 'The other feeds under this name:' : 'Or did you mean:'}
+          </span>
           <ul className="pod-alt-list">
             {found.alternatives.map(a => (
-              <li key={a.feedUrl}>
+              <li key={a.feedUrl} className="pod-alt">
+                <div className="pod-alt-main">
+                  <span className="pod-alt-name">{a.showTitle || a.collectionName}</span>
+                  {(a.publisher || a.artistName) && (
+                    <span className="pod-alt-meta">{a.publisher || a.artistName}</span>
+                  )}
+                  {/* The distinguishing evidence. Without it a sibling list is
+                      just the same name three times. */}
+                  {a.latestEpisode?.title
+                    ? <span className="pod-alt-meta">Latest: “{a.latestEpisode.title}”</span>
+                    : <span className="pod-alt-meta">Latest episode could not be read from this feed.</span>}
+                </div>
                 <button className="nav-btn" onClick={() => resolve(a.feedUrl)}>
-                  {a.collectionName}{a.artistName ? ` — ${a.artistName}` : ''}
+                  Use this one
                 </button>
               </li>
             ))}
@@ -1658,6 +1693,70 @@ function AddPodcast({ onAdded }) {
       )}
 
       {msg && <p className="pod-add-msg">{msg}</p>}
+    </section>
+  );
+}
+
+/**
+ * Your shows — one row per wired show, with the state of its feed.
+ *
+ * The episode list below is ordered by RECENCY across every show, which is the
+ * right default for reading but hides two things: which shows you actually
+ * follow, and which of them stopped answering. This strip is the per-show view
+ * of the same data — no second fetch, no second source of truth, just the
+ * reports the route already returns joined to the episodes already loaded.
+ *
+ * It is where a degraded show becomes visible without hunting through a list
+ * sorted by date, which is exactly the failure a flat feed has.
+ */
+function ShowList({ sources, items }) {
+  if (!sources.length) return null;
+
+  const byShow = new Map();
+  for (const it of items) {
+    const key = it.podcast?.show || it.sourceLabel;
+    if (!byShow.has(key)) byShow.set(key, []);
+    byShow.get(key).push(it);
+  }
+
+  const rows = sources.map(s => {
+    const eps = byShow.get(s.show) || byShow.get(s.label) || [];
+    return { s, latest: eps[0] || null, count: eps.length };
+  });
+
+  return (
+    <section className="sop-strip">
+      <div className="sop-head">
+        <span className="sop-label">Your shows</span>
+        <span className="section-sub">
+          {sources.filter(x => x.ok).length}/{sources.length} answering
+        </span>
+      </div>
+      <ul className="show-list">
+        {rows.map(({ s, latest, count }) => (
+          <li className="show-row" key={`${s.label}-${s.show}`} data-cat={s.category}>
+            <span className={`src-dot ${s.ok ? 'ok' : s.pendingVerification ? 'pending' : 'fail'}`}/>
+            <span className="show-main">
+              <span className="show-name">{s.label}</span>
+              <span className="show-meta">
+                <span className="cat-label" data-cat={s.category}>{categoryLabelOf(s.category)}</span>
+                <span>·</span>
+                <span>{s.ok ? `${count} episode${count === 1 ? '' : 's'}` : (s.error || `HTTP ${s.status}`)}</span>
+                {s.quiet && <><span>·</span><span>quiet {s.staleDays}d</span></>}
+                {s.thinNotes && <><span>·</span><span>thin notes</span></>}
+              </span>
+              {/* The feed's own title, shown ONLY when it disagrees with the
+                  wired name. That disagreement is how a wrong show announces
+                  itself at runtime, and it is the same check that caught the
+                  Acquired/ACQ2 collision at resolve time. */}
+              {s.titleMismatch && (
+                <span className="show-warn">Feed calls itself “{s.feedTitle}” — this may be the wrong show.</span>
+              )}
+              {latest && <span className="show-latest">Latest: {latest.title}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -1679,6 +1778,8 @@ function PodcastView() {
           </p>
         </div>
       </div>
+
+      {!loading && <ShowList sources={sources} items={items}/>}
 
       {!loading && <CrossShowTopics topics={topics} limits={[...topicLimits, ...limits]}/>}
 
@@ -2697,7 +2798,7 @@ function SettingsView({ t, dark, onDark, isMobile }) {
 // and a weather chip; both were fabricated, so the row was deleted rather than
 // kept behind a DEMO DATA badge.
 
-function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav }) {
+function TopBar({ view, category, onCategory, dark, onDark, search, onSearch, onRefresh, onNav }) {
   return (
     <div className="topbar-wrap">
       <div className="nav-bar">
@@ -2707,15 +2808,35 @@ function TopBar({ category, onCategory, dark, onDark, search, onSearch, onRefres
             <div className="logo-tag">Social Intelligence</div>
           </div>
 
-          <nav className="nav-tabs" aria-label="Categories">
-            {NAV_CATEGORIES().map(c => (
-              <button key={c.id}
-                className={`nav-tab${category === c.id ? ' active' : ''}`}
-                aria-current={category === c.id ? 'page' : undefined}
-                onClick={() => onCategory(c.id)}>
-                {c.label}
-              </button>
-            ))}
+          {/* Categories, then Podcasts — a PEER of the category tabs, not one of
+              them. Podcasts is a content TYPE: an episode already carries a
+              topic category of its own and surfaces in that category's feed, so
+              filing "Podcasts" among the topics would put a source-type filter
+              in a row of subject filters and give every episode two categories.
+
+              It therefore sits in the same row, after a hairline, and carries
+              .nav-type-tab rather than .nav-tab. That class boundary is load-
+              bearing: the responsive gate counts .nav-tab against
+              CATEGORIES.length, and a ninth one would read as a ninth
+              category. */}
+          <nav className="nav-tabs" aria-label="Feed sections">
+            {NAV_CATEGORIES().map(c => {
+              const active = view === 'feed' && category === c.id;
+              return (
+                <button key={c.id}
+                  className={`nav-tab${active ? ' active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => onCategory(c.id)}>
+                  {c.label}
+                </button>
+              );
+            })}
+            <button
+              className={`nav-type-tab${view === 'podcasts' ? ' active' : ''}`}
+              aria-current={view === 'podcasts' ? 'page' : undefined}
+              onClick={() => onNav('podcasts')}>
+              Podcasts
+            </button>
           </nav>
 
           <div className="nav-right">
@@ -2801,6 +2922,7 @@ export default function AetherHub() {
   return (
     <>
       <TopBar
+        view={view}
         category={category}
         onCategory={id => { setCategory(id); setView('feed'); }}
         dark={dark}

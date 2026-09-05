@@ -230,7 +230,8 @@ body {
 .tnum, time, [data-num],
 .view-sub, .section-sub, .signal-meta, .vrow-meta, .sop-item-meta, .sop-item-time,
 .src-note, .rec-meta, .rec-why, .rec-note, .empty-note, .empty-body,
-.limit-list, .cat-meta, .nav-tab, .pod-add-note, .ep-provenance, .ep-summary-none,
+.limit-list, .cat-meta, .nav-tab, .nav-type-tab, .pod-add-note, .ep-provenance, .ep-summary-none,
+.pod-alt-meta, .pod-collision, .pod-confirm-meta, .show-meta, .show-latest,
 .export,
 .seg-btn, .sop-label, .note-block, .cat-confirm-text, .drill-label,
 .chart-bar-value, .chart-bar-detail, .chart-spark-foot, .chart-mix-key,
@@ -323,6 +324,28 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 }
 .nav-tab.active { background: var(--accent); color: var(--on-accent); font-weight: var(--fw-medium); }
 .nav-tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+/* Podcasts — a peer of the category tabs, and a different KIND of thing.
+   Same size, same weight, same active treatment: it is not subordinate. The
+   only difference is the hairline before it, which says "the topics end here"
+   without a second colour, an icon or a pill. Signal Desk marks a boundary
+   with a rule, never with decoration.
+
+   Deliberately NOT .nav-tab. The gate counts .nav-tab against CATEGORIES.length
+   so a stray ninth one is caught, and this must not read as a ninth category. */
+.nav-type-tab {
+  background: transparent; border: none; color: var(--text3);
+  flex: 0 0 auto;
+  padding: 7px 12px; cursor: pointer; border-radius: var(--radius-sm);
+  font-family: var(--ah-sans); font-size: var(--fs-body);
+  font-weight: var(--fw-regular); white-space: nowrap;
+  transition: color var(--ah-dur-fast), background var(--ah-dur-fast);
+  /* The boundary. margin absorbs the gap so the rule sits midway. */
+  margin-left: 6px; padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+.nav-type-tab.active { background: var(--accent); color: var(--on-accent); font-weight: var(--fw-medium); }
+.nav-type-tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
 
 .nav-right {
   display: flex; gap: 6px; align-items: center;
@@ -959,7 +982,7 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
    the taller touch tabs are breakpoint-specific here. */
 @media (max-width: 1100px) {
   .page-grid { grid-template-columns: 1fr; gap: var(--s4); }
-  .nav-tab { height: 46px; }
+  .nav-tab, .nav-type-tab { height: 46px; }
 }
 
 @media (max-width: 1024px) {
@@ -1135,6 +1158,33 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   line-height: 1.5;
 }
 
+/* Your shows — one row per wired show. Same hairline rhythm as .src-row, one
+   step taller because it carries a name, a category and a latest episode
+   rather than a single note. */
+.show-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.show-row {
+  display: flex; align-items: flex-start; gap: 9px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border2);
+}
+.show-list > .show-row:first-child { border-top: none; }
+.show-row .src-dot { margin-top: 6px; }
+.show-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.show-name {
+  font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text);
+  overflow-wrap: anywhere;
+}
+.show-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  font-size: var(--fs-meta); color: var(--text3);
+}
+.show-latest {
+  font-size: var(--fs-meta); color: var(--text3); min-width: 0;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+}
+.show-warn { font-size: var(--fs-meta); color: var(--text2); overflow-wrap: anywhere; }
+
 .pod-alts { display: flex; flex-direction: column; gap: 6px; }
 .pod-alts-label { font-size: var(--fs-meta); color: var(--text3); }
 .pod-alt-list {
@@ -1146,12 +1196,42 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   gap: 4px;
   min-width: 0;
 }
-.pod-alt-list button {
-  text-align: left;
-  width: 100%;
+/* One alternative: name, publisher and its latest episode on the left, the
+   switch button on the right. The episode line is the point — siblings share
+   everything above it, so a list without it is the same name three times. */
+.pod-alt {
+  display: flex; align-items: flex-start; gap: var(--s3);
   min-width: 0;
+  padding: 9px 0;
+  border-top: 1px solid var(--border2);
+}
+.pod-alt-list > .pod-alt:first-child { border-top: none; }
+.pod-alt-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pod-alt-name {
+  font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--text);
   overflow-wrap: anywhere;
-  white-space: normal;
+}
+.pod-alt-meta { font-size: var(--fs-meta); color: var(--text3); overflow-wrap: anywhere; }
+.pod-alt > button { flex: 0 0 auto; white-space: nowrap; }
+
+/* Raised above the confirmation card when a publisher runs several feeds under
+   one name. Dashed like every other honest-uncertainty surface in the app —
+   the same treatment .empty-note gets — rather than a new alert colour. */
+.pod-collision {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: var(--s3);
+  font-size: var(--fs-meta);
+  color: var(--text3);
+  line-height: 1.55;
+  display: flex; flex-direction: column; gap: 5px;
+  max-width: 70ch;
+}
+.pod-collision strong { color: var(--text2); font-weight: var(--fw-medium); }
+
+@media (max-width: 720px) {
+  .pod-alt { flex-direction: column; align-items: stretch; gap: 6px; }
+  .pod-alt > button { width: 100%; }
 }
 
 @media (max-width: 720px) {
