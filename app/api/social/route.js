@@ -16,6 +16,10 @@
 
 import { SOCIAL_SOURCES, TOPIC_SOURCES, limitOf } from '../../../config/sources.js';
 import { normalizeSignal } from '../../../lib/adapters.js';
+// AD1: X is served by a chosen provider (xAI live search, a private RSSHub, or off) instead
+// of 11 red "needs token" rows. Selection is a pure, unit-tested function.
+import { selectXProvider, xLayerStatus, isPublicRsshub } from '../../../lib/x-provider.js';
+import { fetchXViaXai } from '../../../lib/x-xai.js';
 
 // Fetching and parsing live in lib/ so /api/podcasts uses the SAME hardened
 // path — the per-host pacing, the response cache and the 429/Retry-After
@@ -178,6 +182,25 @@ async function loadSource(source) {
   };
 }
 
+// ── AD1: resolve the X provider ──────────────────────────────────────────────
+// `auto` on a PRIVATE instance probes one X route (cached by fetchFeed) to confirm the
+// instance actually answers /twitter/*; on the public instance it never probes (it cannot
+// work there). No secret is read beyond a presence check on XAI_API_KEY.
+async function resolveXProvider(xSources) {
+  const mode = (process.env.X_PROVIDER || 'auto').toLowerCase();
+  const base = baseUrl();
+  const hasXaiKey = !!process.env.XAI_API_KEY;
+  if (mode !== 'auto' || isPublicRsshub(base) || !xSources.length) {
+    return selectXProvider({ mode, rsshubBase: base, rsshubAnswersX: false, hasXaiKey });
+  }
+  let rsshubAnswersX = false;
+  try {
+    const probe = await fetchFeed(resolveTarget(xSources[0].route).url);
+    rsshubAnswersX = Boolean(probe.ok);
+  } catch { /* a failed probe just means "does not answer" */ }
+  return selectXProvider({ mode: 'auto', rsshubBase: base, rsshubAnswersX, hasXaiKey });
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function GET(request) {
@@ -191,7 +214,27 @@ export async function GET(request) {
   const selected = category ? pool.filter(s => s.category === category) : pool;
 
   if (!selected.length) {
-    return Response.json({ items: [], sources: [], base: baseUrl() });
+    return Response.json({ items: [], sources: [], xLayer: xLayerStatus('off'), base: baseUrl() });
+  }
+
+  // AD1: split X off. X is served by the chosen provider and reports as ONE neutral chip
+  // (xLayer) instead of per-handle rows — EXCEPT in `rsshub` mode, where X flows through the
+  // normal feed path and reports per-handle like any other source.
+  const xSources   = selected.filter(s => s.platform === 'X');
+  const nonXSources = selected.filter(s => s.platform !== 'X');
+  const xProvider  = await resolveXProvider(xSources);
+
+  let xItems = [], xLayer;
+  let fetchSet = nonXSources;
+  if (xProvider === 'xai') {
+    const r = await fetchXViaXai(xSources, { apiKey: process.env.XAI_API_KEY });
+    xItems = r.items;
+    xLayer = xLayerStatus('xai', { capped: r.capped });
+  } else if (xProvider === 'rsshub') {
+    fetchSet = [...nonXSources, ...xSources];  // X served by the (private) instance like any feed
+    xLayer = xLayerStatus('rsshub');
+  } else {
+    xLayer = xLayerStatus('off');              // not fetched; one honest chip, no red rows
   }
 
   // A deadline, so a slow host cannot turn into a dead endpoint. Whatever has
@@ -219,7 +262,7 @@ export async function GET(request) {
 
   try {
     // allSettled, not all: one rejection must not lose the other feeds.
-    const settled = await Promise.allSettled(selected.map(src =>
+    const settled = await Promise.allSettled(fetchSet.map(src =>
       Promise.race([loadSource(src), deadline.then(() => ({
         items: [],
         report: {
@@ -243,11 +286,14 @@ export async function GET(request) {
         items.push(...s.value.items);
         sources.push(s.value.report);
       } else {
-        const src = selected[i];
+        const src = fetchSet[i];
         console.warn(`[social] ${src.platform}/${src.label} REJECTED ${s.reason?.message || s.reason}`);
         sources.push({ label: src.label, platform: src.platform, category: src.category, ok: false, status: 0, error: 'rejected', count: 0 });
       }
     }
+
+    // X served by xAI joins the item stream; its state is the ONE xLayer chip, not red rows.
+    items.push(...xItems);
 
     // Three states, counted separately, because they mean different things and
     // a single "degraded" number hid the distinction that mattered.
@@ -262,13 +308,13 @@ export async function GET(request) {
     if (pending)  console.warn(`[social] ${pending}/${sources.length} still loading at the deadline (cache warming)`);
 
     return Response.json({
-      items, sources,
+      items, sources, xLayer,
       degraded, pending, served, fromCache,
       base: baseUrl(),
     });
   } catch (err) {
     // Must never take the request down.
     console.warn(`[social] EXCEPTION ${err?.message}`);
-    return Response.json({ items: [], sources: [], degraded: selected.length, error: err?.message || 'exception', base: baseUrl() });
+    return Response.json({ items: xItems, sources: [], xLayer, degraded: nonXSources.length, error: err?.message || 'exception', base: baseUrl() });
   }
 }
