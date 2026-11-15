@@ -766,7 +766,7 @@ const NAV_CATEGORIES = () => sortedCategories(CATEGORIES);
 
 /** Fetches the feed for a category. Never throws — an error is a render state. */
 function useLiveFeed(category) {
-  const [state, setState] = useState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, loading: true });
+  const [state, setState] = useState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, xLayer: null, loading: true });
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
@@ -779,7 +779,7 @@ function useLiveFeed(category) {
       .catch(err => {
         // getFeed already fails soft; this is the belt-and-braces path.
         console.warn('[feed] getFeed threw', err?.message);
-        if (alive) setState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, loading: false });
+        if (alive) setState({ items: [], sources: [], degraded: 0, youtubeNeedsKey: false, xLayer: null, loading: false });
       });
 
     return () => { alive = false; ac.abort(); };
@@ -1133,6 +1133,7 @@ function SignalCard({ item, lead = false }) {
           <span>·</span><span>{item.platform}</span>
           <span>·</span><time dateTime={item.publishedAt}>{item.time}</time>
           {item.topic && <><span>·</span><span>topic</span></>}
+          {item.provider === 'xai' && <><span>·</span><span>via xAI</span></>}
           {!item.live && <><span>·</span><span>Manual</span></>}
         </span>
         <span className="signal-head">{item.title}</span>
@@ -1190,10 +1191,26 @@ function LiveSignalRail({ items }) {
  * not failed, and showing it in red alongside genuinely broken feeds sent
  * people hunting a bug that was not there. Pending is amber and says so.
  */
-function SourceHealth({ sources, youtubeNeedsKey }) {
-  if (!sources.length && !youtubeNeedsKey) return null;
+function SourceHealth({ sources, youtubeNeedsKey, xLayer }) {
+  if (!sources.length && !youtubeNeedsKey && !xLayer) return null;
   const ok = sources.filter(s => s.ok).length;
   const pending = sources.filter(s => !s.ok && s.pending).length;
+
+  // AD1: group the remaining (non-X) degraded sources by cause, so a count becomes an
+  // explanation rather than an alarm. X is not in `sources` unless a private RSSHub serves it.
+  const causeOf = s => {
+    if (s.limitation) return `need ${s.needs} on your RSSHub instance`;
+    if (s.status === 429 || /429|rate/i.test(s.error || '')) return 'rate-limited (datacenter IP)';
+    if (s.status === 0 || /rejected|abort|network|fetch/i.test(s.error || '')) return 'unreachable from the server';
+    return s.error || `HTTP ${s.status}`;
+  };
+  const byCause = {};
+  for (const s of sources) if (!s.ok && !s.pending) {
+    const k = `${s.platform} · ${causeOf(s)}`;
+    byCause[k] = (byCause[k] || 0) + 1;
+  }
+  const causeLines = Object.entries(byCause).sort((a, b) => b[1] - a[1]);
+
   return (
     <section className="sop-strip">
       <div className="sop-head">
@@ -1203,6 +1220,22 @@ function SourceHealth({ sources, youtubeNeedsKey }) {
         </span>
       </div>
       <div className="src-health">
+        {/* ONE neutral chip for the whole X layer — never 11 red "needs token" rows.
+            Red is reserved for Breaking, so this dot is neutral regardless of state. */}
+        {xLayer && (
+          <div className="src-row src-xlayer" title={xLayer.detail}>
+            <span className="src-dot xlayer"/>
+            <span className="src-name">{xLayer.label}</span>
+          </div>
+        )}
+        {/* Remaining degraded, grouped by cause — the "23 degraded" number, explained. */}
+        {causeLines.map(([k, n]) => (
+          <div className="src-row src-cause" key={k}>
+            <span className="src-dot fail"/>
+            <span className="src-name">{k.split(' · ')[0]}{n > 1 ? ` ×${n}` : ''}</span>
+            <span className="src-note">{k.split(' · ').slice(1).join(' · ')}</span>
+          </div>
+        ))}
         {youtubeNeedsKey && (
           <div className="src-row">
             <span className="src-dot fail"/>
@@ -1210,7 +1243,7 @@ function SourceHealth({ sources, youtubeNeedsKey }) {
             <span className="src-note">YOUTUBE_API_KEY not set</span>
           </div>
         )}
-        {sources.map((s, i) => (
+        {sources.filter(s => s.ok || s.pending).map((s, i) => (
           <div className="src-row" key={`${s.platform}-${s.label}-${i}`}>
             <span className={`src-dot ${s.ok ? 'ok' : s.pending ? 'pending' : 'fail'}`}/>
             <span className="src-name">{s.label}</span>
@@ -1263,6 +1296,7 @@ function VelocityRow({ item }) {
           <span>·</span><span>{item.platform}</span>
           <span>·</span><time dateTime={item.publishedAt}>{item.time}</time>
           {item.topic && <><span>·</span><span>topic</span></>}
+          {item.provider === 'xai' && <><span>·</span><span>via xAI</span></>}
         </span>
         <span className="vrow-title">{item.title}</span>
       </span>
@@ -2413,7 +2447,7 @@ function FeedView({ t, category, search, isMobile, onSearch, onCategory }) {
   // "General" is the everything page, not a bucket. After the roster landed,
   // no source is filed under `general`, so treating it as a filter opened the
   // app on an empty feed. Every other tab filters; General shows the lot.
-  const { items, sources, degraded, youtubeNeedsKey, loading, refresh } =
+  const { items, sources, degraded, youtubeNeedsKey, xLayer, loading, refresh } =
     useLiveFeed(category === 'general' ? null : category);
 
   // Expose refresh to the masthead's refresh icon without threading it through
@@ -2507,7 +2541,7 @@ function FeedView({ t, category, search, isMobile, onSearch, onCategory }) {
               </div>
               <SkeletonSourceList rows={6}/>
             </section>
-          : <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey}/>}
+          : <SourceHealth sources={sources} youtubeNeedsKey={youtubeNeedsKey} xLayer={xLayer}/>}
       </aside>
     </div>
   );

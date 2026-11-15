@@ -735,7 +735,11 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
    the point: this source is queued behind a rate limit and will be in cache by
    the next load. Colouring it red sent people chasing a bug that was not there. */
 .src-dot.pending { background: var(--ah-signal-rising, #b8860b); }
-.src-name { color: var(--text2); font-weight: var(--fw-regular); }
+/* AD1: the X-layer chip is NEUTRAL — red is reserved for Breaking. A quiet grey dot, never
+   red, whatever the X provider state (via xAI / via your RSSHub / not connected / capped). */
+.src-dot.xlayer { background: var(--text3); }
+.src-xlayer .src-name { color: var(--text2); white-space: normal; }
+.src-name { color: var(--text2); font-weight: var(--fw-regular); min-width: 0; }
 .src-note { margin-left: auto; color: var(--text3); white-space: nowrap; }
 
 .empty-note {

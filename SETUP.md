@@ -246,3 +246,52 @@ Two things to decide before phase 3: whether `page.jsx` gets split into files (i
 should — 14 components in one file makes any conversion a merge-conflict machine), and
 whether the mock data (`MOCK_POSTS`, `TRENDING`, `ALERTS`, …) moves out at the same
 time. Both are cheap now and expensive later.
+
+---
+
+## 4. X (Twitter): three ways — AD1
+
+X is the one platform the **free public RSSHub instance cannot serve**: `/twitter/*` needs a
+`TWITTER_AUTH_TOKEN` configured **on the RSSHub instance itself**, which AetherHub never sees.
+So instead of 11 red "needs token" rows, the app chooses a provider and shows **one neutral
+chip**. The `X_PROVIDER` env var picks how (`auto` is the default):
+
+| `X_PROVIDER` | What happens |
+|---|---|
+| `auto` (default) | A **private** `RSSHUB_BASE_URL` that actually answers an X route wins; otherwise, if `XAI_API_KEY` is set → **xAI**; otherwise the neutral "not connected" chip. |
+| `xai` | Force the xAI path (falls back to "not connected" if no key). |
+| `rsshub` | Trust the configured instance for X (reports per-handle like any feed). |
+| `off` | Do not fetch X at all; show the neutral chip. |
+
+### A — xAI live search (recommended)
+
+The **supported** route. Set in Vercel → Settings → Environment Variables:
+
+- `XAI_API_KEY` — from your xAI account (console.x.ai). Value is read only server-side and is
+  never logged or returned.
+- *(optional)* `X_XAI_MODEL` (default `grok-4-fast`), `X_DAILY_CAP` (default `40`).
+
+Per X handle, one live-search request restricted to X returns recent posts, shown as
+**Alt. perspective · via xAI** (unverified), each linking out to the real post. Cost guards:
+≤10 X calls per refresh, results cached ≥6h (the daily warm cron reuses that cache, so it never
+calls X more than once per handle per 6h), and a hard daily cap. After the cap the chip reads
+**"X: daily limit reached"** and the rest of the app is unaffected. xAI bills per call.
+
+### B — a private RSSHub instance + a token on THAT instance
+
+Self-host RSSHub, set `TWITTER_AUTH_TOKEN` **on the instance**, and point
+`RSSHUB_BASE_URL=https://your-rsshub.example.com`. The X sources then pull exactly as wired.
+
+> **Risk note (honest):** the X token on a self-hosted RSSHub is an **unofficial, expiring
+> cookie** scraped from a logged-in session. It breaks when the cookie rotates and can get the
+> X account rate-limited or banned. This is why `auto` prefers xAI when a key is present.
+
+Neutral step list: (1) deploy RSSHub (Docker/Fly/Railway); (2) set `TWITTER_AUTH_TOKEN` in the
+RSSHub instance's env; (3) set `RSSHUB_BASE_URL` in AetherHub's Vercel env to that instance;
+(4) redeploy AetherHub. The chip then reads **"X: via your RSSHub"**.
+
+### C — leave X as link-out
+
+Do nothing. The chip reads **"X: not connected (add XAI_API_KEY or a private RSSHub)"**, X
+contributes no items, and every other source is unchanged. This is the honest default state on
+a fresh deploy.
